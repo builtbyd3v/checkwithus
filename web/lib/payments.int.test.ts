@@ -292,8 +292,19 @@ describe('money moves exactly once', () => {
     // Right after the error: not found yet, but too soon to conclude anything.
     expect(payment.status).toBe('paying');
 
-    // A read 31 seconds later settles it: still nothing at Nessie, so failed.
-    await pool.query(`update payments set updated_at = now() - interval '31 seconds' where id = $1`, [payment.id]);
+    // A minute after the send: still "sending". Saying "failed" now would
+    // invite a second payment while the first might still land.
+    await pool.query(
+      `update payments set updated_at = now() - interval '31 seconds', sent_at = now() - interval '1 minute' where id = $1`,
+      [payment.id],
+    );
+    expect((await service.paymentForCircle(circleId, payment.id)).status).toBe('paying');
+
+    // Ten minutes after the send, still nothing at Nessie: now it is failed.
+    await pool.query(
+      `update payments set updated_at = now() - interval '31 seconds', sent_at = now() - interval '11 minutes' where id = $1`,
+      [payment.id],
+    );
     const settled = await service.paymentForCircle(circleId, payment.id);
 
     expect(settled.status).toBe('failed');
@@ -305,7 +316,11 @@ describe('money moves exactly once', () => {
   it('a reconcile racing the original send backs off instead of declaring it failed', async () => {
     fake.failNext('/bills', 'lostThen500');
     const payment = await service.createPayment(circleId, { ...electricBill, idempotencyKey: key() });
-    await pool.query(`update payments set updated_at = now() - interval '31 seconds' where id = $1`, [payment.id]);
+    // Old enough on both clocks that only the race guard can stop a "failed".
+    await pool.query(
+      `update payments set updated_at = now() - interval '31 seconds', sent_at = now() - interval '11 minutes' where id = $1`,
+      [payment.id],
+    );
 
     // While the reconcile is looking at Nessie, the slow original request
     // restarts the clock right before it sends.
