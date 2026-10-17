@@ -6,8 +6,8 @@ Hard limit: 3 minutes, then 1 minute of judge questions ([RULES.md](RULES.md)).
 
 | Who | Device | Shows |
 | --- | --- | --- |
-| Rosa, the older adult | iPhone A: older adult role, debug build of `dev-integration` | Home, Pay a bill, held screen, lock-screen card |
-| Her family | iPhone B: family app (family role), same `dev-integration` build, signed in with Auth0 | Approvals, Alerts, Money (Freeze) |
+| Rosa, the older adult | iPhone A: older adult role, built from merged `main` | Home, Pay a bill, held screen, lock-screen card |
+| Her family | iPhone B: family app (family role), same `main` build, signed in with Auth0 | Approvals, Alerts, Money (Freeze) |
 | Backup for the family | MacBook: checkwith.us/dashboard | Waiting payments, spending chart |
 | The scammer | Google Voice (laptop or a third phone) | One scam text, one call |
 
@@ -16,28 +16,29 @@ Rosa is synthetic ("Rosa CheckWith (synthetic)"). Never use a real person's name
 ## Pre-demo checklist (do 15 minutes before)
 
 One build for everything
-- [ ] Both iPhones and the web run the same local `dev-integration` branch (main plus PRs #30 to #34). Never mix single feature branches.
-- [ ] Web: `dev-integration` is deployed to checkwith.us. `curl https://checkwith.us/api/health` prints `{"ok":true,"database":"reachable"}`.
-- [ ] Migrations applied from `dev-integration`: `cd web && npm run db:migrate` (includes 014, 015 and 016).
+- [ ] One build: every demo PR (#30 to #44) is merged to `main`. Both iPhones are built from that `main`, and that `main` is deployed to checkwith.us. Never mix feature branches.
+- [ ] `curl https://checkwith.us/api/health` prints `{"ok":true,"database":"reachable"}`. Freeze must not 404: the deployed build is the merged one.
+- [ ] Migrations on the live database: `cd web && npm run db:migrate` (014 freeze, 015 ATM cash, 016 weekly and per-payee aggregates, 017 ledger credits).
+- [ ] `DEMO_BANK_LOCATIONS` is set on Vercel to a spot at the expo table, for example `[{"name":"SwampHacks Demo Bank","lat":29.6463,"lng":-82.3478}]`. TODO(Dev): confirm the coordinates on site, redeploy after changing it, then relaunch the app on iPhone A.
 - [ ] `npm run smoke:demo` passes (a $350 City Power & Light bill pays with no push while the allowance exists, and holds when it is revoked; runs on a throwaway schema).
 - [ ] `npm run demo:reset -- --live` on the real demo circle (only there; without `--live` it refuses anything but a throwaway `wt_*` schema). It reseeds Rosa, clears held payments, unfreezes, clears recent ATM cash, and grants the utilities allowance up to $400 until Nov 30.
 - [ ] Do NOT run `npm run demo:atm` after the reset until step 5. If you do, step 3 also shows the ATM reason.
-- [ ] `APPROVAL_MODE=app` on Vercel (the default). The family approves in the family app with Face ID. The Guardian push (`ciba`) is implemented but not verified live, so do not use it in the demo.
+- [ ] `APPROVAL_MODE=app` on Vercel (the default). The family approves in the family app, which asks for Face ID first. The Guardian push (`ciba`) is implemented but not verified live, so do not use it in the demo.
 
 iPhone A (Rosa)
-- [ ] Debug build of `dev-integration` installed (the test bank button exists only in debug builds).
+- [ ] The merged `main` build installed. A debug build also has the "Make this spot a test bank" and "Pretend I'm on a call" backups.
 - [ ] Paired: dashboard, make a pairing code, type it on the phone. Home says "You're safe".
 - [ ] Message Filter on: Settings, Apps, Messages, Unknown and Spam, "Check With Us".
 - [ ] Call labels on: Settings, Apps, Phone, Call Blocking and Identification, "Check With Us".
 - [ ] The Google Voice number is in `scam-numbers.local.json`, and the app was opened once after install so the list loaded.
 - [ ] The Google Voice number is NOT a saved contact, and has not texted this phone before (iOS skips the filter for a sender already in Spam, [DECISIONS 28](../ml/data/DECISIONS.md)).
-- [ ] Location set to Always and Precise. At the expo table, tap "Make this spot a test bank". The debug panel says "Watching" 1 or more banks.
+- [ ] Location set to Always and Precise. The phone is within 150 m of the `DEMO_BANK_LOCATIONS` spot. Backup in a debug build: tap "Make this spot a test bank"; the debug panel says "Watching" 1 or more banks.
 - [ ] Live Activities allowed. Volume up. Focus and Do Not Disturb off.
 - [ ] No held payment is waiting (the phone allows one at a time).
 
 iPhone B (family)
 - [ ] Family role. Signed in with the Auth0 approver account. Joined Rosa's circle.
-- [ ] Face ID works for the app (passcode is the fallback).
+- [ ] Face ID works for the app (passcode is the fallback). The phone has a passcode set.
 - [ ] Money tab says not frozen, and Allowances shows "Utilities, up to $400" (both from `demo:reset`).
 
 MacBook
@@ -80,12 +81,12 @@ Times are cumulative. The script ends at 2:45, so 15 seconds are left as buffer.
 4. **iPhone B: tap Deny.**
 5. **Show iPhone A.** The screen and the lock-screen card change to "Stopped. Your family said no." Nothing reached the bank.
 
-"Deny is one tap. Approve needs Face ID, so a stolen phone cannot release money."
+"Deny is one tap. Approve asks for Face ID first, and our server only accepts an approver's signed Auth0 token."
 
 ### 1:20 Step 4: she is at a bank during the call (20 s)
-1. **iPhone B: open Alerts.** Pull down to refresh. The alert reads "At a bank (Test branch) while on a phone call."
+1. **iPhone B: open Alerts.** Pull down to refresh. The alert names the bank, for example "At a bank (SwampHacks Demo Bank branch) while on a phone call."
 
-"The scammer sends her to the bank. Her phone watches the nearest bank and ATM locations from Capital One's Nessie. Nessie's banks are all near Washington, DC, so we placed a test bank at this table. Only the bank's name is sent, never her location."
+"The scammer sends her to the bank. Her phone watches the nearest bank and ATM locations from Capital One's Nessie. Nessie's banks are all near Washington, DC, so our server adds a demo bank at this table. Only the bank's name is sent, never her location."
 
 2. **Hang up the Google Voice call.**
 
@@ -133,7 +134,7 @@ Unfreeze first if step 7 ran, and make sure no call is active (a call adds a hol
 | Family app does not show the hold | Pull down to refresh (it polls every 10 seconds). Or reload the dashboard on the MacBook. | "The family can also act from the web dashboard." |
 | Face ID fails | Use the passcode. | "The phone's passcode is the fallback, like any banking app." |
 | No on-device note | Continue. | "When Apple Intelligence is off, the family sees the plain facts instead." |
-| Bank alert does not arrive | Bring Check With Us to the foreground on iPhone A. If still nothing: debug panel, turn on "Pretend I'm on a call". Then refresh Alerts. | "Nessie's banks are in DC, so we use a test bank here. The geofence fires when she is inside one during a call." |
+| Bank alert does not arrive | Bring Check With Us to the foreground on iPhone A. Debug build: tap "Make this spot a test bank", or turn on "Pretend I'm on a call". Then refresh Alerts. | "Nessie's banks are in DC, so we add a demo bank here. The geofence fires when she is inside one during a call." |
 | `npm run demo:atm` fails | Skip to step 6. | "The rule is a two-hour window query on the Tiger Data hypertable: ATM cash, then a gift card." |
 | Freeze fails | Show the error, then move to the close. | "Freeze is one Nessie transfer, recorded exactly once, so a retry never moves money twice." |
 | Step 3 already shows the ATM reason | Continue. | "We ran this demo earlier, so her ATM cash from then still counts." |
