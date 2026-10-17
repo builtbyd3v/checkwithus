@@ -175,17 +175,21 @@ describe('the demo, steps 3 to 6', () => {
     expect(back).toMatchObject({ status: 200, body: { frozen: false } });
   }));
 
-  it('step 6', () => step('step 6: a known utility bill under the allowance pays with no push', async () => {
+  it('step 6', () => step('step 6: a known $350 utility bill pays with no push under the allowance, and is held without it', async () => {
+    const bill = { amountCents: 35_000, payee: { name: 'City Power & Light', kind: 'biller' }, category: 'utilities', onCall: false };
     const pushes = fakeAuth0.pushes.size;
-    const bill = await pay('bill', {
-      amountCents: 18_412, payee: { name: 'City Power & Light', kind: 'biller' }, category: 'utilities', onCall: false,
-    });
-    expect(bill).toMatchObject({ status: 201, body: { outcome: 'sent' } });
+    const paid = await pay('bill', bill);
+    expect(paid).toMatchObject({ status: 201, body: { outcome: 'sent' } });
     expect(fakeAuth0.pushes.size).toBe(pushes);
     const { rows } = await db().query<{ category: string; max_amount_cents: string }>(
       `select a.category, a.max_amount_cents::text from payments p join allowances a on a.id = p.allowance_id where p.id = $1`,
-      [bill.body.id],
+      [paid.body.id],
     );
     expect(rows).toEqual([{ category: DEMO_ALLOWANCE.category, max_amount_cents: String(DEMO_ALLOWANCE.maxAmountCents) }]);
+
+    // Without the allowance the same bill is over the $300 limit and waits for the family.
+    await db().query('update allowances set revoked_at = now() where circle_id = $1 and revoked_at is null', [circleId]);
+    const held = await pay('bill-revoked', bill);
+    expect(held).toMatchObject({ status: 201, body: { outcome: 'waiting', holdReasons: ['over_limit'] } });
   }));
 });

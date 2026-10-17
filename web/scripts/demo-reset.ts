@@ -2,7 +2,7 @@
  * Puts the demo back to a known state between expo demos. `npm run demo:reset`
  *
  *   seed-demo   Rosa's circle, accounts, purchase history, aggregates, vault
- *   then        no pending holds, not frozen, the utility-bill allowance (#19)
+ *   then        no pending holds, not frozen, no recent ATM cash, the utility-bill allowance (#19)
  *
  * Refuses to run unless the tables resolve to a throwaway wt_* schema, or the
  * caller passes --live for the live schema. Safe to run again.
@@ -14,8 +14,8 @@ import { dbEnv, nessieEnv } from '@/lib/env';
 import { createNessieClient, type NessieClient } from '@/lib/nessie/client';
 import { seedDemo } from './seed-demo';
 
-/** "Utility bills under $200 until Nov 30" (PLAN.md). */
-export const DEMO_ALLOWANCE = { category: 'utilities', maxAmountCents: 20_000, expiresAt: '2026-11-30T23:59:59-05:00' } as const;
+/** Utility bills up to $400 until Nov 30: above the $300 hold limit, so step 6 shows it at work. */
+export const DEMO_ALLOWANCE = { category: 'utilities', maxAmountCents: 40_000, expiresAt: '2026-11-30T23:59:59-05:00' } as const;
 
 /** The schema the tables resolve to. Throws unless it is wt_*, or `live` is set. */
 export async function demoTarget(pool: pg.Pool, live: boolean): Promise<string> {
@@ -52,6 +52,12 @@ export async function resetDemo(input: { pool: pg.Pool; nessie: NessieClient; cu
     // Clearing it restores the spending balance without a transfer back.
     await q.query('update circles set frozen = false where id = $1', [circleId]);
     const cleared = await q.query('delete from vault_transfers where circle_id = $1', [circleId]);
+    // Last demo's step 4 cash would add "cash then gift card" to the next step 3.
+    // ponytail: its spending_nessie_records claim stays, so nothing re-imports it.
+    const atm = await q.query(
+      `delete from spending where circle_id = $1 and atm_id is not null and occurred_at >= now() - interval '3 hours'`,
+      [circleId],
+    );
 
     // Exactly one live allowance: the demo's. Granted by the first approver,
     // because payments only honor allowances an approver granted.
@@ -75,7 +81,13 @@ export async function resetDemo(input: { pool: pg.Pool; nessie: NessieClient; cu
         [circleId, DEMO_ALLOWANCE.category, DEMO_ALLOWANCE.maxAmountCents, DEMO_ALLOWANCE.expiresAt, approver.rows[0].id],
       );
     }
-    return { holdsExpired: expired.rowCount ?? 0, vaultRowsCleared: cleared.rowCount ?? 0, allowance: Boolean(approver.rows[0]) };
+    const members = approver.rows[0] ? [] : (await q.query<{ id: string; display_name: string; role: string }>(
+      'select id, display_name, role from circle_members where circle_id = $1 order by created_at', [circleId],
+    )).rows;
+    return {
+      holdsExpired: expired.rowCount ?? 0, vaultRowsCleared: cleared.rowCount ?? 0, atmRowsCleared: atm.rowCount ?? 0,
+      allowance: Boolean(approver.rows[0]), members,
+    };
   });
   return { ...seeded, ...state };
 }
@@ -93,10 +105,17 @@ async function main() {
     const r = await resetDemo({ pool, nessie, customerLastName });
     console.log(`Reset demo in schema ${schema}: circle ${r.circleId}, vault account ${r.vaultId}`);
     console.log(`Nessie records created: ${r.created}; ledger rows added: ${r.ledgerAdded}`);
-    console.log(`Holds expired: ${r.holdsExpired}; vault rows cleared: ${r.vaultRowsCleared}; not frozen`);
-    console.log(r.allowance
-      ? `Allowance: utilities up to $200 until Nov 30`
-      : 'No approver in the circle yet: join with the invite code, then run demo:reset again for the allowance');
+    console.log(`Holds expired: ${r.holdsExpired}; vault rows cleared: ${r.vaultRowsCleared}; ATM cash rows cleared: ${r.atmRowsCleared}; not frozen`);
+    const rerun = `npm run demo:reset${live ? ' -- --live' : ''}`;
+    if (r.allowance) console.log('Allowance: utilities up to $400 until Nov 30');
+    else if (!r.members.length) console.log(`No allowance: nobody has joined the circle. Join with the invite code, make that member an approver, then ${rerun}.`);
+    else {
+      // Roles are the family's call, so reset never changes them; it says what to run.
+      console.log('No allowance: the circle has no approver. To make a member an approver, run this SQL on this database, then ' + rerun + ':');
+      for (const m of r.members) {
+        console.log(`  -- ${m.display_name} (now ${m.role})\n  update circle_members set role = 'approver' where id = '${m.id}';`);
+      }
+    }
     if (r.invite) console.log(`Family invite code: ${r.invite.code} (expires ${r.invite.expiresAt})`);
     console.log('Run npm run demo:atm right before demo step 4.');
   } finally {
