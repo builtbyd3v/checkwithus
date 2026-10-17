@@ -170,3 +170,21 @@ describe('AI suggests, code decides (hard rule #1)', () => {
     }
   });
 });
+
+describe('freeze and the cash-then-gift-card sequence', () => {
+  const run = (payment: Partial<PaymentFacts>, circle: { frozen: boolean; atmCashRecently: boolean }) =>
+    decideHold({ payment: { ...ordinary, ...payment }, holdOverCents: DEFAULT_HOLD_OVER_CENTS, baseline: null, guard: null, circle });
+
+  it('holds even the electricity bill while the family has frozen spending', () => {
+    expect(run({}, { frozen: true, atmCashRecently: false })).toEqual({ action: 'hold', reasons: ['frozen'] });
+  });
+
+  it('adds the sequence reason to a gift card bought soon after ATM cash', () => {
+    expect(run({ category: 'gift_cards', payeeKind: 'merchant' }, { frozen: false, atmCashRecently: true }))
+      .toEqual({ action: 'hold', reasons: ['gift_card', 'cash_then_gift_card'] });
+  });
+
+  it('ATM cash alone does not hold anything else', () => {
+    expect(run({}, { frozen: false, atmCashRecently: true })).toEqual({ action: 'allow' });
+  });
+});

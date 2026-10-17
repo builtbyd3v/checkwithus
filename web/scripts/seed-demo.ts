@@ -1,13 +1,16 @@
-/** Synthetic Rosa demo. Run once with `npm run seed:demo`; safe to rerun. */
+/** Synthetic Rosa demo. Run once with `npm run seed:demo`; safe to rerun. Also used by demo:reset. */
+import { pathToFileURL } from 'node:url';
 import pg from 'pg';
 import { dbEnv, nessieEnv } from '@/lib/env';
+import { ensureVaultAccount } from '@/lib/vault';
 import { issueInviteCode } from '@/lib/invites';
 import { toCents } from '@/lib/money';
 import { normalizeName } from '@/lib/names';
-import { createNessieClient } from '@/lib/nessie/client';
+import { createNessieClient, type NessieClient } from '@/lib/nessie/client';
 import {
   checkingAccountBody,
   customerBody,
+  depositBody,
   merchantBody,
   paidBillBody,
   purchaseBody,
@@ -34,19 +37,23 @@ const MERCHANTS: Merchant[] = [
   { name: 'Corner Cafe', category: 'dining', amountCents: 2400 },
 ];
 
-async function main() {
-  if (process.argv.slice(2).some((arg) => arg !== '--rotate-invite')) {
-    throw new Error('Only --rotate-invite is supported');
-  }
-  const nessie = createNessieClient({ key: nessieEnv().NESSIE_API_KEY });
-  const pool = new pg.Pool({ connectionString: dbEnv().DATABASE_URL, max: 2 });
-  try {
+export type SeedOptions = {
+  pool: pg.Pool;
+  nessie: NessieClient;
+  /** A different synthetic Nessie customer, so throwaway schemas never share live Rosa's accounts. */
+  customerLastName?: string;
+  rotateInvite?: boolean;
+};
+
+/** Creates or finds Rosa's circle, accounts, history and vault. Idempotent. */
+export async function seedDemo({ pool, nessie, customerLastName = CUSTOMER.lastName, rotateInvite = false }: SeedOptions) {
+  { // ponytail: bare block keeps the old body's indentation, so the diff stays small.
     const customers = await nessie.listCustomers();
     const existingCustomer = customers.find(
-      (customer) => customer.first_name === CUSTOMER.firstName && customer.last_name === CUSTOMER.lastName,
+      (customer) => customer.first_name === CUSTOMER.firstName && customer.last_name === customerLastName,
     );
     const customerId = existingCustomer?._id ?? await nessie.createCustomer(customerBody({
-      ...CUSTOMER, address: ADDRESS,
+      firstName: CUSTOMER.firstName, lastName: customerLastName, address: ADDRESS,
     }));
 
     const accounts = await nessie.listCustomerAccounts(customerId);
@@ -64,6 +71,8 @@ async function main() {
       [customerId, accountId, OPENING_CENTS],
     );
     const circleId = circles[0]!.id;
+    // The Freeze vault (#18). Found by nickname at Nessie, so a rerun reuses it.
+    const vaultId = await ensureVaultAccount(pool, nessie, circleId);
     for (const payee of [
       { name: 'City Power & Light', kind: 'biller', category: 'utilities' },
       ...MERCHANTS.slice(0, 2).map(({ name, category }) => ({ name, kind: 'merchant', category })),
@@ -159,18 +168,60 @@ async function main() {
       });
     }
 
+    // Rosa's monthly pension, as Nessie deposits. Credits add to the ledger balance (017_ledger_credits.sql).
+    for (const days of [76, 46, 16]) {
+      const key = `deposit:${days}`;
+      const at = atDaysAgo(days);
+      const amountCents = toCents(150_000);
+      const existing = existingRecords.find((record) => record.kind === 'deposit' && record.reference.includes(`${MARKER}${key}]`));
+      if (existing && existing.amountCents !== amountCents) throw new Error(`Demo record ${key} has an unexpected amount`);
+      const nessieId = existing?.nessieId ?? await nessie.createDeposit(accountId, depositBody({
+        amountCents, at, timeZone: TIME_ZONE, description: `Monthly pension ${MARKER}${key}]`,
+      }));
+      if (!existing) created++;
+      const added = await pool.query(
+        `insert into ledger_credits (circle_id, kind, amount_cents, status, idempotency_key, nessie_id, occurred_at)
+         values ($1, 'deposit', $2, 'sent', $3, $4, $5) on conflict (circle_id, idempotency_key) do nothing`,
+        [circleId, amountCents, `seed:${key}`, nessieId, at],
+      );
+      ledgerAdded += added.rowCount ?? 0;
+    }
+
     // These backdated rows can sit behind the continuous aggregate watermark.
     // Refresh once so the dashboard and unusual-spending rule see them now.
     await pool.query(
       `call refresh_continuous_aggregate('spending_daily',
          now() - interval '91 days', now() - interval '1 hour')`,
     );
+    // spending_weekly rolls up spending_daily, so it refreshes after it.
+    await pool.query(
+      `call refresh_continuous_aggregate('spending_weekly',
+         now() - interval '98 days', now() - interval '1 hour')`,
+    );
+    await pool.query(
+      `call refresh_continuous_aggregate('spending_payee_daily',
+         now() - interval '91 days', now() - interval '1 hour')`,
+    );
 
     const inviteIsValid = circles[0]!.invite_expires_at && circles[0]!.invite_expires_at > new Date();
-    const rotate = process.argv.includes('--rotate-invite');
-    const invite = !inviteIsValid || rotate ? await issueInviteCode(pool, circleId) : null;
+    const invite = !inviteIsValid || rotateInvite ? await issueInviteCode(pool, circleId) : null;
+    return { circleId, customerId, accountId, vaultId, created, ledgerAdded, invite };
+  }
+}
+
+async function main() {
+  if (process.argv.slice(2).some((arg) => arg !== '--rotate-invite')) {
+    throw new Error('Only --rotate-invite is supported');
+  }
+  const nessie = createNessieClient({ key: nessieEnv().NESSIE_API_KEY });
+  const pool = new pg.Pool({ connectionString: dbEnv().DATABASE_URL, max: 2 });
+  try {
+    const { circleId, customerId, accountId, vaultId, created, ledgerAdded, invite } = await seedDemo({
+      pool, nessie, rotateInvite: process.argv.includes('--rotate-invite'),
+    });
     console.log(`Demo circle ${circleId}; Nessie customer ${customerId}; account ${accountId}`);
     console.log(`Nessie records created: ${created}; Tiger Data ledger rows added: ${ledgerAdded}`);
+    console.log(`Freeze vault account ${vaultId}. Run npm run demo:atm right before demo step 4.`);
     if (invite) console.log(`Family invite code: ${invite.code} (expires ${invite.expiresAt})`);
     else console.log('Existing family invite remains valid; use --rotate-invite to show a fresh one.');
   } finally {
@@ -178,7 +229,9 @@ async function main() {
   }
 }
 
-main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : 'Demo seed failed');
-  process.exitCode = 1;
-});
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  main().catch((error: unknown) => {
+    console.error(error instanceof Error ? error.message : 'Demo seed failed');
+    process.exitCode = 1;
+  });
+}

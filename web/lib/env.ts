@@ -76,9 +76,22 @@ export const auth0Env = memo(() =>
       AUTH0_CLIENT_ID: required,
       AUTH0_CLIENT_SECRET: required,
       AUTH0_AUDIENCE: required,
+      /** `true`: CIBA pushes carry payment details (RAR). Needs the type registered on the API. */
+      AUTH0_CIBA_RAR: optional(z.enum(['true', 'false']).default('false')),
+      /** `true`: approving needs `approve:payments` in the Auth0 token; a missing claim is a no. */
+      AUTH0_RBAC: optional(z.enum(['true', 'false']).default('false')),
     }),
   ),
 );
+
+/**
+ * The bill-pay agent's Auth0 Machine-to-Machine client id, or null when the
+ * agent is off. Not memoized, so tests can switch it. The secret is read only
+ * by the agent itself (scripts/agent-bills.ts), never by the API.
+ */
+export function agentClientId(): string | null {
+  return process.env.AUTH0_AGENT_CLIENT_ID || null;
+}
 
 export const appEnv = memo(() =>
   parse(
@@ -95,6 +108,42 @@ export const appEnv = memo(() =>
           .string()
           .default('America/New_York')
           .refine(isTimeZone, 'must be an IANA time zone such as America/New_York'),
+      ),
+    }),
+  ),
+);
+
+/**
+ * Extra bank branches for the on-call bank alert, as JSON `[{name, lat, lng}]`.
+ * Nessie has no banks in Gainesville, so the expo needs one. Empty by default.
+ */
+export const demoEnv = memo(() =>
+  parse(
+    'demo',
+    z.object({
+      DEMO_BANK_LOCATIONS: optional(
+        z
+          .string()
+          .transform((text, ctx) => {
+            try {
+              return JSON.parse(text) as unknown;
+            } catch {
+              ctx.addIssue({ code: 'custom', message: 'must be JSON like [{"name":"...","lat":29.6,"lng":-82.3}]' });
+              return z.NEVER;
+            }
+          })
+          .pipe(
+            z
+              .array(
+                z.strictObject({
+                  name: z.string().min(1).max(100),
+                  lat: z.number().min(-90).max(90),
+                  lng: z.number().min(-180).max(180),
+                }),
+              )
+              .max(20),
+          )
+          .default([]),
       ),
     }),
   ),
