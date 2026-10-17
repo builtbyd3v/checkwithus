@@ -30,6 +30,16 @@ describe('bindingMessage', () => {
     expect(message.startsWith('Rosa: 500.00 USD to ')).toBe(true);
   });
 
+  it('always shows the amount, however long the first name', () => {
+    const message = bindingMessage({
+      protectedName: 'A'.repeat(60),
+      amountCents: toCents(100_000_000), // the largest amount the API accepts
+      payeeName: 'QuickGift Cards',
+    });
+    expect(message.length).toBeLessThanOrEqual(64);
+    expect(message).toContain('1,000,000.00 USD to Q');
+  });
+
   it('still says something when the names are all rejected characters', () => {
     expect(bindingMessage({ protectedName: '???', amountCents: toCents(100), payeeName: '$$$' })).toBe(
       'Payment: 1.00 USD to unknown payee',

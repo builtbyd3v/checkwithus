@@ -103,13 +103,17 @@ export function createCibaApprovals(deps: CibaApprovalsDeps) {
    * own circle's payments.
    */
   async function pollPayment(paymentId: string, circleId: string): Promise<void> {
+    // Answers that arrived but whose decision did not land (e.g. a transient
+    // database error) come first. Auth0 hands an answer out only once, so a
+    // recorded answer is retried here until the payment is decided.
+    await applyRecordedAnswers(paymentId, circleId);
+
     const { rows: claimed } = await pool.query<{
       id: string;
       auth_req_id: string;
       member_id: string;
       sub: string;
       payment_held: boolean;
-      clearly_before_expiry: boolean;
     }>(
       `update ciba_requests r
           set poll_after = now() + make_interval(secs => r.interval_seconds)
@@ -135,6 +139,25 @@ export function createCibaApprovals(deps: CibaApprovalsDeps) {
     await supersedeIfDecided(paymentId);
   }
 
+  /**
+   * Re-applies recorded Guardian answers to a payment that is still held, in
+   * the order they arrived, so the first answer still wins. Once the payment
+   * is decided, decidePayment answers already_decided and these are no-ops.
+   */
+  async function applyRecordedAnswers(paymentId: string, circleId: string): Promise<void> {
+    const { rows } = await pool.query<{ member_id: string; state: 'approved' | 'denied' }>(
+      `select r.member_id, r.state
+         from ciba_requests r join payments p on p.id = r.payment_id
+        where r.payment_id = $1 and p.circle_id = $2 and p.status = 'held'
+          and r.state in ('approved', 'denied')
+        order by r.answered_at, r.id`,
+      [paymentId, circleId],
+    );
+    for (const answer of rows) {
+      await decide(paymentId, answer.member_id, answer.state === 'approved' ? 'approve' : 'deny');
+    }
+  }
+
   async function apply(
     paymentId: string,
     request: { id: string; member_id: string; sub: string },
@@ -145,6 +168,13 @@ export function createCibaApprovals(deps: CibaApprovalsDeps) {
         request.id,
         state,
         lastError?.slice(0, 500) ?? null,
+      ]);
+    // A member's answer is recorded, with when it arrived, BEFORE it is applied:
+    // if applying fails, applyRecordedAnswers retries it on the next poll.
+    const recordAnswer = (state: 'approved' | 'denied') =>
+      pool.query(`update ciba_requests set state = $2, answered_at = now(), last_error = null where id = $1`, [
+        request.id,
+        state,
       ]);
 
     switch (result.kind) {
@@ -172,7 +202,7 @@ export function createCibaApprovals(deps: CibaApprovalsDeps) {
           await setState('failed', 'Auth0 returned a token for a different user');
           return;
         }
-        await setState('approved');
+        await recordAnswer('approved');
         await decide(paymentId, request.member_id, 'approve');
         return;
       case 'expired':
@@ -191,7 +221,7 @@ export function createCibaApprovals(deps: CibaApprovalsDeps) {
           await setState('expired');
           return;
         }
-        await setState('denied');
+        await recordAnswer('denied');
         await decide(paymentId, request.member_id, 'deny');
         return;
       }
