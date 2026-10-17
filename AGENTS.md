@@ -125,9 +125,20 @@ team chat first.
 | Vercel (`checkwithus`, production deploys, env vars) | Dev | deploys, `web/.env.local` values |
 | Auth0 tenant | Dev | test approver sign-in, dashboard settings, client secrets |
 | Nessie (Capital One) | Dev | API key, seeded customers and accounts |
-| Tiger Data (Postgres) | Haadi | database access, running live migrations |
+| Tiger Data (Postgres) | Haadi; Dev has full access | database access, running live migrations |
 
 Only Dev deploys to production. Do not paste secrets in issues, PRs, or chat logs.
+
+Tiger Data from the terminal (Haadi or Dev; macOS):
+
+```bash
+brew install --cask timescale/tap/tiger-cli
+tiger auth login        # opens the browser; pick the project Haadi shared
+tiger service list      # the live service and its status
+```
+
+Run live migrations with `cd web && npm run db:migrate`, not by hand. Tell the team
+chat before you run one.
 
 ## Ground rules
 
