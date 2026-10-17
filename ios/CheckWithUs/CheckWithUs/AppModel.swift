@@ -132,11 +132,11 @@ enum Screen: Equatable {
         // A call that started since the first try must reach the server. A duplicate this causes is held for the
         // family, while a stale "not on a call" could skip them.
         if attempt?.onCall == false, isOnCall { attempt = nil }
-        // ponytail: the Guard scores the payment's own words (payee + category). There is no text here to read;
-        // the server treats the score as advisory and its fixed rules decide.
         let onCall = isOnCall
         await run {
             if self.attempt == nil {
+                // ponytail: the Guard scores the payment's own words (payee + category). There is no text here to
+                // read; the server treats the score as advisory and its fixed rules decide.
                 let verdict = try? Self.guardModel?.check("\(payee.name) \(payee.category.replacingOccurrences(of: "_", with: " "))")
                 let explanation = await Explainer.explain(.init(
                     name: self.config?.protectedName ?? "They", amount: dollars(cents), payee: payee.name,
