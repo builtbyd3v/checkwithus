@@ -1,6 +1,7 @@
 /** Synthetic Rosa demo. Run once with `npm run seed:demo`; safe to rerun. */
 import pg from 'pg';
 import { dbEnv, nessieEnv } from '@/lib/env';
+import { ensureVaultAccount } from '@/lib/vault';
 import { issueInviteCode } from '@/lib/invites';
 import { toCents } from '@/lib/money';
 import { normalizeName } from '@/lib/names';
@@ -11,6 +12,7 @@ import {
   merchantBody,
   paidBillBody,
   purchaseBody,
+  withdrawalBody,
   type NessieRecord,
 } from '@/lib/nessie/format';
 import type { Category } from '@/lib/categories';
@@ -64,6 +66,8 @@ async function main() {
       [customerId, accountId, OPENING_CENTS],
     );
     const circleId = circles[0]!.id;
+    // The Freeze vault (#18). Found by nickname at Nessie, so a rerun reuses it.
+    const vaultId = await ensureVaultAccount(pool, nessie, circleId);
     for (const payee of [
       { name: 'City Power & Light', kind: 'biller', category: 'utilities' },
       ...MERCHANTS.slice(0, 2).map(({ name, category }) => ({ name, kind: 'merchant', category })),
@@ -94,7 +98,7 @@ async function main() {
     let created = 0;
     let ledgerAdded = 0;
     async function ensureSpending(input: {
-      key: string; at: Date; amountCents: number; category: Category; payeeName: string;
+      key: string; at: Date; amountCents: number; category: Category; payeeName: string; atmId?: string;
       create: () => Promise<string>;
     }) {
       const marker = `${MARKER}${input.key}]`;
@@ -114,9 +118,9 @@ async function main() {
         );
         if (claim.rowCount) {
           await client.query(
-            `insert into spending (occurred_at, circle_id, amount_cents, category, payee_name, nessie_id)
-             values ($1, $2, $3, $4, $5, $6)`,
-            [input.at, circleId, input.amountCents, input.category, input.payeeName, nessieId],
+            `insert into spending (occurred_at, circle_id, amount_cents, category, payee_name, nessie_id, atm_id)
+             values ($1, $2, $3, $4, $5, $6, $7)`,
+            [input.at, circleId, input.amountCents, input.category, input.payeeName, nessieId, input.atmId ?? null],
           );
           ledgerAdded++;
         }
@@ -159,6 +163,29 @@ async function main() {
       });
     }
 
+    // Cash at a Nessie ATM just now, so a gift card bought from the phone in
+    // the next two hours is held as the scam sequence (#17). A rerun within
+    // the hour adds nothing; after that it records fresh cash for the demo.
+    const recentAtm = await pool.query(
+      `select 1 from spending where circle_id = $1 and atm_id is not null and occurred_at > now() - interval '1 hour'`,
+      [circleId],
+    );
+    let atmNote = 'ATM cash from the last hour is already in the ledger.';
+    if (!recentAtm.rowCount) {
+      const atm = (await nessie.listAtms())[0];
+      if (!atm) throw new Error('Nessie lists no ATMs');
+      const at = new Date();
+      const key = `atm:${at.toISOString()}`;
+      const amountCents = toCents(20_000);
+      await ensureSpending({
+        key, at, amountCents, category: 'other', payeeName: `ATM cash: ${atm.name}`, atmId: atm.id,
+        create: () => nessie.createWithdrawal(accountId, withdrawalBody({
+          amountCents, at, timeZone: TIME_ZONE, description: `ATM cash at ${atm.name} ${MARKER}${key}]`,
+        })),
+      });
+      atmNote = `ATM cash recorded at ${at.toISOString()}; a gift card before ${new Date(at.getTime() + 7_200_000).toISOString()} is held as a scam sequence.`;
+    }
+
     // These backdated rows can sit behind the continuous aggregate watermark.
     // Refresh once so the dashboard and unusual-spending rule see them now.
     await pool.query(
@@ -171,6 +198,7 @@ async function main() {
     const invite = !inviteIsValid || rotate ? await issueInviteCode(pool, circleId) : null;
     console.log(`Demo circle ${circleId}; Nessie customer ${customerId}; account ${accountId}`);
     console.log(`Nessie records created: ${created}; Tiger Data ledger rows added: ${ledgerAdded}`);
+    console.log(`Freeze vault account ${vaultId}. ${atmNote}`);
     if (invite) console.log(`Family invite code: ${invite.code} (expires ${invite.expiresAt})`);
     else console.log('Existing family invite remains valid; use --rotate-invite to show a fresh one.');
   } finally {
