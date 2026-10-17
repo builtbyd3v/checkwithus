@@ -114,7 +114,7 @@ GitHub issues are the source of truth for who does what: `gh issue list --assign
 | Dev (builtbyd3v) | `dev` | Lead. `ios/` (older adult app, Message Filter, Call Directory), `ml/`, integration |
 | Haadi (haad1r) | `haadi` | `web/` backend: Nessie, Auth0, Tiger Data migrations, deploy |
 | rgons (rgons15) | `rgons` | Design, dashboard UI, Tiger Data performance + scam sequence query, README and Devpost |
-| Data + demo teammate (joins later) | TBD | Backup video, DEV post |
+| Hitesh (hiteshk2k6) | `hitesh` | Demo script, demo video, Devpost, DEV post (#55) |
 
 Touching someone else's area (for example a migration in `web/db`)? Agree on it in the
 team chat first.
