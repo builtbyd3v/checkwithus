@@ -65,7 +65,15 @@ public struct ScamRules {
                  + #"|\b(buy|purchase|pick up|get)\b.{0,30}"# + card + #".{0,80}\b(fee|fine|bail|codes?|text me|send me|pay)\b"#,
              card),
         Rule("crypto_payment", "Asks you to send cryptocurrency",
-             #"\b(send|deposit|transfer|pay|buy|put)\b.{0,40}\b(bitcoin|btc|usdt|tether|crypto|ethereum)\b|\b(bitcoin|crypto) (atm|kiosk|machine)\b"#),
+             #"\b(send|deposit|transfer|pay|buy|put)\b.{0,40}\b(bitcoin|btc|usdt|tether|crypto|ethereum)\b|\b(bitcoin|crypto) (atm|kiosk|machine)\b"#,
+             unless: never + #"(send|deposit|transfer|pay|buy|put)\b"#),
+        // Investment scams (pig butchering): the fee to "withdraw" fake profit. No rule for the opener (it reads like a
+        // real wrong number) or the pitch: pitch rules caught 0 and 1 of 30 blind-written texts (ml/data/DECISIONS.md 30).
+        Rule("withdraw_fee", "Asks you to pay a fee or deposit before you can get your money out",
+             #"\b(pay|deposit|top ?up|send)\b.{0,60}\b(to|before you can|so you can)\s+(withdraw|unfreeze|claim|(unlock|release|access)\s+(the |your )?(funds|profits?|money|withdrawal|earnings|balance|assets))\b"#
+                 + #"|\b(withdraw\w*|unlock|release)\b.{0,60}\b(must|need to|needs?|required|first)\b.{0,40}\b(fee|tax|deposit|pay)\b"#
+                 + #"|\b(before|to)\s+(withdraw\w*|unlock|release)\b.{0,60}\b(fee|deposit)\b"#,
+             unless: never + #"(pay|send|deposit|ask)\b|\bpenalty\b"#),
         Rule("toll_link", "Unpaid toll notice with a payment link",
              #"\btolls?\b(?![- ]?free).{0,120}"# + link,
              #"\b(unpaid|overdue|due|pay|payment|balance|outstanding|fee|fine|penalty|settle|final notice)\b"#),

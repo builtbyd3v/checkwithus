@@ -145,6 +145,19 @@ def toll_url():
     return f"https://{R.choice(TOLL_DOMAINS)}/{R.choice(['pay', 'bill', 'v'])}{R.randint(1000, 99999)}"
 
 
+# Made-up trading platforms. The probe uses its own names so the model cannot match on the name.
+PLATFORMS = ["Aurex Trade", "Kinvaro", "BlueHarbor FX", "Zentrix Coin"]
+PROBE_PLATFORMS = ["Lumacoin", "VeraTradex", "OrbitFX Pro"]
+
+
+def pct():
+    return R.choice([6, 9, 12, 15, 20, 35])
+
+
+def profit():
+    return R.choice([14800, 23500, 41200, 88000])
+
+
 # Toll scams count as "delivery": same pattern (small fee + link + urgency), and the task folds them together.
 EXTRA_SCAMS = {
     "delivery": [
@@ -154,18 +167,29 @@ EXTRA_SCAMS = {
         lambda: f"{R.choice(TOLLS)}: We noticed an unpaid toll charge. Reply Y, then reopen this message to activate the link: {toll_url()}",
         lambda: f"Toll notice: ${toll_amt()} due for travel on {R.choice(ROADS)}. Pay immediately to avoid fines: {toll_url()}",
     ],
+    # Pitch and fee stages only. "Wrong number" openers are left out: alone they read like a real wrong number,
+    # so training them as scams teaches false holds (DECISIONS 29).
     "investment": [
-        lambda: f"Hi, is this {R.choice(NAMES)}? This is {R.choice(PERSONAS)}, we met at the {R.choice(PLACES)} last week. Sorry if wrong number!",
-        lambda: f"Sorry, wrong number. But you seem nice. I'm {R.choice(PERSONAS)}, I work in finance in {R.choice(CITIES)}. Where are you from?",
-        lambda: f"Hello, are we still on for lunch {R.choice(['Saturday', 'Sunday', 'Friday'])}? -{R.choice(PERSONAS)}",
         lambda: f"My uncle is an analyst and showed me a crypto trick. I made ${R.choice([3200, 8500, 12000, 26000])} this week. I can teach you, just open an account at {url()}",
         lambda: f"Guaranteed {R.choice([12, 18, 25, 30])}% weekly returns with our Bitcoin trading signals. Join our private group: {url()}",
         lambda: f"Your crypto account shows ${R.choice([18400, 42000, 96500])} profit. To withdraw you must first pay a ${amt()} tax fee.",
         lambda: f"Exclusive offer for retirees: double your savings with gold and crypto. Call {phone()} today, limited spots.",
         lambda: f"{R.choice(PERSONAS)} here. The platform I told you about is up {R.choice([8, 14, 22])}% today. Deposit ${amt()} USDT to start: {url()}",
+        lambda: f"{R.choice(PERSONAS)}: my mentor's AI trading bot made {pct()}% this month. I can open a spot for you, minimum ${amt()}: {url()}",
+        lambda: f"Hello friend, gold futures are moving tonight. Transfer ${amt()} to your trading account now and follow my signals.",
+        lambda: f"Professor {R.choice(PERSONAS)}'s stock group has free spots today. Join and get 3 daily picks: {url()}",
+        lambda: f"Your {R.choice(PLATFORMS)} account has ${profit()} available. Pay the ${amt()} unlock fee to withdraw.",
+        lambda: f"Withdrawal blocked: your profit of ${profit()} needs a {pct()}% tax paid first. Contact customer service.",
+        lambda: f"I know you're nervous, but I doubled my money twice on {R.choice(PLATFORMS)}. Try ${amt()} first, you can withdraw anytime.",
+        lambda: f"Liquidity mining pays {pct()}% a day. Connect your wallet here and start earning: {url()}",
+        lambda: f"Exclusive pre-IPO shares at a discount for our members. Wire ${amt()} today to reserve your allocation.",
+        lambda: f"Your {R.choice(PLATFORMS)} credit score is too low to withdraw. Deposit ${amt()} more to raise it.",
+        lambda: f"Good morning dear, did you buy the coin I told you about? It's up {pct()}% already, still time: {url()}",
+        lambda: f"Hi, I'm {R.choice(PERSONAS)}'s assistant. You were selected for our wealth mentorship, earn {pct()}% weekly. Reply 1 to start.",
+        lambda: f"{R.choice(PLATFORMS)} support: your account will be frozen unless you top up ${amt()} within 24 hours.",
     ],
 }
-EXTRA_N = {"delivery": 20, "investment": 25}
+EXTRA_N = {"delivery": 20, "investment": 40}
 
 TOLL_LEGIT = [
     lambda: f"{R.choice(TOLLS)}: Your account was replenished with ${R.choice([10, 20, 25, 35])}.00 from your card on file. No action needed.",
@@ -175,26 +199,70 @@ TOLL_LEGIT = [
 ]
 TOLL_LEGIT_N = 10
 
+# Brokerage alerts, money talk and real wrong numbers, so the model learns investment words are not scams by themselves.
+INVEST_LEGIT = [
+    lambda: f"Schwab: Your trade confirmation for {R.choice([5, 10, 20])} shares of VTI is available in your account.",
+    lambda: f"E*TRADE: A deposit of ${amt()}.00 has posted to your brokerage account.",
+    lambda: f"Merrill: Your required minimum distribution of ${amt()} was sent to your checking account.",
+    lambda: f"Mom, I finally opened a Roth IRA! Put in ${R.choice([100, 250, 500])} to start.",
+    lambda: f"Reminder: your appointment with {R.choice(PERSONAS)} at Edward Jones is Thursday at 11 AM. Reply C to confirm.",
+    lambda: f"Your 401(k) contribution of {pct()}% starts with your next paycheck.",
+    lambda: f"Sorry, wrong number, I meant to text my {R.choice(['landlord', 'brother', 'neighbor', 'coach'])}!",
+    lambda: "Oops, wrong person, sorry about that!",
+    lambda: "Who is this? I don't have this number saved.",
+    lambda: f"Hi it's {R.choice(PERSONAS)}, new number! Save this one, my old phone died.",
+    lambda: f"Stocks were wild today. Glad I didn't sell, {R.choice(NAMES)}.",
+    lambda: f"Investment club meets at the library {R.choice(['Monday', 'Wednesday'])} at 6. Bring your questions about bonds!",
+]
+INVEST_LEGIT_N = 30
+
 # Probe set: held-out templates, never in train/val/test. Measures toll and investment recall, since no real texts exist.
-PROBE = {
-    ("scam", "delivery"): [
+# Investment is split by stage: the opener is reported but not targeted, the pitch and fee stages are the target.
+PROBE = [
+    (("scam", "delivery"), [
         lambda: f"NOTICE from {R.choice(TOLLS)}: toll invoice #{R.randint(10000, 99999)} for ${toll_amt()} is past due. Avoid collections by paying at {toll_url()}",
         lambda: f"{R.choice(TOLLS)} Billing: a payment of ${toll_amt()} failed. Update your card at {toll_url()} to keep your account open.",
         lambda: f"State Toll Authority: unpaid tolls on your plate. ${toll_amt()} plus fees due tonight. {toll_url()}",
-    ],
-    ("scam", "investment"): [
+    ], 15),
+    (("scam", "investment_opener"), [
         lambda: f"Hey, sorry, I think I texted the wrong person. I'm {R.choice(PERSONAS)}, nice to meet you anyway :)",
+        lambda: f"Is this Dr. {R.choice(NAMES)}'s office? I need to move my cleaning to next week.",
+        lambda: f"Hi {R.choice(NAMES)}, it's been ages! Are you still living in {R.choice(CITIES)}?",
+        lambda: f"Good morning! Is the dog sitting still on for this weekend? - {R.choice(PERSONAS)}",
+        lambda: f"Hello, {R.choice(PERSONAS)} gave me your number. Are you the one selling the piano?",
+    ], 10),
+    (("scam", "investment_pitch"), [
         lambda: f"Hi {R.choice(NAMES)}, it's {R.choice(PERSONAS)} from the {R.choice(PLACES)}. Did you get a chance to look at the trading app I mentioned?",
         lambda: f"Earn ${R.choice([4000, 6500, 9000])} a month from home with AI crypto arbitrage. No experience needed. Start: {url()}",
         lambda: f"Your wallet bonus of {R.choice(['0.15', '0.3', '0.5'])} BTC is waiting. Pay the ${amt()} activation fee to unlock it.",
-    ],
-    ("legit", "none"): [
+        lambda: f"My aunt works at a hedge fund and shares gold contract signals every morning. Last month I made ${profit()}. Want me to add you to the group?",
+        lambda: f"{R.choice(PERSONAS)} here :) I just closed my position, +{pct()}% today. Download {R.choice(PROBE_PLATFORMS)} and I'll walk you through your first trade.",
+        lambda: f"Congratulations, your {R.choice(PROBE_PLATFORMS)} account earned ${profit()}. Before withdrawal a security deposit of ${amt()} is required.",
+        lambda: f"Your withdrawal of ${profit()} is on hold for a tax review. Pay ${amt()} to release the funds.",
+        lambda: f"Hi dear, the mining pool is paying {pct()}% daily interest this week. Start with just ${amt()}, I will help you set it up.",
+        lambda: f"I made a small test deposit for you on {R.choice(PROBE_PLATFORMS)}. Log in with code {R.randint(1000, 9999)} and see the profit yourself: {url()}",
+        lambda: f"Our VIP members are seeing steady {pct()}% monthly returns on AI stock picks. Reply YES and our analyst will message you on WhatsApp.",
+        lambda: f"Did you open the account yet? The signal closes at 9 PM tonight, deposit at least ${amt()} so you don't miss it.",
+    ], 30),
+    (("legit", "none"), [
         lambda: f"{R.choice(TOLLS)}: Thanks for your payment of ${toll_amt()}. Your balance is now $0.00.",
         lambda: f"{R.choice(TOLLS)}: Low balance alert. Auto-replenish will add ${R.choice([10, 20])} from your card on file tonight.",
         lambda: f"Questions about your order? Call our toll-free customer line at 1-800-555-{R.randint(100, 199):04d}.",
-    ],
-}
-PROBE_N = {("scam", "delivery"): 15, ("scam", "investment"): 15, ("legit", "none"): 10}
+    ], 10),
+    (("legit", "none"), [
+        lambda: f"Fidelity: Your deposit of ${amt()}.00 to your brokerage account is complete.",
+        lambda: f"Robinhood: Your order to buy {R.choice([1, 2, 5])} shares of AAPL was filled.",
+        lambda: "Vanguard: Your quarterly statement is ready. Log in to the website or app to view it.",
+        lambda: "Fidelity: We will never ask you to send crypto or pay a fee to withdraw your money.",
+        lambda: f"Your advisor {R.choice(PERSONAS)} scheduled a portfolio review for Tuesday at 2 PM. Reply C to confirm.",
+        lambda: f"Dad, I put ${R.choice([200, 300])} into an index fund like you said. Thanks for the tip!",
+        lambda: "Sorry, wrong number! I was trying to reach my sister.",
+        lambda: f"Hi, is this {R.choice(NAMES)}? It's {R.choice(PERSONAS)} from book club, I got a new phone.",
+        lambda: "Did you see the market today? My 401k is down 3% lol",
+        lambda: f"Your pension deposit of ${amt()} will arrive on the 1st.",
+    ], 20),
+]
+PROBE_SEED = 7  # the probe has its own seed, so adding training rows does not change it
 
 
 def key(text):
@@ -219,7 +287,8 @@ def build():
             seen.add(key(text))
             rows.append((text, "legit", "none", "synthetic"))
     # Added after the original 400 so those rows stay byte-identical.
-    groups = [(("scam", t), fs, EXTRA_N[t]) for t, fs in EXTRA_SCAMS.items()] + [(("legit", "none"), TOLL_LEGIT, TOLL_LEGIT_N)]
+    groups = [(("scam", t), fs, EXTRA_N[t]) for t, fs in EXTRA_SCAMS.items()] + [(("legit", "none"), TOLL_LEGIT, TOLL_LEGIT_N),
+                                                                               (("legit", "none"), INVEST_LEGIT, INVEST_LEGIT_N)]
     rows += fill(groups, seen, "synthetic")
     return rows
 
@@ -248,4 +317,5 @@ if __name__ == "__main__":
     out = Path(__file__).resolve().parent
     rows = build()
     write(out / "synthetic.csv", rows)
-    write(out / "probe.csv", fill([(k, PROBE[k], PROBE_N[k]) for k in PROBE], {key(r[0]) for r in rows}, "probe"))
+    R.seed(PROBE_SEED)
+    write(out / "probe.csv", fill(PROBE, {key(r[0]) for r in rows}, "probe"))
