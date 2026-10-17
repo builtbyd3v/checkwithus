@@ -409,3 +409,27 @@ describe('asking Auth0 politely (rule 8)', () => {
     expect((await requestsFor(payment.id)).filter((s) => s.state === 'pending')).toHaveLength(0);
   });
 });
+
+describe('a member demoted after their push went out', () => {
+  it('cannot decide, and does not jam the payment for the rest of the family', async () => {
+    const payment = await hold();
+    auth0.answer(MARIA, 'deny');
+    auth0.answer(LEO, 'approve');
+    // Maria is made a viewer after the push reached her phone.
+    await pool.query(`update circle_members set role = 'viewer' where circle_id = $1 and auth0_sub = $2`, [circleId, MARIA]);
+    try {
+      await makeDue(payment.id);
+
+      // Polling must keep working: it is the older adult's "Waiting for family" screen.
+      await approvals.pollPayment(payment.id, circleId);
+
+      // Her recorded answer no longer counts: it is superseded, never retried...
+      expect((await requestsFor(payment.id)).find((s) => s.sub === MARIA)).toMatchObject({ state: 'superseded' });
+      // ...and Leo, still an approver, decides.
+      expect((await service.getPayment(payment.id))!.status).toBe('paid');
+      expect(nessieFake.paymentWrites()).toHaveLength(1);
+    } finally {
+      await pool.query(`update circle_members set role = 'approver' where circle_id = $1 and auth0_sub = $2`, [circleId, MARIA]);
+    }
+  });
+});
