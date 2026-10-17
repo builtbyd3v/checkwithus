@@ -10,6 +10,8 @@ At SwampHacks XII we built [checkwith.us](https://checkwith.us): scam protection
 
 This post is about three decisions that shaped the build, and what each one cost us. The code is public at [github.com/builtbyd3v/checkwithus](https://github.com/builtbyd3v/checkwithus).
 
+Draft scope: the implementation described here is on [`rishon`](https://github.com/builtbyd3v/checkwithus/tree/rishon), in [PR #54](https://github.com/builtbyd3v/checkwithus/pull/54). It is not a claim that this build is deployed. The dashboard backup clip uses synthetic data and simulated decisions; live Auth0/Nessie verification and a complete device recording remain necessary before publication.
+
 ## 1. The model had to fit where the texts are
 
 We had one hard privacy rule: the older adult's texts never go to a cloud AI model. On iOS, the place that sees an incoming text from an unknown sender is a Message Filter extension. So that is where our scam model had to run.
@@ -76,7 +78,7 @@ export function decideHold(input: {
 }
 ```
 
-(This version includes Freeze and the "cash then gift card" sequence from PR #32. TODO(Dev): check it still matches `web/lib/rules.ts` on `main` when you publish.)
+(This excerpt matches `web/lib/rules.ts` on the development branch. Before publishing, check it against the exact reviewed commit used for the demo.)
 
 A fooled, broken or tampered model can make the system more careful, never less. Every reason has a plain-words label the family reads on their phone, like "Paid while on a phone call". "The AI said so" is not a reason a family member can check.
 
@@ -116,7 +118,7 @@ We measured it on 1,000,000 synthetic rows (200 circles, 40 payees each, 3 years
 | Unusual-spending baseline (1 circle, 1 category, 90 days) | 2.57 ms | 1.18 ms | 2.2x |
 | Weekly totals, all 200 circles, 3 years | 2077.43 ms | 150.23 ms | 13.8x |
 
-Compression took the table from 163.3 MB to 50.3 MB (3.2x smaller). To be fair to the raw queries: the aggregates were fully materialized, which is a best case. For one family, the raw queries were already fast. The aggregates matter at scale.
+Compression took the table from 163.3 MiB to 50.3 MiB (3.2x smaller). The aggregates were fully materialized, which is a best case. For one family, the raw queries were already fast. The aggregates matter at scale. These are the recorded October 17 measurements preserved in `web/lib/perf-benchmark.json`, not a fresh run for this article. The method and reproduction command are in [docs/perf.md](https://github.com/builtbyd3v/checkwithus/blob/rishon/docs/perf.md).
 
 ## What surprised us
 
@@ -128,4 +130,4 @@ Compression took the table from 163.3 MB to 50.3 MB (3.2x smaller). To be fair t
 
 Claude Code (Opus 5 and 5.5) wrote most of the code and drafted this post with us. OpenAI Codex CLI built parts of the web backend and reviewed changes read-only. Inside the product, Apple Foundation Models writes the family's note on the phone. The scam models are ours, trained during the event.
 
-TODO(Dev): add one or two sentences in your own voice: what you would do differently, or the moment the filter first worked on your phone.
+Next we would test the screens with older adults and their families, improve coverage of investment-scam openers, and verify the full payment flow on the live test tenant. The benchmark and model scores describe measured test conditions, not protection against every scam.

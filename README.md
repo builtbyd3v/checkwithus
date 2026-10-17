@@ -4,7 +4,8 @@ Scam protection where the older adult does nothing and the family does the work.
 
 Scam texts are filtered before they are read. Scam calls ring as "Possible scam".
 Risky payments pause until a family member approves them. All scam detection runs
-on the phone, so the older adult's texts and bills never leave the device.
+on the phone. The older adult's texts and bills never go to a cloud AI model;
+payment details go to our backend and Nessie for rule checks and payment processing.
 
 Live at [checkwith.us](https://checkwith.us). Built at SwampHacks XII (Oct 16 to 18, 2026).
 
@@ -179,6 +180,10 @@ ml/.venv/bin/python -I ml/export_coreml.py   # Core ML export, writes coreml_eva
 ```
 
 ## Repo layout
+
+Submission materials: [Devpost draft](docs/devpost.md), [DEV article](docs/dev-post.md),
+[three-minute expo demo](docs/demo.md), [two-minute video script](docs/video-script.md),
+and [publishing handoff](docs/publishing.md).
 
 ```
 ios/    iPhone app (older adult and family), Message Filter, Call Directory, SafeCard Live Activity, GuardKit

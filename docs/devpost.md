@@ -2,6 +2,8 @@
 
 Copy each section into the matching Devpost field. Check every `TODO(Dev):` before submitting. Due **Sun Oct 18, 8:00 AM ET**.
 
+Recording plan: [two-minute video script](video-script.md). Upload captions and account steps: [publishing handoff](publishing.md).
+
 Build scope: this draft describes the development branch rishon (draft PR #54), not the currently deployed main branch. Before publishing, verify the same reviewed build on devices and the server, and remove any feature that is not demonstrated. Auth0 Guardian and the bill agent are implemented but remain unverified on the live tenant here.
 
 - **Project name:** checkwith.us
@@ -125,7 +127,7 @@ Nessie is the bank in every step. Each endpoint has a job:
 - Real-time continuous aggregates: `spending_daily` feeds the "much more than usual" hold rule. `spending_weekly`, built on top of it (hierarchical), feeds the dashboard's weekly chart. `spending_payee_daily` feeds the dashboard's "About Nx Rosa's usual at this payee" line.
 - The dashboard's speed card times the real weekly chart query on the aggregate and on raw rows, live, and shows the compression ratio of the whole table.
 - A time-window query on the hypertable catches "ATM cash, then a gift card within 2 hours".
-- Measured on 1,000,000 rows (200 circles, 3 years) on Tiger Cloud: weekly totals for all circles over 3 years drop from 2077.43 ms to 150.23 ms (13.8x faster). The dashboard weekly chart drops from 2.61 ms to 1.10 ms (2.4x). Compression: 163.3 MB to 50.3 MB (3.2x smaller). Aggregate times are a best case (fully materialized). Full method in the README.
+- Recorded October 17 measurements on 1,000,000 rows (200 circles, 3 years) on Tiger Cloud: weekly totals for all circles over 3 years drop from 2077.43 ms to 150.23 ms (13.8x faster). The dashboard weekly chart drops from 2.61 ms to 1.10 ms (2.4x). Compression: 163.3 MiB to 50.3 MiB (3.2x smaller). Aggregate times are a best case (fully materialized). These preserved results were not rerun for this draft. Full method in the README.
 
 ### Easy On The Eyes (Best UI/UX)
 - Older adult screens: large Dynamic Type text, big tap targets, plain words, one action per screen. Home says "You're safe". A held payment says "Your money is safe. Your family will call you."
@@ -155,6 +157,7 @@ Two models we trained, with honest scores on 884 real test texts (README "Model 
 We used AI coding tools, as allowed by the SwampHacks and MLH rules:
 - **Claude Code (Anthropic, Opus 5 and Opus 5.5):** wrote most of the code in `web/`, `ios/` and `ml/`, and drafted these docs, with Haiku subagents for dataset search. TODO(Dev): confirm a human checked every dataset license by hand, then keep or cut this sentence: "A human checked every dataset license by hand."
 - **OpenAI Codex CLI:** continued parts of the web backend (approval and reconciliation fixes, the demo seed, the dashboard).
+- **Codex:** dashboard accessibility, scam-sequence evidence, benchmark reporting, local PostgreSQL tests, original SVG design assets, synthetic UI video, and submission-material editing.
 - **OpenAI Codex CLI (review):** read-only second-opinion code review on changed files and review panels on the dataset and app. It found real bugs, which we verified and fixed.
 - **Inside the product:** Apple Foundation Models runs on the phone to rewrite facts into a note for the family. Our scam models are trained by us. checkwith.us is not a reskin of an existing AI tool.
 

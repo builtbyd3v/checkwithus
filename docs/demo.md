@@ -17,7 +17,7 @@ Rosa is synthetic ("Rosa CheckWith (synthetic)"). Never use a real person's name
 
 One build for everything
 - [ ] One build: choose a reviewed commit (development work is currently on rishon, PR #54) and use that exact code for both iPhones and the server. Do not merge to main without the user's explicit instruction. Verify migrations and live settings before deploying. Never mix feature branches.
-- [ ] `curl https://checkwith.us/api/health` prints `{"ok":true,"database":"reachable"}`. Freeze must not 404: the deployed build is the merged one.
+- [ ] On the selected deployment, `/api/health` prints `{"ok":true,"database":"reachable"}`. Confirm its commit matches both phones and exercise the Freeze route; health alone does not prove the feature build is deployed.
 - [ ] Migrations on the live database: `cd web && npm run db:migrate` (014 freeze, 015 ATM cash, 016 weekly and per-payee aggregates, 017 ledger credits, and 020 payment initiator if #46 is merged).
 - [ ] `DEMO_BANK_LOCATIONS` is set on Vercel to a spot at the expo table, for example `[{"name":"SwampHacks Demo Bank","lat":29.6463,"lng":-82.3478}]`. TODO(Dev): confirm the coordinates on site, redeploy after changing it, then relaunch the app on iPhone A.
 - [ ] `npm run smoke:demo` passes (a $350 City Power & Light bill pays with no push while the allowance exists, and holds when it is revoked; with #46, step 6a: the agent pays the $350 water bill only because of the allowance; runs on a throwaway schema).
