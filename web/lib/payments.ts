@@ -69,7 +69,11 @@ export type Payment = {
   approvalsRequired?: number;
   allowanceId?: string | null;
   billDueDate?: string | null;
+  initiatedBy?: PaymentInitiator;
 };
+
+/** Who asked: the older adult's phone, or the family's bill-pay agent. */
+export type PaymentInitiator = 'device' | 'agent';
 
 export type NewPayment = {
   billDueDate?: string | null;
@@ -82,6 +86,8 @@ export type NewPayment = {
   onCall: boolean;
   guard: { score: number; modelVersion: string | null } | null;
   explanation: string | null;
+  /** Default `device`. The rules treat both the same. */
+  initiatedBy?: PaymentInitiator;
 };
 
 /** What the payment service needs to know about a circle. */
@@ -117,7 +123,7 @@ const COLUMNS = `
   id, circle_id, amount_cents, payee_name, payee_kind, category, on_call,
   payee_known, guard_score, guard_model_version, explanation, hold_reasons,
   status, expires_at, decided_by, decided_via, decided_at, nessie_kind,
-  nessie_id, failure, created_at, approvals_required, allowance_id, bill_due_date`;
+  nessie_id, failure, created_at, approvals_required, allowance_id, bill_due_date, initiated_by`;
 
 type PaymentRow = {
   id: string;
@@ -144,6 +150,7 @@ type PaymentRow = {
   approvals_required: number;
   allowance_id: string | null;
   bill_due_date: Date | string | null;
+  initiated_by: PaymentInitiator;
 };
 
 function toPayment(row: PaymentRow): Payment {
@@ -174,6 +181,7 @@ function toPayment(row: PaymentRow): Payment {
     billDueDate: row.bill_due_date instanceof Date
       ? `${row.bill_due_date.getFullYear()}-${String(row.bill_due_date.getMonth()+1).padStart(2,'0')}-${String(row.bill_due_date.getDate()).padStart(2,'0')}`
       : row.bill_due_date,
+    initiatedBy: row.initiated_by,
   };
 }
 
@@ -346,11 +354,11 @@ export function createPaymentService(deps: PaymentServiceDeps) {
       `insert into payments (
          circle_id, idempotency_key, amount_cents, payee_name, payee_kind, category,
          on_call, payee_known, guard_score, guard_model_version, explanation,
-         hold_reasons, status, expires_at, decided_via, decided_at, approvals_required, allowance_id, bill_due_date)
+         hold_reasons, status, expires_at, decided_via, decided_at, approvals_required, allowance_id, bill_due_date, initiated_by)
        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
          case when $14 then now() + make_interval(secs => $15) end,
          case when $14 then null else 'rules' end,
-         case when $14 then null else now() end, $16, $17, $18)
+         case when $14 then null else now() end, $16, $17, $18, $19)
        on conflict (circle_id, idempotency_key) do nothing
        returning ${COLUMNS}`,
       [
@@ -372,6 +380,7 @@ export function createPaymentService(deps: PaymentServiceDeps) {
         input.amountCents > policy.rows[0]!.two_approvals_over_cents ? 2 : 1,
         !held ? allowanceId : null,
         input.billDueDate ?? null,
+        input.initiatedBy ?? 'device',
       ],
     );
     });
@@ -412,7 +421,8 @@ export function createPaymentService(deps: PaymentServiceDeps) {
       existing.guardScore === (input.guard?.score ?? null) &&
       existing.guardModelVersion === (input.guard?.modelVersion ?? null) &&
       existing.explanation === input.explanation &&
-      existing.billDueDate === (input.billDueDate ?? null);
+      existing.billDueDate === (input.billDueDate ?? null) &&
+      existing.initiatedBy === (input.initiatedBy ?? 'device');
     if (!same) {
       throw new PaymentError(
         'idempotency_conflict',

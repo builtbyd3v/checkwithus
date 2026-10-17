@@ -20,6 +20,13 @@ type CircleRow = { hold_over_cents: string; protected_name: string; frozen: bool
 type MemberRow = { id: string; display_name: string };
 type PayeeRow = { id: string; name: string; kind: string; category: Category };
 const money = (cents: bigint | number | string) => formatCents(toCents(Number(cents)));
+/** What the bill-pay agent did, in the family's words; nothing for a no, a lapse or a failure. */
+function agentLabel(payment: { status: string; allowanceId: string | null; category: { label: string } }) {
+  if (payment.status === 'paid') {
+    return payment.allowanceId ? `Paid by the bill agent under your ${payment.category.label} allowance` : 'Paid by the bill agent';
+  }
+  return ['held', 'approved', 'paying'].includes(payment.status) ? 'Asked by the bill agent' : null;
+}
 
 /** One look per payment state: colour plus words, never colour alone. */
 const STATES: Record<string, { label: string; className: string }> = {
@@ -177,7 +184,8 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
         </div>
         <div className="mt-5 rounded-xl border border-stone-200 bg-white p-5"><h3 className="font-semibold">Recent payments</h3>
           {recent.length ? <ul role="list" className="mt-3 divide-y divide-stone-100">{recent.slice(0, 8).map((payment) => <li key={payment.id} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm">
-            <span><strong className="font-semibold">{payment.payee.name}</strong><span className="ml-2 text-stone-500">{payment.category.label}</span></span>
+            <span><strong className="font-semibold">{payment.payee.name}</strong><span className="ml-2 text-stone-500">{payment.category.label}</span>
+              {payment.initiatedBy === 'agent' && agentLabel(payment) && <span className="block text-stone-500">{agentLabel(payment)}</span>}</span>
             <span className="flex items-center gap-4"><StateBadge status={payment.status} /><strong className="tabular-nums">{money(payment.amountCents)}</strong></span>
           </li>)}</ul> : <p className="mt-3 text-sm text-stone-600">Payments from the phone will appear here.</p>}
         </div>

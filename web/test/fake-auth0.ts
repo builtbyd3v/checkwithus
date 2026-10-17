@@ -9,6 +9,9 @@ export const FAKE_AUTH0 = {
   domain: 'checkwith-test.us.auth0.com',
   clientId: 'test-client-id',
   clientSecret: 'test-client-secret',
+  /** The bill-pay agent's Machine-to-Machine application. */
+  agentClientId: 'test-agent-client-id',
+  agentClientSecret: 'test-agent-client-secret',
 };
 const ISSUER = `https://${FAKE_AUTH0.domain}/`;
 
@@ -43,7 +46,7 @@ export async function createFakeAuth0() {
   const notEnrolled = new Set<string>();
   const calls: Array<{ path: string; fields: Record<string, string> }> = [];
   /** Off: like a tenant whose API has not registered the details type. */
-  const settings = { rarRegistered: true };
+  const settings = { rarRegistered: true, agentScopes: ['pay:bills'] };
   let next = 1;
 
   const json = (status: number, body: unknown) =>
@@ -53,6 +56,18 @@ export async function createFakeAuth0() {
     const path = new URL(url).pathname;
     const fields = Object.fromEntries(new URLSearchParams(String(init.body)));
     calls.push({ path, fields });
+    if (path === '/oauth/token' && fields.grant_type === 'client_credentials') {
+      // The agent's M2M app gets only the scopes it is authorized for on the API.
+      if (fields.client_id !== FAKE_AUTH0.agentClientId || fields.client_secret !== FAKE_AUTH0.agentClientSecret) {
+        return json(401, { error: 'access_denied', error_description: 'Unauthorized' });
+      }
+      const scope = settings.agentScopes.join(' ');
+      const accessToken = await mint({
+        sub: `${FAKE_AUTH0.agentClientId}@clients`, audience: fields.audience ?? '',
+        claims: { gty: 'client-credentials', azp: FAKE_AUTH0.agentClientId, scope },
+      });
+      return json(200, { access_token: accessToken, scope, token_type: 'Bearer', expires_in: 86400 });
+    }
     if (fields.client_id !== FAKE_AUTH0.clientId || fields.client_secret !== FAKE_AUTH0.clientSecret) {
       return json(401, { error: 'access_denied', error_description: 'Unauthorized' });
     }
@@ -127,9 +142,22 @@ export async function createFakeAuth0() {
     return json(404, { error: 'not_found' });
   }
 
+  /** Any access token this tenant could sign: a family member's, another M2M app's. */
+  function mint(input: { sub: string; audience: string; claims?: Record<string, unknown> }) {
+    return new SignJWT(input.claims ?? {})
+      .setProtectedHeader({ alg: 'RS256', kid: 'k1' })
+      .setSubject(input.sub)
+      .setIssuer(ISSUER)
+      .setAudience(input.audience)
+      .setIssuedAt()
+      .setExpirationTime('5m')
+      .sign(privateKey);
+  }
+
   return {
     fetch,
     keys,
+    mint,
     calls,
     pushes,
     notEnrolled,

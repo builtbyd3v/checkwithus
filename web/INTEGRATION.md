@@ -36,6 +36,7 @@ All paths below are relative to the base URL.
 | `POST /family/circles/:id/unfreeze` | Family (approver, fresh login) | `{amountCents}` -> `{frozen: false, movedCents}`: that amount back |
 | `GET /family/circles/:id/balance` | Family | Ledger balance (vault excluded) and `frozen` |
 | `POST /family/circles/:id/top-up` | Family (approver, fresh login) | `{amountCents, idempotencyKey}` -> `{id, movedCents, status}`: money from the member's own Nessie account into spending |
+| `POST /agent/bills/run` | Bill-pay agent (Auth0 M2M token, `pay:bills`) | `{circleId?, dueWithinDays?}` -> `{proposals:[...]}`; see "Bill-pay agent" below |
 
 Health endpoint: `GET https://checkwith.us/api/health`.
 
@@ -170,6 +171,74 @@ Two-approval quorum is tested on both paths: `app/api/v1/api.int.test.ts`
 approver pays once, approve then deny blocks) and `lib/approvals.int.test.ts`
 (Guardian through a fake Auth0: the same cases, plus a Guardian vote and an app
 vote together).
+
+### Bill-pay agent (#19)
+
+The agent is a real Auth0 identity: its own Machine-to-Machine application,
+signed in with the client credentials grant. `npm run agent:bills` (from
+`web/`, needs `AUTH0_AGENT_CLIENT_ID`, `AUTH0_AGENT_CLIENT_SECRET`,
+`AUTH0_DOMAIN`, `AUTH0_AUDIENCE`, `APP_BASE_URL`) gets a token and calls
+`POST /api/v1/agent/bills/run`. Options: `-- --circle <id> --within <days>`
+(default: every circle with a live allowance, bills due within 7 days; at most
+14). The agent acts only in circles whose family granted a live allowance;
+any other `circleId` answers `403 agent_not_invited`.
+
+- What it proposes: each known biller's next bill, due one month after the
+  latest bill we paid (its due date, or the day paid), for the last amount.
+  History is matched by biller name and category. A biller paid by anyone in
+  the last 20 days is skipped, so the phone and the agent never pay one cycle
+  twice. A fixed rule, no AI model; bill data never leaves our server.
+- Who decides: nobody new. Each proposal goes through `createPayment`, the same
+  rules as the phone. Inside an allowance it pays with no push and stores
+  `allowanceId`; otherwise it is held and the family is asked (CIBA push with
+  `APPROVAL_MODE=ciba`, the family app otherwise). One proposal per biller per
+  due date: a rerun replays a held or paid one. A denied, expired or failed one
+  is not asked again: it is listed with `status: "skipped"` and `skipped`
+  (`family_said_no`, `expired`, `failed`). A payment error on one bill is listed
+  with `status: "error"` and `error`, and the run goes on.
+- Every agent payment stores `initiated_by = 'agent'` (migration 020). Family
+  payment views include `initiatedBy` (`device` or `agent`). The dashboard
+  shows "Paid by the bill agent under your Utilities allowance" (paid with an
+  allowance), "Paid by the bill agent" (paid without), or "Asked by the bill
+  agent" (waiting or sending).
+- Demo: `demo:reset` adds the biller `Sunshine Water Co.` with a ledger-only
+  $350 bill 25 days ago. Its next bill is due within 7 days, over the $300 hold
+  limit and inside the $400 allowance, so the agent pays it only because of the
+  allowance. `smoke:demo` step 6a checks this.
+- Token checks (`lib/auth/agent.ts`): RS256, our issuer, `AUTH0_AUDIENCE`,
+  `gty = client-credentials`, `sub = <AUTH0_AGENT_CLIENT_ID>@clients` (and
+  `azp` the same id when present), and `pay:bills` in `scope`. Otherwise `403
+  agent_only` or `403 insufficient_scope`. Unset `AUTH0_AGENT_CLIENT_ID`:
+  `503 agent_disabled`.
+- Every family route refuses a machine token with `403 agent_not_allowed`
+  (`lib/auth/family.ts`). The agent can never approve, deny, freeze, unfreeze,
+  grant or revoke allowances, or change policy. There is no top-up route today;
+  a new family route gets this check for free through `requireFamilyUser`.
+
+Auth0 dashboard steps (Dev):
+
+1. APIs > the API whose Identifier is `AUTH0_AUDIENCE` > Permissions: add
+   `pay:bills` ("Ask to pay known bills; our rules decide").
+2. Applications > Create Application > Machine to Machine, name it
+   `checkwith bill-pay agent`, pick that API, and tick only `pay:bills`.
+   (Later: the API's Machine to Machine Applications tab, or Application
+   Access tab, controls the same grant.)
+3. Put its Client ID in `AUTH0_AGENT_CLIENT_ID` on Vercel and in `.env.local`.
+   Put its Client Secret in `AUTH0_AGENT_CLIENT_SECRET` only where the agent
+   runs (`.env.local`). The API never needs the secret.
+4. Run `npm run demo:reset`, then `npm run agent:bills`. It prints `Signed in as the
+   bill-pay agent (scope: pay:bills)`, then `Paid under the family's
+   allowance: Sunshine Water Co. $350.00`.
+5. Never give this app `approve:payments`. Family routes refuse machine tokens
+   anyway.
+
+Agent story (README/Devpost):
+
+> Rosa's bill-pay agent has its own Auth0 identity: an M2M client whose token holds one scope, `pay:bills`.
+> It can only ask. Fixed rules decide, the same rules as Rosa's phone.
+> Inside the family's expiring allowance, the bill pays with no push.
+> Over it, the payment is held and the family gets a Guardian push (CIBA).
+> The agent can never approve, freeze or grant itself more; revoking the allowance stops it. No AI model sees Rosa's bills.
 
 ### CIBA push details (`AUTH0_CIBA_RAR`)
 

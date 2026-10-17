@@ -91,6 +91,11 @@ describe('requireFamilyUser', () => {
     }
   });
 
+  it('refuses a Machine-to-Machine token: the bill-pay agent is never a family member', async () => {
+    const token = await sign({ gty: 'client-credentials', scope: 'pay:bills' });
+    await expect(requireFamilyUser(request(token))).rejects.toMatchObject({ status: 403, code: 'agent_not_allowed' });
+  });
+
   it('rejects no token', async () => {
     await expect(requireFamilyUser(request())).rejects.toBeInstanceOf(AuthError);
   });
