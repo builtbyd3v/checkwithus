@@ -2,6 +2,20 @@
 
 Production base URL: `https://checkwith.us/api/v1`.
 
+## ESP32 assistance requests
+
+Hardware uses separate `cwh_` credentials and **`POST /api/device/alert`** plus
+`POST /api/device/heartbeat` (outside `/api/v1`). Register/revoke/rotate a button
+in the authenticated family dashboard. These credentials cannot use phone or
+payment APIs. Apply migration `013_hardware_alerts.sql` before deploying.
+
+The existing family alerts feed now also returns `kind: "purchase_review_requested"`.
+Clients should handle unknown alert kinds gracefully. Hardware assistance requests
+do not authorize payments; their purchase details are unknown. The web dashboard
+polls and resolves them through circle-scoped session authentication. Delivery is
+persistent in-app only, not Guardian/push/SMS. Wiring, provisioning, payloads and
+tests: [ESP32 guide](../firmware/esp32/README.md).
+
 ## Authentication and money
 
 - Device routes use `Authorization: Bearer <deviceToken>` from device pairing.

@@ -9,6 +9,8 @@ import { familyPayments, memberships } from '@/lib/family';
 import { formatCents, toCents } from '@/lib/money';
 import { cibaApprovals, payments } from '@/lib/services';
 import { Countdown, JoinForm, SettingsForms } from './controls';
+import { hardwareDashboard } from '@/lib/hardware';
+import { HardwarePanel } from './hardware-panel';
 
 type SpendRow = { day: Date; category: Category; total_cents: string };
 type CircleRow = { hold_over_cents: string; protected_name: string };
@@ -38,7 +40,7 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
   const requested = (await searchParams).circle;
   const active = circles.find((circle) => circle.circleId === requested) ?? circles[0]!;
   await cibaApprovals()?.pollCircles([active.circleId]);
-  const [recent, held, spendResult, circleResult, memberResult, payeeResult] = await Promise.all([
+  const [recent, held, spendResult, circleResult, memberResult, payeeResult, hardware] = await Promise.all([
     familyPayments(db(), payments(), session.user.sub, { heldOnly: false, circleId: active.circleId }),
     // Query holds independently: newer completed payments must not hide them.
     familyPayments(db(), payments(), session.user.sub, { heldOnly: true, circleId: active.circleId }),
@@ -50,6 +52,7 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
     db().query<CircleRow>('select protected_name, hold_over_cents::text from circles where id = $1', [active.circleId]),
     db().query<MemberRow>('select id, display_name from circle_members where circle_id = $1 order by created_at', [active.circleId]),
     db().query<PayeeRow>('select id, name, kind, category from payees where circle_id = $1 order by name', [active.circleId]),
+    hardwareDashboard(db(), session.user.sub, active.circleId),
   ]);
   const circle = circleResult.rows[0]!;
   const categories = new Map<Category, bigint>();
@@ -83,9 +86,11 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
             className={`rounded-full border px-4 py-2 text-sm font-medium ${item.circleId === active.circleId ? 'border-teal-800 bg-teal-800 text-white' : 'border-stone-300 bg-white text-stone-700'}`}>{item.protectedName}</Link>)}</div>}
       </section>
 
+      <HardwarePanel key={active.circleId} circleId={active.circleId} initial={hardware} />
+
       <section aria-labelledby="attention-title" className="rounded-2xl border border-teal-900/15 bg-[#e6f0eb] p-5 sm:p-7">
         <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-bold uppercase tracking-widest text-teal-800">Needs attention</p>
-          <h2 id="attention-title" className="mt-1 text-2xl font-semibold">{held.length ? `${held.length} payment${held.length === 1 ? '' : 's'} waiting` : 'All clear right now'}</h2></div>
+          <h2 id="attention-title" className="mt-1 text-2xl font-semibold">{held.length ? `${held.length} payment${held.length === 1 ? '' : 's'} waiting` : 'No payments waiting'}</h2></div>
           <p className="text-sm text-teal-950">{held.length ? 'A Guardian notification lets the family approve or deny.' : 'New held payments will appear here.'}</p></div>
         {held.length > 0 && <ul role="list" className="mt-6 grid gap-4 lg:grid-cols-2">{held.map((payment) => <li key={payment.id} className="rounded-xl border border-teal-900/10 bg-white p-5">
           <div className="flex items-start justify-between gap-4"><div><p className="text-sm text-stone-500">{payment.protectedName} is paying</p><h3 className="mt-1 text-xl font-semibold">{payment.payee.name}</h3></div>

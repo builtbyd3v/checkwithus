@@ -30,4 +30,7 @@ DerivedData/
 # OS
 .DS_Store
 .vercel
+firmware/esp32/checkwith_button/config.h
+firmware/esp32/.tools/
+firmware/esp32/build/
 ios/CheckWithUs/MessageFilter/GuardInt8.mlpackage/

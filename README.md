@@ -112,6 +112,14 @@ Full details, row counts and rejected sources: [`ml/data/SOURCES.md`](ml/data/SO
 
 No third-party Swift packages. `ios/GuardKit` is our own package (tokenizer, rules, scorers); Apple frameworks only (Core ML, IdentityLookup).
 
+## ESP32 Ask My Family button
+
+Firmware, exact wiring, secure device registration, dashboard assistance requests,
+and demo steps: [firmware/esp32/README.md](firmware/esp32/README.md). Hardware requests
+never authorize money. Arduino-ESP32 3.3.12 (LGPL-2.1, with bundled components under
+their respective licenses) provides WiFi, HTTPS, Preferences and LEDC. The public
+TLS trust anchor is ISRG Root X1. AI tool used for this integration: Codex.
+
 ## Demo data
 
 Demo data uses fake people only. No real person's name, phone number, bank

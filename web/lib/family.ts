@@ -153,7 +153,7 @@ export async function familyAlerts(pool: pg.Pool, sub: string) {
     id: string;
     circle_id: string;
     protected_name: string;
-    kind: 'bank_during_call' | 'ask_family';
+    kind: 'bank_during_call' | 'ask_family' | 'purchase_review_requested';
     detail: string | null;
     created_at: Date;
   }>(
