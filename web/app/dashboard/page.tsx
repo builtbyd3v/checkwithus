@@ -14,6 +14,7 @@ import { cachedSpeed } from '@/lib/speed';
 import { herUsual, usualLabel, type UsualRow } from '@/lib/usual';
 import { Countdown, DecisionButtons, DecisionStatus, FreezeControl, JoinForm, SettingsForms } from './controls';
 import { alertHeadline, timeAgo } from './format';
+import { PaymentCard, StateBadge } from './payment-card';
 
 type SpendRow = { day: Date; category: Category; total_cents: string };
 type CircleRow = { hold_over_cents: string; protected_name: string; frozen: boolean; vault_cents: number };
@@ -21,20 +22,6 @@ type MemberRow = { id: string; display_name: string };
 type PayeeRow = { id: string; name: string; kind: string; category: Category };
 const money = (cents: bigint | number | string) => formatCents(toCents(Number(cents)));
 
-/** One look per payment state: colour plus words, never colour alone. */
-const STATES: Record<string, { label: string; className: string }> = {
-  held: { label: 'Waiting for family', className: 'bg-amber-100 text-amber-950 ring-amber-900/20' },
-  approved: { label: 'Approved', className: 'bg-teal-100 text-teal-950 ring-teal-900/20' },
-  paying: { label: 'Approved, sending', className: 'bg-teal-100 text-teal-950 ring-teal-900/20' },
-  paid: { label: 'Paid', className: 'bg-teal-100 text-teal-950 ring-teal-900/20' },
-  denied: { label: 'Denied', className: 'bg-rose-100 text-rose-950 ring-rose-900/20' },
-  expired: { label: 'Expired, blocked', className: 'bg-stone-200 text-stone-900 ring-stone-900/20' },
-  failed: { label: 'Bank error', className: 'bg-stone-200 text-stone-900 ring-stone-900/20' },
-};
-function StateBadge({ status }: { status: string }) {
-  const state = STATES[status] ?? { label: status, className: 'bg-stone-100 text-stone-800 ring-stone-900/10' };
-  return <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ${state.className}`}>{state.label}</span>;
-}
 const ms = (value: number) => value < 10 ? value.toFixed(2) : value.toFixed(0);
 
 export default function Dashboard(props: { searchParams: Promise<{ circle?: string }> }) {
@@ -130,16 +117,9 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
             : active.role !== 'approver' ? 'An approver in your family decides these.'
             : canApproveHere ? 'Approve or deny here, or from the family app.' : 'Deny here. Approve from the Guardian notification on your phone.'}</p></div>
         <DecisionStatus />
-        {held.length > 0 && <ul role="list" className="mt-6 grid gap-4 lg:grid-cols-2">{held.map((payment) => { const usualLine = usualLabel(usual.get(payment.id), payment.payee.name, firstName); return <li key={payment.id} className="rounded-xl border border-teal-900/10 bg-white p-5">
-          <div className="flex flex-wrap items-center justify-between gap-2"><StateBadge status={payment.status} />
-            <p className="text-sm font-semibold text-amber-950">{payment.expiresAt && <Countdown expiresAt={payment.expiresAt} />}</p></div>
-          <div className="mt-3 flex items-start justify-between gap-4"><div><p className="text-sm text-stone-600">{payment.protectedName} is paying</p><h3 className="mt-1 text-xl font-semibold">{payment.payee.name}</h3></div>
-            <strong className="text-xl tabular-nums">{money(payment.amountCents)}</strong></div>
-          {usualLine && <p className="mt-3 text-base font-semibold text-rose-900">{usualLine}</p>}
-          <p className="mt-3 text-sm leading-6 text-stone-700">{payment.explanation || 'This payment triggered a safety rule and needs a family decision.'}</p>
-          <ul className="mt-4 flex flex-wrap gap-2" aria-label="Reasons for hold">{payment.holdReasons.map((reason) => <li key={reason.code} className="rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-700">{reason.label}</li>)}</ul>
+        {held.length > 0 && <ul role="list" className="mt-6 grid gap-4 lg:grid-cols-2">{held.map((payment) => { const usualLine = usualLabel(usual.get(payment.id), payment.payee.name, firstName); return <li key={payment.id} className="min-w-0"><PaymentCard payment={payment} usualLine={usualLine} deadline={payment.expiresAt ? <Countdown expiresAt={payment.expiresAt} /> : null}>
           {active.role === 'approver' && <DecisionButtons paymentId={payment.id} canApproveHere={canApproveHere} />}
-        </li>; })}</ul>}
+        </PaymentCard></li>; })}</ul>}
         {decided.length > 0 && <div className="mt-6"><h3 id="decided-title" tabIndex={-1} className="text-sm font-bold uppercase tracking-widest text-teal-900 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal-800">Recently decided</h3>
           <ul role="list" className="mt-3 grid gap-3 lg:grid-cols-2">{decided.map((payment) => <li key={payment.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-900/10 bg-white/70 px-5 py-4">
             <div><p className="font-semibold">{payment.payee.name} <span className="ml-1 font-normal tabular-nums text-stone-700">{money(payment.amountCents)}</span></p>
@@ -163,10 +143,21 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
           <p className="text-3xl font-semibold tabular-nums">{money(total)}</p></div>
         <div className="mt-5 grid gap-5 lg:grid-cols-[1.3fr_0.7fr]">
           <div className="rounded-xl border border-stone-200 bg-white p-5"><h3 className="font-semibold">Weekly spending</h3>
-            <div role="img" aria-label="Weekly spending across the last 90 days" className="mt-6 flex h-44 items-end gap-2 border-b border-stone-200 pb-1">{weeks.map((week, index) => <div key={index} className="group relative flex h-full flex-1 items-end">
+            <div aria-hidden="true" className="mt-6 flex h-44 items-end gap-2 border-b border-stone-200 pb-1">{weeks.map((week, index) => <div key={index} className="group relative flex h-full flex-1 items-end">
               <div className="w-full rounded-t bg-teal-700/80" style={{ height: `${Math.max(week > 0n ? 5 : 0, Number(week * 100n / largestWeek))}%` }} />
-              <span className="sr-only">Week {index + 1}: {money(week)}.</span></div>)}</div>
+              </div>)}</div>
             <div className="mt-2 flex justify-between text-xs text-stone-500"><span>12 weeks ago</span><span>This week</span></div>
+            <details className="mt-4">
+              <summary className="min-h-11 cursor-pointer rounded px-2 py-3 text-sm font-semibold text-teal-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800">View weekly amounts</summary>
+              <table className="mt-2 w-full text-left text-sm">
+                <caption className="sr-only">Weekly spending, oldest to newest</caption>
+                <thead><tr><th scope="col" className="py-2 font-semibold">Week</th><th scope="col" className="py-2 text-right font-semibold">Amount</th></tr></thead>
+                <tbody>{weeks.map((week, index) => <tr key={index} className="border-t border-stone-100">
+                  <th scope="row" className="py-2 font-normal">{index === 12 ? 'This week' : index === 11 ? '1 week ago' : `${12 - index} weeks ago`}</th>
+                  <td className="py-2 text-right tabular-nums">{money(week)}</td>
+                </tr>)}</tbody>
+              </table>
+            </details>
           </div>
           <div className="rounded-xl border border-stone-200 bg-white p-5"><h3 className="font-semibold">By category</h3>
             {categoryRows.length ? <ul role="list" className="mt-5 space-y-4">{categoryRows.slice(0, 5).map(([category, cents]) => <li key={category}>
