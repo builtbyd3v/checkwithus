@@ -18,6 +18,9 @@ ml/data/raw/
 ml/models/*.mlpackage/
 ml/models/*.log
 *.safetensors
+# trained Guard output: only the scores are tracked
+ml/models/guard/*
+!ml/models/guard/eval.json
 *.gguf
 
 # Xcode
