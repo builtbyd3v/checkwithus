@@ -29,7 +29,7 @@ import {
   taggedDescription,
   withdrawalBody,
 } from '@/lib/nessie/format';
-import { decideHold, type Baseline, type HoldReason } from '@/lib/rules';
+import { CASH_THEN_GIFT_CARD_WINDOW_SECONDS, decideHold, type Baseline, type HoldReason } from '@/lib/rules';
 
 export const PAYMENT_STATUSES = [
   'held',
@@ -98,7 +98,8 @@ export type PaymentErrorCode =
   | 'expired'
   | 'already_decided'
   | 'idempotency_conflict'
-  | 'whole_dollars_only';
+  | 'whole_dollars_only'
+  | 'frozen';
 
 /** A request we refuse for a reason the caller should be told about. */
 export class PaymentError extends Error {
@@ -269,6 +270,21 @@ export function createPaymentService(deps: PaymentServiceDeps) {
     return { typicalDailyCents: toCents(row.typical), activeDays: row.active_days };
   }
 
+  /**
+   * The scam-sequence query over the spending hypertable: ATM cash in the
+   * last two hours, exactly two hours included. Only recent chunks are scanned.
+   */
+  async function atmCashRecently(circleId: string): Promise<boolean> {
+    const { rowCount } = await pool.query(
+      `select 1 from spending
+        where circle_id = $1 and atm_id is not null
+          and occurred_at >= now() - make_interval(secs => $2) and occurred_at <= now()
+        limit 1`,
+      [circleId, CASH_THEN_GIFT_CARD_WINDOW_SECONDS],
+    );
+    return (rowCount ?? 0) > 0;
+  }
+
   async function createPayment(circleId: string, input: NewPayment): Promise<Payment> {
     // Refuse up front what Nessie would silently truncate, so the phone hears
     // "no" now instead of a family approving an amount the bank then changes.
@@ -280,14 +296,16 @@ export function createPaymentService(deps: PaymentServiceDeps) {
     }
 
     const circle = await circleSettings(circleId);
-    const [payeeKnown, baseline] = await Promise.all([
+    const [payeeKnown, baseline, atmCash] = await Promise.all([
       isKnownPayee(circle.id, input.payeeKind, input.payeeName),
       baselineFor(circle.id, input.category),
+      input.category === 'gift_cards' ? atmCashRecently(circle.id) : false,
     ]);
 
     const inserted = await transaction(pool, async q => {
-    const policy = await q.query<{ two_approvals_over_cents: number; hold_over_cents: number }>(
-      'select two_approvals_over_cents, hold_over_cents from circles where id = $1 for update', [circle.id],
+    // The row lock also orders this payment against a Freeze tap.
+    const policy = await q.query<{ two_approvals_over_cents: number; hold_over_cents: number; frozen: boolean }>(
+      'select two_approvals_over_cents, hold_over_cents, frozen from circles where id = $1 for update', [circle.id],
     );
     const allowance = await q.query<{ id: string }>(
       `select a.id from allowances a join circle_members m on m.id = a.granted_by
@@ -309,6 +327,7 @@ export function createPaymentService(deps: PaymentServiceDeps) {
       holdOverCents: toCents(policy.rows[0]!.hold_over_cents),
       baseline,
       guard: input.guard ? { score: input.guard.score } : null,
+      circle: { frozen: policy.rows[0]!.frozen, atmCashRecently: atmCash },
     });
     // A family allowance only lifts routine amount/baseline limits for a known
     // payee. It never overrides scam categories, calls, Guard, or new payees.
@@ -428,6 +447,14 @@ export function createPaymentService(deps: PaymentServiceDeps) {
       const row = locked.rows[0];
       if (!row) throw new PaymentError('not_found', 'Payment not found or approval permission missing');
       if (row.status !== 'held') return null;
+      // The circle lock orders this against a Freeze tap. While frozen the
+      // spending money is in the vault, so an approval would pay from nothing.
+      const circle = await client.query<{ frozen: boolean }>(
+        'select frozen from circles where id = $1 for update', [row.circle_id],
+      );
+      if (input.decision === 'approve' && circle.rows[0]?.frozen) {
+        throw new PaymentError('frozen', 'Spending is frozen. Unfreeze first.', toPayment(row));
+      }
       const member = await client.query<{ id: string }>(
         `select id from circle_members where circle_id = $1 and role = 'approver'
          and (auth0_sub = $2 or id = $3) for share`, [row.circle_id, bySub, byId],

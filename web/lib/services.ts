@@ -4,11 +4,13 @@ import { createCibaApprovals, type CibaApprovals } from '@/lib/approvals';
 import { createCibaClient } from '@/lib/auth0/ciba';
 import { db } from '@/lib/db';
 import { appEnv, auth0Env } from '@/lib/env';
+import { createFreezeService, type FreezeService } from '@/lib/freeze';
 import { nessie } from '@/lib/nessie/client';
 import { createPaymentService, type PaymentService } from '@/lib/payments';
 
 let paymentService: PaymentService | undefined;
 let approvals: CibaApprovals | null | undefined;
+let freezeService: FreezeService | undefined;
 
 export function payments(): PaymentService {
   return (paymentService ??= createPaymentService({
@@ -18,6 +20,10 @@ export function payments(): PaymentService {
       await cibaApprovals()?.onHeld(payment);
     },
   }));
+}
+
+export function freeze(): FreezeService {
+  return (freezeService ??= createFreezeService({ pool: db(), nessie: nessie() }));
 }
 
 /** True when approvals must come through Auth0 CIBA (Guardian push) rather than the app. */
