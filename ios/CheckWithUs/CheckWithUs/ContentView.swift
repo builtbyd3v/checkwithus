@@ -21,11 +21,9 @@ struct ContentView: View {
             }
         }
         .task {
-        .task {
             await model.installScamNumbers()
             await model.loadConfig()
             await model.resume()
-        }
         }
     }
 }
