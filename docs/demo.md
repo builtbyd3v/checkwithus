@@ -132,7 +132,7 @@ Unfreeze first if step 7 ran, and make sure no call is active (a call adds a hol
 | --- | --- | --- |
 | Scam text lands in the inbox | Move on. Show the model table later. | "iOS only sends unknown senders to the filter. Here are the model's scores on 884 real texts." |
 | Call shows no "Possible scam" label | Answer and continue with step 3. | "iOS reloads the call list on its own schedule. The payment rule still knows she is on a call." |
-| Payment does not reach the server | Check `https://checkwith.us/api/health`. Switch to the hotspot. | "No connection means nothing is paid. The app fails closed." |
+| Payment does not reach the server | Check `https://www.checkwith.us/api/health`. Switch to the hotspot. | "No connection means nothing is paid. The app fails closed." |
 | Family app does not show the hold | Pull down to refresh (it polls every 10 seconds). Or reload the dashboard on the MacBook. | "The family can also act from the web dashboard." |
 | Face ID fails | Use the passcode. | "The phone's passcode is the fallback, like any banking app." |
 | No on-device note | Continue. | "When Apple Intelligence is off, the family sees the plain facts instead." |
