@@ -52,15 +52,19 @@ for (hits, (text, isScam)) in zip(ruleHits, zip(texts, y)) where !isScam && !hit
     print("  rule false hold [\(hits.map(\.id).joined(separator: ","))]: \(text.prefix(100))")
 }
 
-if args.count >= 3 {
-    let config = MLModelConfiguration()
-    config.computeUnits = .cpuAndNeuralEngine  // what the iPhone uses; the Mac GPU path crashes on this graph
-    let compiled = try MLModel.compileModel(at: URL(fileURLWithPath: args[2]))
-    let guardModel = try Guard(compiledModelURL: compiled, configuration: config)
+func evaluate(_ name: String, _ scorer: ScamScorer) throws {
+    let guardModel = Guard(scorer: scorer)
     let start = Date()
     let verdicts = try texts.map { try guardModel.check($0) }
     let ms = Date().timeIntervalSince(start) * 1000 / Double(texts.count)
-    report("model", verdicts.map { $0.probability >= guardModel.threshold }, y)
-    report("rules + model", verdicts.map(\.isScam), y)
-    print(String(format: "threshold %.4f, %.1f ms per text (tokenize + predict + rules)", guardModel.threshold, ms))
+    report(name, verdicts.map { $0.probability >= guardModel.threshold }, y)
+    report("rules + " + name, verdicts.map(\.isScam), y)
+    print(String(format: "  %@: threshold %.4f, %.2f ms per text (score + rules)", name, guardModel.threshold, ms))
+}
+
+try evaluate("ngram", NGramScorer())
+if args.count >= 3 {
+    let config = MLModelConfiguration()
+    config.computeUnits = .cpuAndNeuralEngine  // what the iPhone uses; the Mac GPU path crashes on this graph
+    try evaluate("distilbert", CoreMLScorer(compiledModelURL: MLModel.compileModel(at: URL(fileURLWithPath: args[2])), configuration: config))
 }
