@@ -29,12 +29,12 @@ const clock = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', d
 export function PaymentCard({ payment, deadline, usualLine, sequence, children }: {
   payment: ReviewPayment; deadline?: ReactNode; usualLine?: string | null; sequence?: SequenceEvidence; children?: ReactNode;
 }) {
-  return <article className="min-w-0 rounded-[18px] border border-family-line bg-white p-6 sm:p-7">
+  return <article className="@container min-w-0 rounded-[18px] border border-family-line bg-white p-6 sm:p-7">
     <div className="flex flex-wrap items-center justify-between gap-2"><StateBadge status={payment.status} />
       {deadline && <p className="text-sm font-semibold text-amber-950">{deadline}</p>}</div>
     <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
       <div className="min-w-0 flex-1 basis-40 [overflow-wrap:anywhere]"><p className="text-sm text-family-muted">{payment.protectedName} is paying</p><h3 className="mt-1 text-xl font-semibold">{payment.payee.name}</h3></div>
-      <strong className="shrink-0 text-3xl tracking-tight tabular-nums">{formatCents(payment.amountCents)}</strong>
+      <strong className="shrink-0 text-[length:min(1.875rem,11cqi)] tracking-tight tabular-nums">{formatCents(payment.amountCents)}</strong>
     </div>
     {usualLine && <p className="mt-3 text-base font-semibold text-rose-900">{usualLine}</p>}
     <p className="mt-3 text-sm leading-6 text-family-body">{payment.explanation || 'This payment triggered a safety rule and needs a family decision.'}</p>
