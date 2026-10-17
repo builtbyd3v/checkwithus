@@ -17,3 +17,81 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
+
+/* Landing page, "calm" option (app/_landing-oura). Additive: nothing above changes. */
+@theme {
+  --color-cw-canvas: #f7f1e8;
+  --color-cw-sand: #efe6d8;
+  --color-cw-ink: #1c1b1a;
+  --color-cw-night: #19191c;
+  --color-cw-bezel: #2b2926;
+  --color-cw-stone: #4a4741;
+  --color-cw-mute: #b5b1aa;
+  --color-cw-blue: #2a72de;
+  --color-cw-blue-deep: #1f5fc0;
+  --color-cw-amber: #ddaa61;
+  --color-cw-gold-deep: #684d07;
+  --color-cw-forest: #224228;
+  --color-cw-forest-deep: #1a3520;
+  --color-cw-sage-pale: #ced4b8;
+
+  --animate-cw-breathe: cw-breathe 7s ease-in-out infinite;
+  --animate-cw-breathe-fast: cw-breathe 3.2s ease-in-out infinite;
+  --animate-cw-drift: cw-drift 26s ease-in-out infinite alternate;
+  --animate-cw-enter: cw-enter 1.2s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+
+  @keyframes cw-breathe {
+    0%, 100% { transform: scale(0.94); opacity: 0.55; }
+    50% { transform: scale(1.04); opacity: 1; }
+  }
+  @keyframes cw-drift {
+    from { transform: translate3d(0, 0, 0) scale(1); }
+    to { transform: translate3d(8%, -6%, 0) scale(1.12); }
+  }
+  @keyframes cw-enter {
+    from { opacity: 0; transform: translateY(28px); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+@theme inline {
+  --font-cw-display: var(--font-cw-fraunces);
+  --font-cw-text: var(--font-cw-hanken);
+}
+
+/* Scroll-driven reveals and the dusk-to-dawn band. Without support, or with reduced
+   motion, everything simply shows: nothing depends on the animation to be visible. */
+@keyframes cw-rise {
+  from { opacity: 0; transform: translateY(32px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes cw-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes cw-slow-zoom {
+  from { transform: scale(1.12); }
+  to { transform: scale(1); }
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .cw-reveal, .cw-reveal-2, .cw-reveal-3 {
+      animation: cw-rise linear both;
+      animation-timeline: view();
+    }
+    .cw-reveal { animation-range: entry 5% entry 70%; }
+    .cw-reveal-2 { animation-range: entry 15% entry 85%; }
+    .cw-reveal-3 { animation-range: entry 25% entry 100%; }
+    .cw-dawn, .cw-dawn-text {
+      animation: cw-fade-in linear both;
+      animation-timeline: view();
+      animation-range: cover 5% cover 30%;
+    }
+    .cw-dawn-text { animation-range: cover 18% cover 36%; }
+    .cw-zoom {
+      animation: cw-slow-zoom linear both;
+      animation-timeline: view();
+      animation-range: cover 0% cover 100%;
+    }
+  }
+}
