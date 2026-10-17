@@ -8,6 +8,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createFakeNessie } from '@/test/fake-nessie';
+import { toCents } from '@/lib/money';
 
 vi.mock('next/server', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/server')>()),
@@ -29,6 +30,7 @@ vi.mock('@/lib/auth/family', async () => {
 const fake = createFakeNessie();
 /** Flipped by the CIBA-mode test. CIBA itself is covered in lib/approvals.int.test.ts. */
 const approvalMode = { ciba: false };
+const pollPayment = vi.fn(async () => {});
 vi.mock('@/lib/services', async () => {
   const { db } = await import('@/lib/db');
   const { createNessieClient } = await import('@/lib/nessie/client');
@@ -39,7 +41,7 @@ vi.mock('@/lib/services', async () => {
   });
   return {
     payments: () => service,
-    cibaApprovals: () => null,
+    cibaApprovals: () => approvalMode.ciba ? { pollPayment, pollCircles: async () => {} } : null,
     approvalsUseCiba: () => approvalMode.ciba,
   };
 });
@@ -56,6 +58,7 @@ const routes = {
   payments: await import('./payments/route'),
   payment: await import('./payments/[id]/route'),
   familyPayments: await import('./family/payments/route'),
+  familyPayment: await import('./family/payments/[id]/route'),
   decision: await import('./family/payments/[id]/decision/route'),
   familyAlerts: await import('./family/alerts/route'),
   join: await import('./family/join/route'),
@@ -275,7 +278,76 @@ describe('the demo, over HTTP', () => {
   });
 });
 
+describe('family payment detail and recovery', () => {
+  it('requires sign-in and hides unknown or unauthorized payments before polling', async () => {
+    const { payments } = await import('@/lib/services');
+    const held = await payments().createPayment(circleId, {
+      idempotencyKey: 'api-detail-private', amountCents: toCents(50000),
+      payeeName: 'Synthetic gift cards', payeeKind: 'merchant', category: 'gift_cards',
+      onCall: true, guard: null, explanation: null,
+    });
+    approvalMode.ciba = true;
+    pollPayment.mockClear();
+    const writes = fake.paymentWrites().length;
+    try {
+      expect((await routes.familyPayment.GET(req(`/family/payments/${held.id}`), params(held.id))).status).toBe(401);
+      for (const id of [held.id, crypto.randomUUID(), 'not-a-uuid']) {
+        expect((await routes.familyPayment.GET(req(`/family/payments/${id}`, { sub: 'test|stranger' }), params(id))).status).toBe(404);
+      }
+      expect(pollPayment).not.toHaveBeenCalled();
+      const response = await routes.familyPayment.GET(req(`/family/payments/${held.id}`, { sub: MARIA }), params(held.id));
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(await response.json()).toMatchObject({ id: held.id, status: 'held', protectedName: 'Rosa Test (synthetic)' });
+      expect(pollPayment).toHaveBeenCalledWith(held.id, circleId);
+      expect(fake.paymentWrites()).toHaveLength(writes);
+    } finally { approvalMode.ciba = false; }
+  });
+
+  it('expires an unanswered hold when only the family checks it', async () => {
+    const { rows } = await db().query<{ id: string }>(
+      `insert into payments (circle_id, idempotency_key, amount_cents, payee_name, payee_kind,
+         category, on_call, payee_known, status, expires_at)
+       values ($1, 'api-detail-expired', 50000, 'Synthetic shop', 'merchant', 'shopping',
+         false, false, 'held', now() - interval '1 second') returning id`, [circleId],
+    );
+    const id = rows[0]!.id;
+    const response = await read(await routes.familyPayment.GET(req(`/family/payments/${id}`, { sub: MARIA }), params(id)));
+    expect(response).toMatchObject({ status: 200, body: { status: 'expired', decidedVia: 'timeout' } });
+  });
+
+  it('recovers a bank write without resending when only the family polls', async () => {
+    const { payments } = await import('@/lib/services');
+    fake.failNext('/bills', 'lostThen500');
+    const payment = await payments().createPayment(circleId, {
+      idempotencyKey: 'api-detail-recovery', amountCents: toCents(8412), payeeName: 'City Power & Light',
+      payeeKind: 'biller', category: 'utilities', onCall: false, guard: null, explanation: null,
+    });
+    expect(payment.status).toBe('paying');
+    const account = await db().query<{ nessie_account_id: string }>('select nessie_account_id from circles where id = $1', [circleId]);
+    fake.records.push({ kind: 'bills', accountId: account.rows[0]!.nessie_account_id,
+      body: { _id: 'fake-family-recovered', payee: 'City Power & Light', nickname: `Utilities [cw:${payment.id}]`,
+        payment_date: '2026-10-17', payment_amount: 84.12 } });
+    await db().query('update payments set next_lookup_at = now() where id = $1', [payment.id]);
+    const writes = fake.paymentWrites().length;
+    for (let i = 0; i < 2; i++) {
+      const response = await read(await routes.familyPayment.GET(req(`/family/payments/${payment.id}`, { sub: MARIA }), params(payment.id)));
+      expect(response).toMatchObject({ status: 200, body: { status: 'paid', amountCents: 8412 } });
+    }
+    expect(fake.paymentWrites()).toHaveLength(writes);
+    const ledger = await db().query('select amount_cents from spending where payment_id = $1', [payment.id]);
+    expect(ledger.rows).toEqual([{ amount_cents: 8412 }]);
+  });
+});
+
 describe('strict input', () => {
+  it('rejects malformed label cursors and ambiguous pagination', async () => {
+    const malformed = Buffer.from(JSON.stringify({ decidedAt: 'not-a-date', paymentId: 'not-an-id' })).toString('base64url');
+    for (const query of ['cursor=garbage', `cursor=${malformed}`, 'cursor=abc&after=2026-10-17T00:00:00Z']) {
+      const response = await routes.labels.GET(req(`/device/labels?${query}`, { device: deviceToken }), noParams);
+      expect(response.status).toBe(400);
+    }
+  });
+
   it('rejects dollars sent where cents are expected, naming the field', async () => {
     const response = await read(
       await routes.payments.POST(req('/payments', { device: deviceToken, body: { ...scamBody, idempotencyKey: 'api-test-dollars-01', amountCents: 499.5 } }), noParams),
