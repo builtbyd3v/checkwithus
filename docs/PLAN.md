@@ -44,7 +44,7 @@ Setup: one iPhone as the older adult, the MacBook dashboard as the family, Googl
 
 ## Out of scope (cut on Oct 17 to focus on sponsors)
 - Qwen fine-tune ("checkwith-1") and model retraining
-- Family iPhone app (Guardian push + dashboard instead)
+- ~~Family iPhone app~~ Back in scope (decided Oct 17): the iPhone app serves both roles, the older adult and the family. The web is the landing page plus the family dashboard.
 - Screen Time app lock
 - Usability test with older adults (later, not this weekend)
 
