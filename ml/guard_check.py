@@ -96,10 +96,10 @@ RULES = [
          L(r"\b(send|deposit|transfer|pay|buy|put)\b.{0,40}\b(bitcoin|btc|usdt|tether|crypto|ethereum)\b|\b(bitcoin|crypto) (atm|kiosk|machine)\b"),
          unless=never + L(r"(send|deposit|transfer|pay|buy|put)\b")),
     rule("withdraw_fee",
-         L(r"\b(pay|deposit|top ?up|send)\b.{0,60}\b(to|before you can|so you can)\s+(withdraw|unlock|release|unfreeze|access|claim)\b")
+         L(r"\b(pay|deposit|top ?up|send)\b.{0,60}\b(to|before you can|so you can)\s+(withdraw|unfreeze|claim|(unlock|release|access)\s+(the |your )?(funds|profits?|money|withdrawal|earnings|balance|assets))\b")
          + L(r"|\b(withdraw\w*|unlock|release)\b.{0,60}\b(must|need to|needs?|required|first)\b.{0,40}\b(fee|tax|deposit|pay)\b")
          + L(r"|\b(before|to)\s+(withdraw\w*|unlock|release)\b.{0,60}\b(fee|deposit)\b"),
-         unless=never + L(r"(pay|send|deposit|ask)\b")),
+         unless=never + L(r"(pay|send|deposit|ask)\b|\bpenalty\b")),
     rule("toll_link", L(r"\btolls?\b(?![- ]?free).{0,120}") + link,
          L(r"\b(unpaid|overdue|due|pay|payment|balance|outstanding|fee|fine|penalty|settle|final notice)\b")),
     rule("remote_access", L(r"\b(anydesk|teamviewer|ultraviewer|quick ?support|logmein|remote (access|desktop|control))\b"),

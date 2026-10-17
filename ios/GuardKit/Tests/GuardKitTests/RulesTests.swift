@@ -62,7 +62,12 @@ final class RulesTests: XCTestCase {
             "Weekly returns are due Friday, bring the library books",
             "Robinhood: Your order to buy 2 shares of AAPL was filled.",
             "Sorry, wrong number! I was trying to reach my sister.",
-            "Mom please don't send money to that guy you met on Facebook. Anyone who promises guaranteed crypto returns is scamming you.",
+            // Not copied from blind_probe.csv, so these tests never tune rules on the blind set.
+            "Dad, if someone online promises guaranteed crypto returns, it is a scam. Please don't send them money.",
+            "CVS Pharmacy: Your prescription is ready. Please pay at the counter to release your order.",
+            "Library: pay your $3 late fee to unlock your account and borrow again.",
+            "I need to pay the parking fine to release the car from the impound lot",
+            "HSA reminder: to withdraw for non-medical expenses you must pay a 20% tax penalty.",
         ]
         for text in legit {
             XCTAssertEqual(fired(text), [], "false hold on: \(text)")

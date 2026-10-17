@@ -92,10 +92,10 @@ The app ships only Guard tiny (`NGramScorer`), in the Message Filter and in the 
 | Guard v2: DistilBERT, + toll and investment data (PyTorch) | No | | 884 | 97.4% | 94.0% | 1.3% | |
 | Guard v2, Core ML fp16 | No | 133.4 MB | 884 | | 93.5% | 1.3% | 1.3 ms |
 | Guard v2, Core ML 8-bit (`GuardInt8.mlpackage`) | No | 67 MB | 884 | | 94.0% | 1.1% | 1.50 ms (Swift, with rules) |
-| Rules only (`ios/GuardKit/ScamRules.swift`, 9 rules) | Yes, with Guard tiny | | 884 | | 2.4% | 0.0% | |
+| Rules only (`ios/GuardKit/ScamRules.swift`, 10 rules) | Yes, with Guard tiny | | 884 | | 3.6% | 0.0% | |
 | Guard v1: DistilBERT, val target 95% (older test set) | No | | 878 | 97.6% | 98.4% | 2.7% | |
 
-Adding the 9 rules to either model changes nothing on this test set (same recall and false holds in `guard-eval`).
+Adding the 10 rules to either model changes nothing on this test set (same recall and false holds in `guard-eval`).
 
 Probe set: the first 40-row probe of held-out synthetic texts (15 toll and delivery scams, 15 investment scams, 10 legit), because no real ones exist in open data. The current 85-row `probe.csv` is under "Investment scams" below.
 
@@ -109,7 +109,7 @@ Probe set: the first 40-row probe of held-out synthetic texts (15 toll and deliv
 Notes:
 - v1 and v2 use slightly different test sets (the data changed), so compare with care.
 - The Message Filter extension is killed above roughly 25 to 30 MB (measured with a probe on iOS 26), so DistilBERT cannot run there ([DECISIONS 27](ml/data/DECISIONS.md)). The DistilBERT Core ML scorer stays in GuardKit (`CoreMLScorer`) for later.
-- The 9 rules hold 0 of 6,382 legit texts across train, val and test. Legit "Toll Free" texts in test held by v2: 0 of 3.
+- The 10 rules hold 0 of 6,382 legit texts across train, val and test. Legit "Toll Free" texts in test held by v2: 0 of 3.
 - Weak spot: investment scams that open with "sorry, wrong number" (13% probe recall). The payment hold catches the money step instead.
 - Speeds are on an Apple M5 Pro Mac. We have no saved iPhone timing; the 2.6 MB extension memory was measured on one iPhone ([DECISIONS 27](ml/data/DECISIONS.md)).
 
@@ -132,6 +132,7 @@ Pig-butchering scams start as a friendly "wrong number" text, build trust, then 
 - Blind-set false holds: the model holds real Chase and Kraken withdrawal alerts, and `safe_account` holds an FTC warning tip.
 - Score any CSV the way the phone does, on any machine: `python -I ml/guard_check.py <csv> --rows`. It checks its regexes against `ScamRules.swift` first. Real texts from your own phone go in `ml/data/real_local.csv` (gitignored).
 - Do not tune rules or training data on `blind_probe.csv`; it stops being blind. Use a new blind set to measure a change.
+- Disclosure: the two pitch rules were dropped after seeing their blind result, so the blind number for the rules is slightly optimistic. The model was never tuned on it.
 - The tiny model is not retrained. `synthetic.csv` has 17 investment pitch templates (40 rows) and 30 investment-themed legit rows waiting for `build.py` + `train_ngram.py`.
 
 ## Tiger Data performance
