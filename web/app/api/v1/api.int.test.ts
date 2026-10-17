@@ -40,12 +40,13 @@ vi.mock('@/lib/services', async () => {
   const { db } = await import('@/lib/db');
   const { createNessieClient } = await import('@/lib/nessie/client');
   const { createPaymentService } = await import('@/lib/payments');
-  const service = createPaymentService({
-    pool: db(),
-    nessie: createNessieClient({ key: 'test-key', fetch: fake.fetch, sleep: async () => {} }),
-  });
+  const { createFreezeService } = await import('@/lib/freeze');
+  const nessie = createNessieClient({ key: 'test-key', fetch: fake.fetch, sleep: async () => {} });
+  const service = createPaymentService({ pool: db(), nessie });
+  const freezeService = createFreezeService({ pool: db(), nessie });
   return {
     payments: () => service,
+    freeze: () => freezeService,
     cibaApprovals: () => approvalMode.ciba ? { pollPayment, pollCircles: async () => {} } : null,
     approvalsUseCiba: () => approvalMode.ciba,
   };
@@ -69,6 +70,8 @@ const routes = {
   familyAlerts: await import('./family/alerts/route'),
   join: await import('./family/join/route'),
   me: await import('./family/me/route'),
+  freeze: await import('./family/circles/[id]/freeze/route'),
+  unfreeze: await import('./family/circles/[id]/unfreeze/route'),
 };
 
 const BASE = 'https://checkwith.us/api/v1';
@@ -447,5 +450,23 @@ describe('alerts and the family circle', () => {
     await db().query(`update devices set revoked_at = now() where circle_id = $1`, [circleId]);
     const response = await routes.config.GET(req('/device/config', { device: deviceToken }), noParams);
     expect(response.status).toBe(401);
+  });
+});
+
+describe('Freeze over HTTP (the family app contract)', () => {
+  it('an approver freezes with {} and unfreezes an amount; a viewer gets 403', async () => {
+    const path = `/family/circles/${circleId}`;
+    expect((await routes.freeze.POST(req(`${path}/freeze`, { sub: MARIA, body: { extra: true } }), params(circleId))).status).toBe(400);
+    // Leo joined by invite, so he is a viewer.
+    expect(await read(await routes.freeze.POST(req(`${path}/freeze`, { sub: 'test|leo', body: {} }), params(circleId))))
+      .toMatchObject({ status: 403, body: { error: 'permission_required' } });
+
+    const frozen = await read(await routes.freeze.POST(req(`${path}/freeze`, { sub: MARIA, body: {} }), params(circleId)));
+    expect(frozen).toEqual({ status: 200, body: { frozen: true, movedCents: expect.any(Number) } });
+    expect(frozen.body.movedCents).toBeGreaterThan(0);
+
+    expect((await routes.unfreeze.POST(req(`${path}/unfreeze`, { sub: MARIA, body: { amountCents: '100' } }), params(circleId))).status).toBe(400);
+    expect(await read(await routes.unfreeze.POST(req(`${path}/unfreeze`, { sub: MARIA, body: { amountCents: 10_000 } }), params(circleId))))
+      .toEqual({ status: 200, body: { frozen: false, movedCents: 10_000 } });
   });
 });
