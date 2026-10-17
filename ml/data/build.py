@@ -155,7 +155,8 @@ def clusters(texts, bands=24, per_band=3):
 
 
 def near(queries, pool):
-    """For each query: does any pool text reach SIM? Exact Jaccard over candidates that share a rare 5-gram."""
+    """For each query: does any pool text reach SIM? Exact: a match holds at least SIM*|q| of q's 5-grams,
+    so it shares one of q's rarest |q| - floor(SIM*|q|) + 1."""
     ps = [shingles(t) for t in pool]
     index = {}
     for i, s in enumerate(ps):
@@ -164,7 +165,8 @@ def near(queries, pool):
 
     def hit(q):
         qs = shingles(q)
-        cand = {i for x in sorted(qs, key=lambda x: len(index.get(x, ())))[:8] for i in index.get(x, ())}
+        k = len(qs) - int(SIM * len(qs)) + 1
+        cand = {i for x in sorted(qs, key=lambda x: len(index.get(x, ())))[:k] for i in index.get(x, ())}
         return any(len(qs & ps[i]) / len(qs | ps[i]) >= SIM for i in cand)
 
     return queries.map(hit)

@@ -47,7 +47,9 @@ def leaks(queries, pool, thr=0.8):
     hits = []
     for q in queries:
         qg = grams(q)
-        rare = sorted(qg, key=lambda x: len(index.get(x, ())))[:8]
+        # Exact: a pool text with Jaccard >= thr holds at least thr*|q| of q's grams, so it holds one of
+        # any |q| - floor(thr*|q|) + 1 of them. Take the rarest that many.
+        rare = sorted(qg, key=lambda x: len(index.get(x, ())))[:len(qg) - int(thr * len(qg)) + 1]
         cand = {i for x in rare for i in index.get(x, ())}
         best = max((len(qg & pg[i]) / len(qg | pg[i]) for i in cand), default=0)
         if best >= thr:

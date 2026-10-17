@@ -22,6 +22,7 @@ final class RulesTests: XCTestCase {
             ("Your lost iPhone is online. See location: http://view-Apple.com/23r3ew2", "lookalike_domain"),
             ("USPS: package on hold, update address at usps-redeliver.info/r1", "lookalike_domain"),
             ("Account locked. Verify at https://secure.paypalsecurity.net/login", "lookalike_domain"),
+            ("Photos from Sunday are ready! https://apple.com.example.com/view", "lookalike_domain"),
         ]
         for (text, rule) in cases {
             XCTAssertTrue(fired(text).contains(rule), "\(rule) did not fire on: \(text)")
@@ -44,6 +45,12 @@ final class RulesTests: XCTestCase {
             "USPS Informed Delivery: track at https://tools.usps.com/go/TrackConfirmAction",
             "Read our blog at startups.com and groups.google.com",
             "Apple: your receipt is at https://reportaproblem.apple.com",
+            "Amazon UK: your order shipped, see https://www.amazon.co.uk/orders",
+            "Chase: Never move your savings to a safe account when a caller asks. This is a scam.",
+            "We will never ask you to move money to a secure account.",
+            "Chase fraud alert: Never install AnyDesk or share your screen with a caller.",
+            "Your toll statement is ready at https://www.sunpass.com",
+            "Thanks for calling. Our toll-free support line is listed at https://example.com/help",
         ]
         for text in legit {
             XCTAssertEqual(fired(text), [], "false hold on: \(text)")

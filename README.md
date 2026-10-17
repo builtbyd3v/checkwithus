@@ -23,7 +23,7 @@ Contributors and agents: read [AGENTS.md](AGENTS.md) first, then
 
 ## Model evaluation
 
-Test set: real texts only (Mendeley, NCSU, UCI), no near-duplicates of training rows. Threshold set on val. Probe: 40 held-out synthetic toll and investment texts (no real ones exist). Data: `ml/data/REPORT.md`.
+Test set: real texts only (Mendeley, NCSU, UCI), no near-duplicates of training rows. Threshold set on val. The 97% val target (v2 and tiny) was picked after seeing one test result ([DECISIONS 26](ml/data/DECISIONS.md)), so those test numbers are slightly optimistic. Probe: 40 held-out synthetic toll and investment texts (no real ones exist). Data: `ml/data/REPORT.md`.
 
 | Model | Test n | Accuracy | Scam recall | False holds | ECE | Delivery + toll recall (test / probe) | Investment recall (test / probe) | iPhone latency |
 |---|---|---|---|---|---|---|---|---|

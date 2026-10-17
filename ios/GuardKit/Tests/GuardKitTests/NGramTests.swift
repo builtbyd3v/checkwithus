@@ -14,7 +14,7 @@ final class NGramTests: XCTestCase {
         var bad: [String] = []
         for c in cases {
             let p = scorer.score(c.text)
-            if NGramScorer.features(c.text, bits: scorer.bits, charNs: scorer.charNs).count != c.n || abs(p - c.p) > 1e-4 {
+            if NGramScorer.features(c.text, bits: scorer.bits, charNs: scorer.charNs).count != c.n || !(abs(p - c.p) <= 1e-4) {
                 bad.append("\(c.text.prefix(40)) swift=\(p) python=\(c.p)")
             }
         }
