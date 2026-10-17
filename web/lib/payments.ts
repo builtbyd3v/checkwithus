@@ -1,0 +1,682 @@
+/**
+ * Payments: from the phone's request to money moving (or not) at Nessie.
+ *
+ *   createPayment  rules decide: allowed -> sent to Nessie now; held -> family
+ *   decidePayment  first family answer wins, before the deadline
+ *   expireOverdue  no answer by the deadline -> blocked
+ *   executePayment approved -> Nessie, exactly once
+ *
+ * Every state change is one conditional UPDATE, so the database, not this
+ * process, decides races: two family members answering at the same instant
+ * produce one winner, and an answer that arrives after the deadline cannot
+ * win. Deadlines use the database clock (`now()`), never the server's.
+ *
+ * Money only moves in `executePayment`, and only from `approved`, which is
+ * reachable only through the fixed rules or a family member's answer
+ * (hard rule #1).
+ */
+import 'server-only';
+import type pg from 'pg';
+import { CATEGORY_LABELS, payeeKindNeedsWholeDollars, type Category, type PayeeKind } from '@/lib/categories';
+import { transaction, type Queryable } from '@/lib/db';
+import { toCents, type Cents } from '@/lib/money';
+import { normalizeName } from '@/lib/names';
+import { NessieError, type NessieClient } from '@/lib/nessie/client';
+import {
+  merchantBody,
+  paidBillBody,
+  purchaseBody,
+  taggedDescription,
+  withdrawalBody,
+} from '@/lib/nessie/format';
+import { decideHold, type Baseline, type HoldReason } from '@/lib/rules';
+
+export const PAYMENT_STATUSES = [
+  'held',
+  'approved',
+  'denied',
+  'expired',
+  'paying',
+  'paid',
+  'failed',
+] as const;
+export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
+
+export type DecisionChannel = 'app' | 'ciba' | 'dashboard';
+
+export type Payment = {
+  id: string;
+  circleId: string;
+  amountCents: Cents;
+  payeeName: string;
+  payeeKind: PayeeKind;
+  category: Category;
+  onCall: boolean;
+  payeeKnown: boolean;
+  guardScore: number | null;
+  guardModelVersion: string | null;
+  explanation: string | null;
+  holdReasons: HoldReason[];
+  status: PaymentStatus;
+  expiresAt: Date | null;
+  decidedBy: string | null;
+  decidedVia: 'rules' | DecisionChannel | 'timeout' | null;
+  decidedAt: Date | null;
+  nessieKind: 'purchase' | 'withdrawal' | 'bill' | null;
+  nessieId: string | null;
+  failure: string | null;
+  createdAt: Date;
+};
+
+export type NewPayment = {
+  /** Chosen by the phone; a retry with the same key returns the same payment. */
+  idempotencyKey: string;
+  amountCents: Cents;
+  payeeName: string;
+  payeeKind: PayeeKind;
+  category: Category;
+  onCall: boolean;
+  guard: { score: number; modelVersion: string | null } | null;
+  explanation: string | null;
+};
+
+/** What the payment service needs to know about a circle. */
+export type CircleSettings = {
+  id: string;
+  nessieAccountId: string;
+  timeZone: string;
+  holdOverCents: Cents;
+  approvalTimeoutSeconds: number;
+};
+
+export type PaymentErrorCode =
+  | 'not_found'
+  | 'expired'
+  | 'already_decided'
+  | 'idempotency_conflict'
+  | 'whole_dollars_only';
+
+/** A request we refuse for a reason the caller should be told about. */
+export class PaymentError extends Error {
+  constructor(
+    readonly code: PaymentErrorCode,
+    message: string,
+    readonly payment?: Payment,
+  ) {
+    super(message);
+    this.name = 'PaymentError';
+  }
+}
+
+const COLUMNS = `
+  id, circle_id, amount_cents, payee_name, payee_kind, category, on_call,
+  payee_known, guard_score, guard_model_version, explanation, hold_reasons,
+  status, expires_at, decided_by, decided_via, decided_at, nessie_kind,
+  nessie_id, failure, created_at`;
+
+type PaymentRow = {
+  id: string;
+  circle_id: string;
+  amount_cents: number;
+  payee_name: string;
+  payee_kind: PayeeKind;
+  category: Category;
+  on_call: boolean;
+  payee_known: boolean;
+  guard_score: number | null;
+  guard_model_version: string | null;
+  explanation: string | null;
+  hold_reasons: HoldReason[];
+  status: PaymentStatus;
+  expires_at: Date | null;
+  decided_by: string | null;
+  decided_via: Payment['decidedVia'];
+  decided_at: Date | null;
+  nessie_kind: Payment['nessieKind'];
+  nessie_id: string | null;
+  failure: string | null;
+  created_at: Date;
+};
+
+function toPayment(row: PaymentRow): Payment {
+  return {
+    id: row.id,
+    circleId: row.circle_id,
+    amountCents: toCents(row.amount_cents),
+    payeeName: row.payee_name,
+    payeeKind: row.payee_kind,
+    category: row.category,
+    onCall: row.on_call,
+    payeeKnown: row.payee_known,
+    guardScore: row.guard_score,
+    guardModelVersion: row.guard_model_version,
+    explanation: row.explanation,
+    holdReasons: row.hold_reasons,
+    status: row.status,
+    expiresAt: row.expires_at,
+    decidedBy: row.decided_by,
+    decidedVia: row.decided_via,
+    decidedAt: row.decided_at,
+    nessieKind: row.nessie_kind,
+    nessieId: row.nessie_id,
+    failure: row.failure,
+    createdAt: row.created_at,
+  };
+}
+
+/** Every Nessie merchant we create shares this fake address (rule 4: no real data). */
+const DEMO_MERCHANT_LOCATION = {
+  address: {
+    street_number: '100',
+    street_name: 'Demo Street',
+    city: 'Gainesville',
+    state: 'FL',
+    zip: '32601',
+  },
+  geocode: { lat: 29.6516, lng: -82.3248 },
+};
+
+/** A 'paying' payment untouched this long had its request cut off mid-flight. */
+const STUCK_PAYING_SECONDS = 30;
+
+export type PaymentServiceDeps = {
+  pool: pg.Pool;
+  nessie: NessieClient;
+  /** Called once when a payment is held, to start asking the family (e.g. CIBA). */
+  onHeld?: (payment: Payment) => Promise<void>;
+};
+
+export function createPaymentService(deps: PaymentServiceDeps) {
+  const { pool, nessie } = deps;
+
+  async function getPayment(id: string, q: Queryable = pool): Promise<Payment | null> {
+    const { rows } = await q.query<PaymentRow>(`select ${COLUMNS} from payments where id = $1`, [
+      id,
+    ]);
+    return rows[0] ? toPayment(rows[0]) : null;
+  }
+
+  async function circleSettings(circleId: string): Promise<CircleSettings> {
+    const { rows } = await pool.query<{
+      id: string;
+      nessie_account_id: string;
+      time_zone: string;
+      hold_over_cents: number;
+      approval_timeout_seconds: number;
+    }>(
+      `select id, nessie_account_id, time_zone, hold_over_cents, approval_timeout_seconds
+         from circles where id = $1`,
+      [circleId],
+    );
+    const row = rows[0];
+    if (!row) throw new PaymentError('not_found', 'Circle not found');
+    return {
+      id: row.id,
+      nessieAccountId: row.nessie_account_id,
+      timeZone: row.time_zone,
+      holdOverCents: toCents(row.hold_over_cents),
+      approvalTimeoutSeconds: row.approval_timeout_seconds,
+    };
+  }
+
+  async function isKnownPayee(circleId: string, kind: PayeeKind, name: string) {
+    const { rowCount } = await pool.query(
+      `select 1 from payees where circle_id = $1 and kind = $2 and normalized_name = $3`,
+      [circleId, kind, normalizeName(name)],
+    );
+    return (rowCount ?? 0) > 0;
+  }
+
+  /**
+   * What this person typically spends in a category on a day they spend in it,
+   * over the last 90 days, from the `spending_daily` continuous aggregate.
+   */
+  async function baselineFor(circleId: string, category: Category): Promise<Baseline> {
+    const { rows } = await pool.query<{ typical: number | null; active_days: number }>(
+      `select round(avg(total_cents))::bigint as typical, count(*)::int as active_days
+         from spending_daily
+        where circle_id = $1 and category = $2 and day >= now() - interval '90 days'`,
+      [circleId, category],
+    );
+    const row = rows[0];
+    if (!row || row.typical === null || row.active_days === 0) return null;
+    return { typicalDailyCents: toCents(row.typical), activeDays: row.active_days };
+  }
+
+  async function createPayment(circleId: string, input: NewPayment): Promise<Payment> {
+    // Refuse up front what Nessie would silently truncate, so the phone hears
+    // "no" now instead of a family approving an amount the bank then changes.
+    if (payeeKindNeedsWholeDollars(input.payeeKind) && input.amountCents % 100 !== 0) {
+      throw new PaymentError(
+        'whole_dollars_only',
+        'Payments to merchants and people must be whole dollars; only bills can include cents.',
+      );
+    }
+
+    const circle = await circleSettings(circleId);
+    const [payeeKnown, baseline] = await Promise.all([
+      isKnownPayee(circle.id, input.payeeKind, input.payeeName),
+      baselineFor(circle.id, input.category),
+    ]);
+
+    const decision = decideHold({
+      payment: {
+        amountCents: input.amountCents,
+        category: input.category,
+        payeeKind: input.payeeKind,
+        payeeKnown,
+        onCall: input.onCall,
+      },
+      holdOverCents: circle.holdOverCents,
+      baseline,
+      guard: input.guard ? { score: input.guard.score } : null,
+    });
+    const held = decision.action === 'hold';
+
+    const inserted = await pool.query<PaymentRow>(
+      `insert into payments (
+         circle_id, idempotency_key, amount_cents, payee_name, payee_kind, category,
+         on_call, payee_known, guard_score, guard_model_version, explanation,
+         hold_reasons, status, expires_at, decided_via, decided_at)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+         case when $14 then now() + make_interval(secs => $15) end,
+         case when $14 then null else 'rules' end,
+         case when $14 then null else now() end)
+       on conflict (circle_id, idempotency_key) do nothing
+       returning ${COLUMNS}`,
+      [
+        circle.id,
+        input.idempotencyKey,
+        input.amountCents,
+        input.payeeName,
+        input.payeeKind,
+        input.category,
+        input.onCall,
+        payeeKnown,
+        input.guard?.score ?? null,
+        input.guard?.modelVersion ?? null,
+        input.explanation,
+        held ? decision.reasons : [],
+        held ? 'held' : 'approved',
+        held,
+        circle.approvalTimeoutSeconds,
+      ],
+    );
+
+    if (!inserted.rows[0]) return replay(circle.id, input);
+
+    const payment = toPayment(inserted.rows[0]);
+    if (payment.status === 'approved') return executePayment(payment.id);
+    try {
+      await deps.onHeld?.(payment);
+    } catch (error) {
+      // The hold is what protects the money, and it is already saved. A failed
+      // push must not fail the request: the phone would retry, the retry would
+      // replay this payment, and onHeld would never run again. The family app
+      // still sees the hold when it next loads.
+      console.error(`Could not notify family about payment ${payment.id}: ${messageOf(error)}`);
+    }
+    return payment;
+  }
+
+  /** Same idempotency key again: the original payment, never a second one. */
+  async function replay(circleId: string, input: NewPayment): Promise<Payment> {
+    const { rows } = await pool.query<PaymentRow>(
+      `select ${COLUMNS} from payments where circle_id = $1 and idempotency_key = $2`,
+      [circleId, input.idempotencyKey],
+    );
+    const existing = rows[0] ? toPayment(rows[0]) : null;
+    if (!existing) throw new Error('Idempotency conflict but no existing payment found');
+
+    // Every input the hold decision used must match, or a retry could return a
+    // payment the rules allowed under different facts (say, before a call began).
+    const same =
+      existing.amountCents === input.amountCents &&
+      existing.payeeKind === input.payeeKind &&
+      existing.category === input.category &&
+      normalizeName(existing.payeeName) === normalizeName(input.payeeName) &&
+      existing.onCall === input.onCall &&
+      sameGuardScore(existing.guardScore, input.guard?.score ?? null) &&
+      existing.guardModelVersion === (input.guard?.modelVersion ?? null) &&
+      existing.explanation === input.explanation;
+    if (!same) {
+      throw new PaymentError(
+        'idempotency_conflict',
+        'This idempotency key was already used for a different payment.',
+      );
+    }
+    // A crash between approval and sending leaves it 'approved'; finish the job.
+    return existing.status === 'approved' ? executePayment(existing.id) : existing;
+  }
+
+  /**
+   * A family member's answer. Wins only if the payment is still held and the
+   * deadline has not passed, both checked by the database in the same UPDATE.
+   */
+  async function decidePayment(input: {
+    paymentId: string;
+    member: { auth0Sub: string } | { memberId: string };
+    decision: 'approve' | 'deny';
+    via: DecisionChannel;
+  }): Promise<Payment> {
+    const bySub = 'auth0Sub' in input.member ? input.member.auth0Sub : null;
+    const byId = 'memberId' in input.member ? input.member.memberId : null;
+
+    const { rows } = await pool.query<PaymentRow>(
+      `update payments p
+          set status = $2, decided_by = m.id, decided_via = $3,
+              decided_at = now(), updated_at = now()
+         from circle_members m
+        where p.id = $1
+          and m.circle_id = p.circle_id
+          and (m.auth0_sub = $4 or m.id = $5)
+          and p.status = 'held'
+          and p.expires_at > now()
+       returning ${COLUMNS.replace(/(\w+)/g, 'p.$1')}`,
+      [input.paymentId, input.decision === 'approve' ? 'approved' : 'denied', input.via, bySub, byId],
+    );
+
+    if (rows[0]) {
+      const decided = toPayment(rows[0]);
+      return decided.status === 'approved' ? executePayment(decided.id) : decided;
+    }
+
+    // It did not win. Say why, without revealing payments in other circles.
+    const { rows: visible } = await pool.query<PaymentRow>(
+      `select ${COLUMNS.replace(/(\w+)/g, 'p.$1')}
+         from payments p
+         join circle_members m on m.circle_id = p.circle_id
+        where p.id = $1 and (m.auth0_sub = $2 or m.id = $3)`,
+      [input.paymentId, bySub, byId],
+    );
+    const current = visible[0] ? toPayment(visible[0]) : null;
+    if (!current) throw new PaymentError('not_found', 'Payment not found');
+    if (current.status === 'held') {
+      await expireOverdue(current.circleId);
+      throw new PaymentError(
+        'expired',
+        'Nobody answered in time, so this payment was blocked.',
+        (await getPayment(current.id)) ?? current,
+      );
+    }
+    throw new PaymentError(
+      current.status === 'expired' ? 'expired' : 'already_decided',
+      current.status === 'expired'
+        ? 'Nobody answered in time, so this payment was blocked.'
+        : 'Someone in the family already answered.',
+      current,
+    );
+  }
+
+  /** Held payments past their deadline become `expired`: blocked. */
+  async function expireOverdue(circleId: string): Promise<number> {
+    const { rowCount } = await pool.query(
+      `update payments
+          set status = 'expired', decided_via = 'timeout',
+              decided_at = expires_at, updated_at = now()
+        where circle_id = $1 and status = 'held' and expires_at <= now()`,
+      [circleId],
+    );
+    return rowCount ?? 0;
+  }
+
+  async function ensureMerchant(name: string, category: Category): Promise<string> {
+    const key = [normalizeName(name), category];
+    const select = `select nessie_merchant_id from nessie_merchants
+                     where normalized_name = $1 and category = $2`;
+    const found = await pool.query<{ nessie_merchant_id: string }>(select, key);
+    if (found.rows[0]) return found.rows[0].nessie_merchant_id;
+
+    const nessieMerchantId = await nessie.createMerchant(
+      merchantBody({ name, category, ...DEMO_MERCHANT_LOCATION }),
+    );
+    // Two payments creating the same merchant at once: keep whichever landed first.
+    await pool.query(
+      `insert into nessie_merchants (normalized_name, category, name, nessie_merchant_id)
+       values ($1, $2, $3, $4) on conflict do nothing`,
+      [...key, name, nessieMerchantId],
+    );
+    const stored = await pool.query<{ nessie_merchant_id: string }>(select, key);
+    return stored.rows[0]?.nessie_merchant_id ?? nessieMerchantId;
+  }
+
+  /**
+   * Sends an approved payment to Nessie, exactly once. The `approved ->
+   * paying` claim is a conditional UPDATE, so if two requests race here only
+   * one of them sends.
+   */
+  async function executePayment(id: string): Promise<Payment> {
+    const claimed = await pool.query<PaymentRow>(
+      `update payments set status = 'paying', updated_at = now()
+        where id = $1 and status = 'approved'
+       returning ${COLUMNS}`,
+      [id],
+    );
+    if (!claimed.rows[0]) {
+      const current = await getPayment(id);
+      if (!current) throw new PaymentError('not_found', 'Payment not found');
+      return current;
+    }
+    const payment = toPayment(claimed.rows[0]);
+    const circle = await circleSettings(payment.circleId);
+    const common = { amountCents: payment.amountCents, at: new Date(), timeZone: circle.timeZone };
+
+    let kind: 'purchase' | 'withdrawal' | 'bill';
+    let send: () => Promise<string>;
+    try {
+      switch (payment.payeeKind) {
+        case 'merchant': {
+          const merchantId = await ensureMerchant(payment.payeeName, payment.category);
+          const body = purchaseBody({
+            ...common,
+            merchantId,
+            description: taggedDescription(CATEGORY_LABELS[payment.category], payment.id),
+          });
+          kind = 'purchase';
+          send = () => nessie.createPurchase(circle.nessieAccountId, body);
+          break;
+        }
+        case 'person': {
+          const body = withdrawalBody({
+            ...common,
+            description: taggedDescription(`To ${payment.payeeName}`, payment.id),
+          });
+          kind = 'withdrawal';
+          send = () => nessie.createWithdrawal(circle.nessieAccountId, body);
+          break;
+        }
+        case 'biller': {
+          const body = paidBillBody({
+            ...common,
+            payee: payment.payeeName,
+            nickname: taggedDescription(CATEGORY_LABELS[payment.category], payment.id),
+          });
+          kind = 'bill';
+          send = () => nessie.createBill(circle.nessieAccountId, body);
+          break;
+        }
+      }
+    } catch (error) {
+      // Nothing reached Nessie yet (a merchant create is not a payment).
+      return markFailed(payment.id, `Could not prepare the payment: ${messageOf(error)}`);
+    }
+
+    // Only the send is guarded here. Once Nessie has said yes, nothing that
+    // goes wrong afterwards may mark this payment failed: the money moved.
+    let nessieId: string;
+    try {
+      nessieId = await send();
+    } catch (error) {
+      if (error instanceof NessieError && error.outcomeUnknown) {
+        // Too soon to call it failed: a write that timed out on our side can
+        // still land at Nessie. Look now; if it is not there yet, stay `paying`.
+        return reconcile(payment, circle.nessieAccountId, { mayConcludeFailed: false });
+      }
+      return markFailed(payment.id, messageOf(error));
+    }
+    return recordPaid(payment, kind, nessieId);
+  }
+
+  /**
+   * Records a payment Nessie confirmed. If our own bookkeeping fails, the
+   * payment stays `paying` with a note, and a later read finds it at Nessie by
+   * its tag and records it then. It is never marked failed.
+   */
+  async function recordPaid(
+    payment: Payment,
+    kind: 'purchase' | 'withdrawal' | 'bill',
+    nessieId: string,
+  ): Promise<Payment> {
+    try {
+      return await markPaid(payment, kind, nessieId);
+    } catch (error) {
+      await notePaying(
+        payment.id,
+        `Sent to Nessie but not yet recorded here (${messageOf(error).slice(0, 200)})`,
+      ).catch(() => {});
+      throw error;
+    }
+  }
+
+  /** Leaves a payment `paying`, with a note for the dashboard. Restarts the reconcile clock. */
+  async function notePaying(id: string, note: string): Promise<void> {
+    await pool.query(
+      `update payments set failure = $2, updated_at = now() where id = $1 and status = 'paying'`,
+      [id, note],
+    );
+  }
+
+  /**
+   * After a write whose outcome is unknown: look for the payment's tag at
+   * Nessie instead of sending again. Finding it settles it. Not finding it
+   * settles it only when enough time has passed since the last attempt that a
+   * slow write would have landed (`mayConcludeFailed`); until then it stays
+   * `paying` and a later read looks again.
+   */
+  async function reconcile(
+    payment: Payment,
+    nessieAccountId: string,
+    { mayConcludeFailed }: { mayConcludeFailed: boolean },
+  ): Promise<Payment> {
+    let record;
+    try {
+      record = await nessie.findRecordForPayment(nessieAccountId, payment.id);
+    } catch {
+      await notePaying(payment.id, 'Nessie did not confirm this payment; checking again shortly');
+      return (await getPayment(payment.id)) ?? payment;
+    }
+    if (record && record.kind !== 'deposit') {
+      return recordPaid(payment, record.kind, record.nessieId);
+    }
+    if (!mayConcludeFailed) {
+      await notePaying(payment.id, 'Nessie has not confirmed this payment yet; checking again shortly');
+      return (await getPayment(payment.id)) ?? payment;
+    }
+    return markFailed(payment.id, 'Nessie never confirmed this payment and has no record of it');
+  }
+
+  /**
+   * Settles a payment left `paying`: a send cut off mid-flight, or one waiting
+   * on reconciliation. Waits until the last attempt is STUCK_PAYING_SECONDS
+   * old, so a write still in flight at Nessie is not declared failed.
+   */
+  async function reconcileIfStuck(payment: Payment): Promise<Payment> {
+    if (payment.status !== 'paying') return payment;
+    const { rowCount } = await pool.query(
+      `select 1 from payments where id = $1 and status = 'paying'
+          and updated_at < now() - make_interval(secs => $2)`,
+      [payment.id, STUCK_PAYING_SECONDS],
+    );
+    if (!rowCount) return payment;
+    const circle = await circleSettings(payment.circleId);
+    return reconcile(payment, circle.nessieAccountId, { mayConcludeFailed: true });
+  }
+
+  /** paying -> paid, and the ledger row, in one transaction; once only. */
+  async function markPaid(
+    payment: Payment,
+    kind: 'purchase' | 'withdrawal' | 'bill',
+    nessieId: string,
+  ): Promise<Payment> {
+    return transaction(pool, async (client) => {
+      const { rows } = await client.query<PaymentRow>(
+        `update payments
+            set status = 'paid', nessie_kind = $2, nessie_id = $3,
+                failure = null, updated_at = now()
+          where id = $1 and status = 'paying'
+         returning ${COLUMNS}`,
+        [payment.id, kind, nessieId],
+      );
+      if (!rows[0]) return (await getPayment(payment.id, client)) ?? payment;
+      // Claim the Nessie record first; the ledger gets a row only if it is new.
+      const claim = await client.query(
+        `insert into spending_nessie_records (nessie_id, circle_id) values ($1, $2)
+         on conflict do nothing`,
+        [nessieId, payment.circleId],
+      );
+      if (claim.rowCount) {
+        await client.query(
+          `insert into spending (occurred_at, circle_id, amount_cents, category, payee_name, payment_id, nessie_id)
+           values (now(), $1, $2, $3, $4, $5, $6)`,
+          [payment.circleId, payment.amountCents, payment.category, payment.payeeName, payment.id, nessieId],
+        );
+      }
+      return toPayment(rows[0]);
+    });
+  }
+
+  async function markFailed(id: string, failure: string): Promise<Payment> {
+    const { rows } = await pool.query<PaymentRow>(
+      `update payments set status = 'failed', failure = $2, updated_at = now()
+        where id = $1 and status = 'paying'
+       returning ${COLUMNS}`,
+      [id, failure.slice(0, 500)],
+    );
+    if (rows[0]) return toPayment(rows[0]);
+    const current = await getPayment(id);
+    if (!current) throw new PaymentError('not_found', 'Payment not found');
+    return current;
+  }
+
+  /**
+   * The phone's view of one of its payments. Applies anything that is due
+   * first (an expired deadline, a crashed send), so polling this endpoint is
+   * also what moves stalled payments forward.
+   */
+  async function paymentForCircle(circleId: string, id: string): Promise<Payment> {
+    await expireOverdue(circleId);
+    const { rows } = await pool.query<PaymentRow>(
+      `select ${COLUMNS} from payments where id = $1 and circle_id = $2`,
+      [id, circleId],
+    );
+    if (!rows[0]) throw new PaymentError('not_found', 'Payment not found');
+    const payment = toPayment(rows[0]);
+    if (payment.status === 'approved') return executePayment(payment.id);
+    return reconcileIfStuck(payment);
+  }
+
+  return {
+    createPayment,
+    decidePayment,
+    expireOverdue,
+    executePayment,
+    paymentForCircle,
+    getPayment,
+  };
+}
+
+export type PaymentService = ReturnType<typeof createPaymentService>;
+
+/**
+ * `guard_score` is a 32-bit `real` column, so a score comes back at float4
+ * precision (0.123456789 returns as 0.12345679). Compare at that precision,
+ * or a genuine retry would look like a different payment.
+ */
+function sameGuardScore(stored: number | null, sent: number | null): boolean {
+  if (stored === null || sent === null) return stored === sent;
+  return Math.fround(stored) === Math.fround(sent);
+}
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
