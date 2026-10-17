@@ -12,7 +12,6 @@ type Stored = { kind: 'purchases' | 'withdrawals' | 'deposits' | 'bills' | 'tran
 export type FakeNessie = ReturnType<typeof createFakeNessie>;
 
 export function createFakeNessie() {
-  let nextId = 1;
   const merchants: Array<Record<string, unknown> & { _id: string }> = [];
   const accounts: Array<Record<string, unknown> & { _id: string; customer_id: string }> = [];
   const customers: Array<Record<string, unknown> & { _id: string }> = [];
@@ -28,7 +27,10 @@ export function createFakeNessie() {
   /** Runs once, in the middle of the next account list read: for staging races. */
   let listHook: (() => Promise<void>) | null = null;
 
-  const id = () => `fake-${nextId++}`;
+  // Nessie ids are globally unique, and spending_nessie_records keys on them
+  // across circles. A counter restarting at 1 per fake made `fake-1` collide
+  // with any other run on the same database, and the payment lost its ledger row.
+  const id = () => `fake-${crypto.randomUUID()}`;
 
   const json = (status: number, body: unknown) =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
