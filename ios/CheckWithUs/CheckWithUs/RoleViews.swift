@@ -13,8 +13,9 @@ struct RootView: View {
         case "protected":
             ContentView()
                 .overlay(alignment: .topTrailing) {
-                    // Only on the home and connect screens, so it never sits on top of a payment.
-                    if model.token == nil || model.screen == .home {
+                    // Only on the home and connect screens, so it never sits on top of a payment
+                    // or the bank permission step (#25).
+                    if model.token == nil || (model.screen == .home && !BankWatcher.shared.needsPermission) {
                         Button { settings = true } label: {
                             Image(systemName: "gearshape.fill").font(.title2).frame(width: 56, height: 56)
                         }
