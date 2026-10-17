@@ -48,4 +48,3 @@ export function DecisionForm({ paymentId, canApproveHere, decideAction }: { paym
     {!state.decided && <p role="status" className="mt-3 text-sm text-teal-900">{state.message}</p>}
   </form>;
 }
-
