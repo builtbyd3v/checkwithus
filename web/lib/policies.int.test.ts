@@ -54,6 +54,15 @@ describe('family policies', () => {
     expect(result.status).toBe('denied');
     expect(fake.paymentWrites().filter(w => JSON.stringify(w.body).includes(p.id))).toHaveLength(0);
   });
+  it('an approver who approved can change their mind to Deny', async () => {
+    const p = await service.createPayment(circleId, bill(150000));
+    await service.decidePayment({ paymentId: p.id, member: { memberId: approver }, decision: 'approve', via: 'dashboard' });
+    const result = await service.decidePayment({ paymentId: p.id, member: { memberId: approver }, decision: 'deny', via: 'dashboard' });
+    expect(result.status).toBe('denied');
+    await Promise.allSettled([service.decidePayment({ paymentId: p.id, member: { memberId: second }, decision: 'approve', via: 'app' })]);
+    expect((await service.getPayment(p.id))?.status).toBe('denied');
+    expect(fake.paymentWrites().filter(w => JSON.stringify(w.body).includes(p.id))).toHaveLength(0);
+  });
   it('requires fresh approver authentication to grant', async () => {
     const input = { payeeId: null, category: 'utilities' as const, maxAmountCents: 50000, expiresAt: new Date(Date.now() + 3600000).toISOString() };
     await expect(grantAllowance(pool, sub, undefined, circleId, input)).rejects.toMatchObject({ code: 'step_up_required' });

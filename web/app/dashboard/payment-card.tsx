@@ -23,6 +23,9 @@ export type ReviewPayment = Pick<ReturnType<typeof familyPaymentView>,
   'status' | 'protectedName' | 'payee' | 'amountCents' | 'explanation' | 'holdReasons' | 'approvalsRequired'>;
 
 /** Shared with the local gallery so screenshots exercise the production layout. */
+// ponytail: the demo family is in Gainesville; use the circle's time_zone if families span zones.
+const clock = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', dateStyle: 'medium', timeStyle: 'short' });
+
 export function PaymentCard({ payment, deadline, usualLine, sequence, children }: {
   payment: ReviewPayment; deadline?: ReactNode; usualLine?: string | null; sequence?: SequenceEvidence; children?: ReactNode;
 }) {
@@ -40,9 +43,9 @@ export function PaymentCard({ payment, deadline, usualLine, sequence, children }
       <h4 className="font-semibold">Cash, then a gift card</h4>
       <ol className="mt-2 list-decimal space-y-2 pl-5">
         <li><strong>{formatCents(sequence.cashCents)} cash</strong> at <span className="[overflow-wrap:anywhere]">{sequence.atmName}</span><br />
-          <time dateTime={sequence.cashAt}>{new Date(sequence.cashAt).toUTCString()}</time></li>
+          <time dateTime={sequence.cashAt}>{clock.format(new Date(sequence.cashAt))}</time></li>
         <li><strong>{formatCents(payment.amountCents)} gift card request</strong><br />
-          <time dateTime={sequence.paymentAt}>{new Date(sequence.paymentAt).toUTCString()}</time></li>
+          <time dateTime={sequence.paymentAt}>{clock.format(new Date(sequence.paymentAt))}</time></li>
       </ol>
       <p className="mt-3">These happened within two hours. Call {payment.protectedName} before deciding.</p>
     </section>}
