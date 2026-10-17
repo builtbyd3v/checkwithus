@@ -136,11 +136,6 @@ export function checkingAccountBody(input: { nickname: string; openingBalanceCen
   };
 }
 
-/** The Freeze vault. Starts empty; the ledger tracks what moves in. */
-export function vaultAccountBody(input: { nickname: string }) {
-  return { type: 'Savings' as const, nickname: input.nickname, rewards: 0, balance: 0 };
-}
-
 export function merchantBody(input: {
   name: string;
   category: Category;
@@ -186,20 +181,6 @@ export function withdrawalBody(input: MovementInput) {
 export function depositBody(input: MovementInput) {
   return {
     medium: 'balance' as const,
-    transaction_date: toNessieDate(input.at, input.timeZone),
-    status: 'completed' as const,
-    amount: toNessieWholeDollars(input.amountCents),
-    description: input.description,
-  };
-}
-
-/**
- * A transfer out of an account. Verified live on 2026-10-17: Nessie accepts
- * exactly these four fields and rejects `medium` and `payee_id`, so a
- * transfer cannot name the account it goes to. The description says it.
- */
-export function transferBody(input: MovementInput) {
-  return {
     transaction_date: toNessieDate(input.at, input.timeZone),
     status: 'completed' as const,
     amount: toNessieWholeDollars(input.amountCents),

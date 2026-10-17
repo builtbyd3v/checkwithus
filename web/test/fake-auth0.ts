@@ -9,44 +9,22 @@ export const FAKE_AUTH0 = {
   domain: 'checkwith-test.us.auth0.com',
   clientId: 'test-client-id',
   clientSecret: 'test-client-secret',
-  /** The bill-pay agent's Machine-to-Machine application. */
-  agentClientId: 'test-agent-client-id',
-  agentClientSecret: 'test-agent-client-secret',
 };
 const ISSUER = `https://${FAKE_AUTH0.domain}/`;
 
 type Answer = 'pending' | 'approve' | 'deny' | 'expire' | 'slow_down';
-type PushRequest = {
-  sub: string;
-  message: string;
-  expiry: number;
-  answer: Answer;
-  tokenSub?: string;
-  audience?: string;
-  /** The parsed authorization_details, when sent. */
-  details?: unknown;
-  /** RBAC claim for the access token. */
-  permissions?: string[];
-  /** Issue a JWT access token for the API (implied by `permissions`); else opaque. */
-  apiToken?: boolean;
-  /** Access token for someone else, or signed with a key Auth0 never published. */
-  accessSub?: string;
-  accessForged?: boolean;
-};
+type PushRequest = { sub: string; message: string; expiry: number; answer: Answer; tokenSub?: string };
 
 export type FakeAuth0 = Awaited<ReturnType<typeof createFakeAuth0>>;
 
 export async function createFakeAuth0() {
   const { privateKey, publicKey } = await generateKeyPair('RS256');
-  const forger = (await generateKeyPair('RS256')).privateKey;
   const keys = createLocalJWKSet({
     keys: [{ ...(await exportJWK(publicKey)), kid: 'k1', alg: 'RS256' }],
   });
   const pushes = new Map<string, PushRequest>();
   const notEnrolled = new Set<string>();
   const calls: Array<{ path: string; fields: Record<string, string> }> = [];
-  /** Off: like a tenant whose API has not registered the details type. */
-  const settings = { rarRegistered: true, agentScopes: ['pay:bills'] };
   let next = 1;
 
   const json = (status: number, body: unknown) =>
@@ -56,18 +34,6 @@ export async function createFakeAuth0() {
     const path = new URL(url).pathname;
     const fields = Object.fromEntries(new URLSearchParams(String(init.body)));
     calls.push({ path, fields });
-    if (path === '/oauth/token' && fields.grant_type === 'client_credentials') {
-      // The agent's M2M app gets only the scopes it is authorized for on the API.
-      if (fields.client_id !== FAKE_AUTH0.agentClientId || fields.client_secret !== FAKE_AUTH0.agentClientSecret) {
-        return json(401, { error: 'access_denied', error_description: 'Unauthorized' });
-      }
-      const scope = settings.agentScopes.join(' ');
-      const accessToken = await mint({
-        sub: `${FAKE_AUTH0.agentClientId}@clients`, audience: fields.audience ?? '',
-        claims: { gty: 'client-credentials', azp: FAKE_AUTH0.agentClientId, scope },
-      });
-      return json(200, { access_token: accessToken, scope, token_type: 'Bearer', expires_in: 86400 });
-    }
     if (fields.client_id !== FAKE_AUTH0.clientId || fields.client_secret !== FAKE_AUTH0.clientSecret) {
       return json(401, { error: 'access_denied', error_description: 'Unauthorized' });
     }
@@ -84,9 +50,6 @@ export async function createFakeAuth0() {
       if (message.length > 64) {
         return json(400, { error: 'invalid_request', error_description: 'binding_message should not exceed 64 characters' });
       }
-      if (fields.authorization_details && !settings.rarRegistered) {
-        return json(400, { error: 'invalid_request', error_description: 'authorization_details type is not allowed' });
-      }
       const sub = (JSON.parse(fields.login_hint ?? '{}') as { sub?: string }).sub ?? '';
       if (notEnrolled.has(sub)) {
         return json(400, { error: 'invalid_request', error_description: 'User has no enrolled push notification device' });
@@ -94,10 +57,7 @@ export async function createFakeAuth0() {
       // Unique across fake instances, like Auth0's: the column is unique, so ids
       // restarting at 1 in each test would collide with earlier tests' rows.
       const id = `fake-auth-req-${next++}-${crypto.randomUUID()}`;
-      pushes.set(id, {
-        sub, message, expiry: Number(fields.requested_expiry), answer: 'pending', audience: fields.audience,
-        details: fields.authorization_details ? JSON.parse(fields.authorization_details) : undefined,
-      });
+      pushes.set(id, { sub, message, expiry: Number(fields.requested_expiry), answer: 'pending' });
       return json(200, { auth_req_id: id, expires_in: Number(fields.requested_expiry), interval: 5 });
     }
 
@@ -125,54 +85,25 @@ export async function createFakeAuth0() {
             .setIssuedAt()
             .setExpirationTime('5m')
             .sign(privateKey);
-          const accessToken = (push.permissions || push.apiToken) && push.audience
-            ? await new SignJWT(push.permissions ? { permissions: push.permissions } : {})
-                .setProtectedHeader({ alg: 'RS256', kid: 'k1' })
-                .setSubject(push.accessSub ?? push.tokenSub ?? push.sub)
-                .setIssuer(ISSUER)
-                .setAudience(push.audience)
-                .setIssuedAt()
-                .setExpirationTime('5m')
-                .sign(push.accessForged ? forger : privateKey)
-            : 'opaque';
-          return json(200, { access_token: accessToken, id_token: idToken, token_type: 'Bearer', expires_in: 86400 });
+          return json(200, { access_token: 'opaque', id_token: idToken, token_type: 'Bearer', expires_in: 86400 });
         }
       }
     }
     return json(404, { error: 'not_found' });
   }
 
-  /** Any access token this tenant could sign: a family member's, another M2M app's. */
-  function mint(input: { sub: string; audience: string; claims?: Record<string, unknown> }) {
-    return new SignJWT(input.claims ?? {})
-      .setProtectedHeader({ alg: 'RS256', kid: 'k1' })
-      .setSubject(input.sub)
-      .setIssuer(ISSUER)
-      .setAudience(input.audience)
-      .setIssuedAt()
-      .setExpirationTime('5m')
-      .sign(privateKey);
-  }
-
   return {
     fetch,
     keys,
-    mint,
     calls,
     pushes,
     notEnrolled,
-    settings,
     /** What the member taps in Guardian, on their most recent push. */
-    answer(
-      sub: string,
-      answer: Answer,
-      options: Pick<PushRequest, 'tokenSub' | 'permissions' | 'apiToken' | 'accessSub' | 'accessForged'> = {},
-    ) {
+    answer(sub: string, answer: Answer, options: { tokenSub?: string } = {}) {
       const entry = [...pushes.values()].reverse().find((p) => p.sub === sub);
       if (!entry) throw new Error(`no push was sent to ${sub}`);
       entry.answer = answer;
       entry.tokenSub = options.tokenSub;
-      Object.assign(entry, { permissions: undefined, apiToken: undefined, accessSub: undefined, accessForged: undefined }, options);
     },
     tokenPolls: () => calls.filter((c) => c.path === '/oauth/token'),
   };

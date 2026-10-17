@@ -21,8 +21,6 @@ import 'server-only';
 import type pg from 'pg';
 import { bindingMessage, CibaError, type CibaClient, type CibaPoll } from '@/lib/auth0/ciba';
 import { PaymentError, type Payment, type PaymentService } from '@/lib/payments';
-import { hasTokenPermission } from '@/lib/permissions';
-import { HOLD_REASON_LABELS } from '@/lib/rules';
 
 /**
  * Auth0 answers `access_denied` both for "Deny" and for an expired push.
@@ -74,12 +72,7 @@ export function createCibaApprovals(deps: CibaApprovalsDeps) {
               payeeName: payment.payeeName,
             }),
             expirySeconds: member.seconds_left,
-            payment: {
-              amountCents: payment.amountCents,
-              payee: payment.payeeName,
-              reasons: payment.holdReasons.map((r) => HOLD_REASON_LABELS[r]),
-              approvalsRequired: payment.approvalsRequired,
-            },
+            payment: { amountCents: payment.amountCents, payee: payment.payeeName, reasons: payment.holdReasons },
           });
           await pool.query(
             `insert into ciba_requests
@@ -239,11 +232,6 @@ export function createCibaApprovals(deps: CibaApprovalsDeps) {
           await update(`state = 'failed', last_error = $2`, ['Auth0 returned a token for a different user']);
           return;
         }
-        // Auth0 RBAC: when the access token lists permissions, it must include this one.
-        if (!hasTokenPermission(result.permissions, 'approve:payments')) {
-          await update(`state = 'failed', last_error = $2`, ['Auth0 token lacks the approve:payments permission']);
-          return;
-        }
         await update(`state = 'approved', answered_at = clock_timestamp(), last_polled_at = clock_timestamp(), last_error = null`);
         return;
       case 'denied_or_expired':
@@ -265,8 +253,7 @@ export function createCibaApprovals(deps: CibaApprovalsDeps) {
       await deps.payments().decidePayment({ paymentId, member: { memberId }, decision, via: 'ciba' });
     } catch (error) {
       // Someone else answered first, or the deadline passed: their outcome stands.
-      // A Guardian approval while frozen is refused; the hold runs out and blocks.
-      if (error instanceof PaymentError && (error.code === 'already_decided' || error.code === 'expired' || error.code === 'frozen')) {
+      if (error instanceof PaymentError && (error.code === 'already_decided' || error.code === 'expired')) {
         return;
       }
       throw error;

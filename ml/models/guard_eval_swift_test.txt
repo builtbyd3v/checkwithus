@@ -1,9 +1,0 @@
-# swift run -c release guard-eval ml/data/test.csv GuardInt8.mlpackage  (2026-10-17, Apple M5 Pro)
-884 rows from ../../ml/data/test.csv
-rules scam recall   2.4% (6/248)   false holds  0.0% (0/636)
-ngram scam recall  96.0% (238/248)   false holds  2.4% (15/636)
-rules + ngram scam recall  96.0% (238/248)   false holds  2.4% (15/636)
-  ngram: threshold 0.6497, 0.14 ms per text (score + rules)
-distilbert scam recall  94.0% (233/248)   false holds  1.1% (7/636)
-rules + distilbert scam recall  94.0% (233/248)   false holds  1.1% (7/636)
-  distilbert: threshold 0.7624, 1.50 ms per text (score + rules)
