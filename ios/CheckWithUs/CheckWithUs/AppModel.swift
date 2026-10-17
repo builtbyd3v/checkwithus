@@ -3,6 +3,7 @@ import CallKit
 import GuardKit
 import SwiftUI
 import UIKit
+import os
 
 /// Someone the older adult can pay. Names match the demo seed's known payees (web/scripts/seed-demo.ts).
 struct Payee: Hashable, Identifiable {
@@ -43,6 +44,7 @@ enum Screen: Equatable {
     private var watching = false
     private var backgroundTask = UIBackgroundTaskIdentifier.invalid
     private static let guardModel = try? Guard(scorer: NGramScorer())
+    private static let log = Logger(subsystem: "us.checkwith.app", category: "App")
 
     var isOnCall: Bool { calls.calls.contains { !$0.hasEnded } }
 
@@ -75,6 +77,29 @@ enum Screen: Equatable {
             self.token = token
             await self.loadConfig()
         }
+    }
+
+    /// The Call Directory extension is off until someone turns it on in Settings.
+    var callLabelsOff = false
+
+    /// Writes the scam-number list for the Call Directory extension and asks iOS to reload it.
+    /// ponytail: scam-numbers.json holds fictional 555-01xx numbers; the demo phone's number goes in the
+    /// gitignored scam-numbers.local.json. A real feed (for example FTC complaint data) would replace both.
+    func installScamNumbers() async {
+        let lists = ["scam-numbers", "scam-numbers.local"].compactMap { Bundle.main.url(forResource: $0, withExtension: "json") }
+        let numbers = lists.flatMap { (try? JSONDecoder().decode([String].self, from: Data(contentsOf: $0))) ?? [] }
+        let directory = CXCallDirectoryManager.sharedInstance
+        do {
+            try ScamNumbers.write(numbers)
+            callLabelsOff = try await directory.enabledStatusForExtension(withIdentifier: ScamNumbers.extensionID) != .enabled
+            if !callLabelsOff { try await directory.reloadExtension(withIdentifier: ScamNumbers.extensionID) }
+        } catch {
+            Self.log.error("Call Directory: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    func openCallSettings() {
+        CXCallDirectoryManager.sharedInstance.openSettings { _ in }
     }
 
     func loadConfig() async {

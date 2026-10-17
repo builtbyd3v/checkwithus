@@ -11,7 +11,10 @@ import SwiftUI
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { model.keepPollingInBackground() }
-            if phase == .active { Task { await model.watch() } }
+            if phase == .active {
+                Task { await model.watch() }
+                Task { await model.installScamNumbers() }
+            }
         }
     }
 }

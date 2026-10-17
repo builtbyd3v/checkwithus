@@ -11,6 +11,7 @@
 		D707C9000000000000000001 /* GuardKit in Frameworks */ = {isa = PBXBuildFile; productRef = D707C9000000000000000002 /* GuardKit */; };
 		D707CB000000000000000002 /* GuardKit in Frameworks */ = {isa = PBXBuildFile; productRef = D707CB000000000000000003 /* GuardKit */; };
 		D707CA00000000000000000D /* SafeCard.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D707CA000000000000000002 /* SafeCard.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		D707CC00000000000000000D /* CallDirectory.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D707CC000000000000000002 /* CallDirectory.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -28,6 +29,13 @@
 			remoteGlobalIDString = D707CA000000000000000001;
 			remoteInfo = SafeCard;
 		};
+		D707CC00000000000000000B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D707CC000000000000000001;
+			remoteInfo = CallDirectory;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -38,6 +46,7 @@
 			files = (
 				D707C7FE3083297900A792A4 /* MessageFilter.appex in Embed Foundation Extensions */,
 				D707CA00000000000000000D /* SafeCard.appex in Embed Foundation Extensions */,
+				D707CC00000000000000000D /* CallDirectory.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 		};
@@ -47,6 +56,7 @@
 		000000000000000000000120 /* CheckWithUs.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CheckWithUs.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D707C7F73083297900A792A4 /* MessageFilter.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MessageFilter.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		D707CA000000000000000002 /* SafeCard.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SafeCard.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		D707CC000000000000000002 /* CallDirectory.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CallDirectory.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -63,6 +73,13 @@
 				Info.plist,
 			);
 			target = D707CA000000000000000001 /* SafeCard */;
+		};
+		D707CC000000000000000004 /* Exceptions for "CallDirectory" folder in "CallDirectory" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = D707CC000000000000000001 /* CallDirectory */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -93,6 +110,14 @@
 			path = SafeCard;
 			sourceTree = "<group>";
 		};
+		D707CC000000000000000003 /* CallDirectory */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D707CC000000000000000004 /* Exceptions for "CallDirectory" folder in "CallDirectory" target */,
+			);
+			path = CallDirectory;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -113,6 +138,11 @@
 			files = (
 			);
 		};
+		D707CC000000000000000006 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -124,6 +154,7 @@
 				D707CB000000000000000001 /* Shared */,
 				000000000000000000000020 /* Products */,
 				D707CA000000000000000003 /* SafeCard */,
+				D707CC000000000000000003 /* CallDirectory */,
 			);
 			sourceTree = "<group>";
 		};
@@ -133,6 +164,7 @@
 				000000000000000000000120 /* CheckWithUs.app */,
 				D707C7F73083297900A792A4 /* MessageFilter.appex */,
 				D707CA000000000000000002 /* SafeCard.appex */,
+				D707CC000000000000000002 /* CallDirectory.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -154,6 +186,7 @@
 			dependencies = (
 				D707C7FD3083297900A792A4 /* PBXTargetDependency */,
 				D707CA00000000000000000C /* PBXTargetDependency */,
+				D707CC00000000000000000C /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				000000000000000000000010 /* CheckWithUs */,
@@ -207,6 +240,25 @@
 			productReference = D707CA000000000000000002 /* SafeCard.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		D707CC000000000000000001 /* CallDirectory */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D707CC000000000000000008 /* Build configuration list for PBXNativeTarget "CallDirectory" */;
+			buildPhases = (
+				D707CC000000000000000005 /* Sources */,
+				D707CC000000000000000006 /* Frameworks */,
+				D707CC000000000000000007 /* Resources */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				D707CC000000000000000003 /* CallDirectory */,
+				D707CB000000000000000001 /* Shared */,
+			);
+			name = CallDirectory;
+			productName = CallDirectory;
+			productReference = D707CC000000000000000002 /* CallDirectory.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -217,6 +269,9 @@
 				LastSwiftUpdateCheck = 2710;
 				LastUpgradeCheck = 2700;
 				TargetAttributes = {
+					D707CC000000000000000001 = {
+						CreatedOnToolsVersion = 27.1;
+					};
 					D707CA000000000000000001 = {
 						CreatedOnToolsVersion = 27.1;
 					};
@@ -248,6 +303,7 @@
 				000000000000000100000000 /* CheckWithUs */,
 				D707C7F63083297900A792A4 /* MessageFilter */,
 				D707CA000000000000000001 /* SafeCard */,
+				D707CC000000000000000001 /* CallDirectory */,
 			);
 		};
 /* End PBXProject section */
@@ -264,6 +320,11 @@
 			);
 		};
 		D707CA000000000000000007 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		D707CC000000000000000007 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
 			);
@@ -286,6 +347,11 @@
 			files = (
 			);
 		};
+		D707CC000000000000000005 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -298,6 +364,11 @@
 			isa = PBXTargetDependency;
 			target = D707CA000000000000000001 /* SafeCard */;
 			targetProxy = D707CA00000000000000000B /* PBXContainerItemProxy */;
+		};
+		D707CC00000000000000000C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D707CC000000000000000001 /* CallDirectory */;
+			targetProxy = D707CC00000000000000000B /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -446,6 +517,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Check With Us";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
+				CODE_SIGN_ENTITLEMENTS = CheckWithUs.entitlements;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -486,6 +558,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Check With Us";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
+				CODE_SIGN_ENTITLEMENTS = CheckWithUs.entitlements;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -636,6 +709,69 @@
 			};
 			name = Release;
 		};
+		D707CC000000000000000009 /* Debug configuration for PBXNativeTarget "CallDirectory" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = CallDirectory.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6NXLW84FWQ;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CallDirectory/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = CallDirectory;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.devgiribharatgirigoswami.CheckWithUs.CallDirectory;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		D707CC00000000000000000A /* Release configuration for PBXNativeTarget "CallDirectory" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = CallDirectory.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6NXLW84FWQ;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CallDirectory/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = CallDirectory;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.devgiribharatgirigoswami.CheckWithUs.CallDirectory;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -668,6 +804,14 @@
 			buildConfigurations = (
 				D707CA000000000000000009 /* Debug configuration for PBXNativeTarget "SafeCard" */,
 				D707CA00000000000000000A /* Release configuration for PBXNativeTarget "SafeCard" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		D707CC000000000000000008 /* Build configuration list for PBXNativeTarget "CallDirectory" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D707CC000000000000000009 /* Debug configuration for PBXNativeTarget "CallDirectory" */,
+				D707CC00000000000000000A /* Release configuration for PBXNativeTarget "CallDirectory" */,
 			);
 			defaultConfigurationName = Release;
 		};
