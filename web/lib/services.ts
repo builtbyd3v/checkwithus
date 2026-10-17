@@ -7,10 +7,12 @@ import { appEnv, auth0Env } from '@/lib/env';
 import { createFreezeService, type FreezeService } from '@/lib/freeze';
 import { nessie } from '@/lib/nessie/client';
 import { createPaymentService, type PaymentService } from '@/lib/payments';
+import { createTopUpService, type TopUpService } from '@/lib/top-up';
 
 let paymentService: PaymentService | undefined;
 let approvals: CibaApprovals | null | undefined;
 let freezeService: FreezeService | undefined;
+let topUpService: TopUpService | undefined;
 
 export function payments(): PaymentService {
   return (paymentService ??= createPaymentService({
@@ -24,6 +26,10 @@ export function payments(): PaymentService {
 
 export function freeze(): FreezeService {
   return (freezeService ??= createFreezeService({ pool: db(), nessie: nessie() }));
+}
+
+export function topUp(): TopUpService {
+  return (topUpService ??= createTopUpService({ pool: db(), nessie: nessie() }));
 }
 
 /** True when approvals must come through Auth0 CIBA (Guardian push) rather than the app. */

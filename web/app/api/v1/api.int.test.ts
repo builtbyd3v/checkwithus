@@ -51,9 +51,12 @@ vi.mock('@/lib/services', async () => {
   const nessie = createNessieClient({ key: 'test-key', fetch: fake.fetch, sleep: async () => {} });
   const service = createPaymentService({ pool: db(), nessie });
   const freezeService = createFreezeService({ pool: db(), nessie });
+  const { createTopUpService } = await import('@/lib/top-up');
+  const topUpService = createTopUpService({ pool: db(), nessie });
   return {
     payments: () => service,
     freeze: () => freezeService,
+    topUp: () => topUpService,
     cibaApprovals: () => approvalMode.ciba ? { pollPayment, pollCircles: async () => {} } : null,
     approvalsUseCiba: () => approvalMode.ciba,
   };
@@ -80,6 +83,7 @@ const routes = {
   freeze: await import('./family/circles/[id]/freeze/route'),
   unfreeze: await import('./family/circles/[id]/unfreeze/route'),
   balance: await import('./family/circles/[id]/balance/route'),
+  topUp: await import('./family/circles/[id]/top-up/route'),
 };
 
 const BASE = 'https://checkwith.us/api/v1';
@@ -496,5 +500,24 @@ describe('Freeze over HTTP (the family app contract)', () => {
     fake.accounts.push({ _id: rows[0]!.nessie_account_id, customer_id: 'test-customer', type: 'Checking', nickname: 'x', balance: 1 });
     const live = await balance();
     expect(live.body).toMatchObject({ nessieReportedBalanceCents: 100, availableCents: offline.body.availableCents });
+  });
+
+  it('an approver tops up spending with a fresh login and an idempotency key; the balance shows it', async () => {
+    const path = `/family/circles/${circleId}/top-up`;
+    const body = { amountCents: 2_500, idempotencyKey: 'api-test-topup-0001' };
+    expect((await routes.topUp.POST(req(path, { sub: MARIA, body: { amountCents: 2_500 } }), params(circleId))).status).toBe(400);
+    expect(await read(await routes.topUp.POST(req(path, { sub: MARIA, body }), params(circleId))))
+      .toMatchObject({ status: 403, body: { error: 'step_up_required' } });
+    const before = await read(await routes.balance.GET(req(`/family/circles/${circleId}/balance`, { sub: MARIA }), params(circleId)));
+    const fresh = () => {
+      const r = req(path, { sub: MARIA, body });
+      r.headers.set('x-test-auth-time', String(Math.floor(Date.now() / 1000)));
+      return r;
+    };
+    const first = await read(await routes.topUp.POST(fresh(), params(circleId)));
+    expect(first).toEqual({ status: 200, body: { id: expect.any(String), movedCents: 2_500, status: 'sent' } });
+    expect(await read(await routes.topUp.POST(fresh(), params(circleId)))).toEqual(first);
+    const after = await read(await routes.balance.GET(req(`/family/circles/${circleId}/balance`, { sub: MARIA }), params(circleId)));
+    expect(after.body.ledgerBalanceCents).toBe(before.body.ledgerBalanceCents + 2_500);
   });
 });

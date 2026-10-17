@@ -2,7 +2,7 @@
  * Puts the demo back to a known state between expo demos. `npm run demo:reset`
  *
  *   seed-demo   Rosa's circle, accounts, purchase history, aggregates, vault
- *   then        no pending holds, not frozen, no recent ATM cash, the utility-bill allowance (#19)
+ *   then        no pending holds, not frozen, no top-ups, no recent ATM cash, the utility-bill allowance (#19)
  *
  * Refuses to run unless the tables resolve to a throwaway wt_* schema, or the
  * caller passes --live for the live schema. Safe to run again.
@@ -52,6 +52,8 @@ export async function resetDemo(input: { pool: pg.Pool; nessie: NessieClient; cu
     // Clearing it restores the spending balance without a transfer back.
     await q.query('update circles set frozen = false where id = $1', [circleId]);
     const cleared = await q.query('delete from vault_transfers where circle_id = $1', [circleId]);
+    // Same for last demo's family top-ups; the seeded pension deposits stay.
+    await q.query(`delete from ledger_credits where circle_id = $1 and kind = 'top_up'`, [circleId]);
     // Last demo's step 4 cash would add "cash then gift card" to the next step 3.
     // ponytail: its spending_nessie_records claim stays, so nothing re-imports it.
     const atm = await q.query(

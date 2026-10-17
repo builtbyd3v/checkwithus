@@ -35,6 +35,7 @@ All paths below are relative to the base URL.
 | `POST /family/circles/:id/freeze` | Family (approver) | `{}` -> `{frozen: true, movedCents}`: spending balance to the vault |
 | `POST /family/circles/:id/unfreeze` | Family (approver, fresh login) | `{amountCents}` -> `{frozen: false, movedCents}`: that amount back |
 | `GET /family/circles/:id/balance` | Family | Ledger balance (vault excluded) and `frozen` |
+| `POST /family/circles/:id/top-up` | Family (approver, fresh login) | `{amountCents, idempotencyKey}` -> `{id, movedCents, status}`: money from the member's own Nessie account into spending |
 
 Health endpoint: `GET https://checkwith.us/api/health`.
 
@@ -179,7 +180,7 @@ $1,000 from an account Nessie stores at $50 into a vault opened at $0, then unfr
 `GET /family/circles/:id/balance` answers integer cents:
 `{ledgerBalanceCents, reservedCents, availableCents, nessieReportedBalanceCents, checkedAt, balanceSource: "ledger", frozen}`.
 `availableCents` is `max(0, ledger - reserved)`. The ledger is the opening balance, less
-spending and the Freeze vault, in Tiger Data.
+spending and the Freeze vault, plus top-ups and deposits, in Tiger Data.
 
 Decision, from a live probe on October 17 (synthetic customer, Checking account opened at $100):
 a $25 deposit, a $10 transfer in from another account, and a $5 withdrawal were all
@@ -191,6 +192,26 @@ would hide behind a figure Nessie never updates. We still read `GET /accounts/:i
 and return its figure as `nessieReportedBalanceCents`, but a Nessie error returns
 `null` there instead of failing the whole balance. The ledger fields were also fixed to
 be JSON numbers: Postgres `sum()` is `numeric`, which arrived as a string.
+
+### Family top-up and pension deposits (#13)
+
+`POST /family/circles/:id/top-up` with `{amountCents, idempotencyKey}` moves whole
+dollars ($1 to $10,000) from the approver's own Nessie account into the older adult's
+spending with one Nessie transfer. On first use the member gets a synthetic Nessie
+customer and a Checking account opened at $0, found again by a `[cw:<memberId>]` tag.
+Reusing a key answers with the first top-up and sends nothing (`status` `sent`, or
+`sending` while an unknown outcome is unsettled); a different amount under the same key
+is `409 idempotency_conflict`. Errors: viewers `403 permission_required`, stale login
+`403 step_up_required`, cents `422 whole_dollars_only`, frozen circle `409 frozen`
+(unfreeze first; the vault is the way back), definite bank refusal `502 bank_error`
+(retry with the same key). A top-up is a ledger credit (`ledger_credits`, migration 017),
+so it raises `ledgerBalanceCents`, and a later Freeze moves it to the vault too.
+Verified live on October 17 on a synthetic circle: one transfer listed on the member's
+account for three calls with the same key. `demo:reset` deletes last demo's top-ups.
+
+The seed records Rosa's monthly pension ($1,500 on August 2, September 1 and October 1)
+as Nessie deposits (`POST /accounts/:id/deposits`) and as deposit credits in the same
+ledger, so the balance includes them. A rerun finds each deposit by its seed marker.
 
 ### Scam sequence (#17)
 

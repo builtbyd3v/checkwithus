@@ -22,7 +22,7 @@ export function createFakeNessie() {
    * The next matching write fails this way. `recordedThen500` stores the
    * record and still answers 500: the "did it go through?" case.
    */
-  let pendingFailure: { pathIncludes: string; mode: 'recordedThen500' | 'lostThen500' | 'timeout' } | null =
+  let pendingFailure: { pathIncludes: string; mode: 'recordedThen500' | 'lostThen500' | 'timeout' | 'rejected400' } | null =
     null;
 
   /** Runs once, in the middle of the next account list read: for staging races. */
@@ -45,6 +45,8 @@ export function createFakeNessie() {
         : null;
     if (failure) pendingFailure = null;
     if (failure?.mode === 'timeout') throw new Error('The operation was aborted due to timeout');
+    // A definite refusal: nothing stored.
+    if (failure?.mode === 'rejected400') return json(400, 'Invalid request');
 
     if (method === 'POST' && pathname === '/merchants') {
       const merchant = { ...body, _id: id() };
@@ -110,7 +112,7 @@ export function createFakeNessie() {
     /** Writes that reached the fake (not merchant creation). */
     paymentWrites: () =>
       calls.filter((c) => c.method === 'POST' && c.path !== '/merchants'),
-    failNext(pathIncludes: string, mode: 'recordedThen500' | 'lostThen500' | 'timeout') {
+    failNext(pathIncludes: string, mode: 'recordedThen500' | 'lostThen500' | 'timeout' | 'rejected400') {
       pendingFailure = { pathIncludes, mode };
     },
     /** Run `hook` while the next lookup of an account's records is in flight. */
