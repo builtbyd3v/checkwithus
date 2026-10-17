@@ -216,12 +216,28 @@ describe('money moves exactly once', () => {
     ).rejects.toMatchObject({ code: 'idempotency_conflict' });
   });
 
-  it('accepts a genuine retry even though the score went through 32-bit storage', async () => {
+  it('accepts a genuine retry, score stored at full precision', async () => {
     const idempotencyKey = key();
     const input = { ...scam, guard: { score: 0.123456789, modelVersion: 'guard-test' }, idempotencyKey };
     const first = await service.createPayment(circleId, input);
+    expect(first.guardScore).toBe(0.123456789);
     const again = await service.createPayment(circleId, input);
     expect(again.id).toBe(first.id);
+  });
+
+  it('refuses a retry whose score crossed the threshold, even by a hair', async () => {
+    // As float4 these two were the same number; the rules treat them differently.
+    const idempotencyKey = key();
+    const justUnder = { ...electricBill, guard: { score: 0.49999999, modelVersion: 'guard-test' } };
+    const allowed = await service.createPayment(circleId, { ...justUnder, idempotencyKey });
+    expect(allowed.status).toBe('paid');
+    await expect(
+      service.createPayment(circleId, {
+        ...justUnder,
+        guard: { score: 0.5, modelVersion: 'guard-test' },
+        idempotencyKey,
+      }),
+    ).rejects.toMatchObject({ code: 'idempotency_conflict' });
   });
 
   it('two simultaneous sends of one approved payment reach Nessie once', async () => {
