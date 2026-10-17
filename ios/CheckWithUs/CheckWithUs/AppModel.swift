@@ -94,6 +94,8 @@ enum Screen: Equatable {
             callLabelsOff = try await directory.enabledStatusForExtension(withIdentifier: ScamNumbers.extensionID) != .enabled
             if !callLabelsOff { try await directory.reloadExtension(withIdentifier: ScamNumbers.extensionID) }
         } catch {
+            // Disabled, not yet registered, or unsupported: offer the Settings link rather than hide the problem.
+            callLabelsOff = true
             Self.log.error("Call Directory: \(String(describing: error), privacy: .public)")
         }
     }
