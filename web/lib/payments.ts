@@ -29,6 +29,7 @@ import {
   taggedDescription,
   withdrawalBody,
 } from '@/lib/nessie/format';
+import { AVAILABLE_CENTS_SQL } from '@/lib/vault';
 import { CASH_THEN_GIFT_CARD_WINDOW_SECONDS, decideHold, type Baseline, type HoldReason } from '@/lib/rules';
 
 export const PAYMENT_STATUSES = [
@@ -105,7 +106,8 @@ export type PaymentErrorCode =
   | 'already_decided'
   | 'idempotency_conflict'
   | 'whole_dollars_only'
-  | 'frozen';
+  | 'frozen'
+  | 'insufficient_funds';
 
 /** A request we refuse for a reason the caller should be told about. */
 export class PaymentError extends Error {
@@ -312,9 +314,16 @@ export function createPaymentService(deps: PaymentServiceDeps) {
 
     const inserted = await transaction(pool, async q => {
     // The row lock also orders this payment against a Freeze tap.
-    const policy = await q.query<{ two_approvals_over_cents: number; hold_over_cents: number; frozen: boolean }>(
-      'select two_approvals_over_cents, hold_over_cents, frozen from circles where id = $1 for update', [circle.id],
+    const policy = await q.query<{ two_approvals_over_cents: number; hold_over_cents: number; frozen: boolean; available: number }>(
+      `select two_approvals_over_cents, hold_over_cents, frozen, ${AVAILABLE_CENTS_SQL} as available
+         from circles c where c.id = $1 for update`, [circle.id],
     );
+    // The ledger, not the rules, knows the money is there. A retry of a payment already saved is exempt
+    // (its own amount is reserved now); it is answered from the saved row below.
+    const duplicate = await q.query('select 1 from payments where circle_id = $1 and idempotency_key = $2', [circle.id, input.idempotencyKey]);
+    if (!duplicate.rowCount && input.amountCents > Number(policy.rows[0]!.available)) {
+      throw new PaymentError('insufficient_funds', 'There is not enough money available for this payment.');
+    }
     const allowance = await q.query<{ id: string }>(
       `select a.id from allowances a join circle_members m on m.id = a.granted_by
        left join payees p on p.id = a.payee_id
@@ -459,11 +468,15 @@ export function createPaymentService(deps: PaymentServiceDeps) {
       if (row.status !== 'held') return null;
       // The circle lock orders this against a Freeze tap. While frozen the
       // spending money is in the vault, so an approval would pay from nothing.
-      const circle = await client.query<{ frozen: boolean }>(
-        'select frozen from circles where id = $1 for update', [row.circle_id],
+      const circle = await client.query<{ frozen: boolean; available: number }>(
+        `select frozen, ${AVAILABLE_CENTS_SQL} as available from circles c where c.id = $1 for update`, [row.circle_id],
       );
       if (input.decision === 'approve' && circle.rows[0]?.frozen) {
         throw new PaymentError('frozen', 'Spending is frozen. Unfreeze first.', toPayment(row));
+      }
+      // The balance can have dropped since the hold: approving must not pay money that is no longer there.
+      if (input.decision === 'approve' && row.amount_cents > Number(circle.rows[0]!.available)) {
+        throw new PaymentError('insufficient_funds', 'There is not enough money available for this payment.', toPayment(row));
       }
       const member = await client.query<{ id: string }>(
         `select id from circle_members where circle_id = $1 and role = 'approver'

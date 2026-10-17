@@ -19,6 +19,16 @@ export const VAULT_CENTS_SQL = `coalesce((select sum(case t.direction when 'free
 export const CREDIT_CENTS_SQL = `coalesce((select sum(k.amount_cents) from ledger_credits k
   where k.circle_id = c.id and k.status = 'sent'), 0)::bigint`;
 
+/**
+ * What circle `c` can still spend: the opening balance, less recorded spending and
+ * payments already approved or paying, less the vault, plus confirmed credits.
+ * Nessie's own balance never changes (INTEGRATION.md), so this ledger figure decides.
+ */
+export const AVAILABLE_CENTS_SQL = `(c.opening_balance_cents
+  - coalesce((select sum(amount_cents) from spending where circle_id = c.id), 0)
+  - coalesce((select sum(amount_cents) from payments where circle_id = c.id and status in ('approved', 'paying')), 0)
+  - ${VAULT_CENTS_SQL} + ${CREDIT_CENTS_SQL})::bigint`;
+
 /** The circle's vault account at Nessie, created on first use. Safe to call again. */
 export async function ensureVaultAccount(pool: pg.Pool, nessie: NessieClient, circleId: string): Promise<string> {
   const { rows } = await pool.query<{ vault_account_id: string | null; nessie_customer_id: string }>(

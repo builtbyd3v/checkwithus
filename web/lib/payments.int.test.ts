@@ -427,3 +427,23 @@ describe('errors carry a code', () => {
     expect(error).toBeInstanceOf(PaymentError);
   });
 });
+
+describe('the ledger balance', () => {
+  it('refuses a payment bigger than the money available, and sends nothing', async () => {
+    const fresh = await pool.query<{ id: string }>(
+      `insert into circles (protected_name, nessie_customer_id, nessie_account_id, opening_balance_cents)
+       values ('Empty Test (synthetic)', 'test', $1, 0) returning id`,
+      ['test-account-' + crypto.randomUUID()],
+    );
+    const id = fresh.rows[0]!.id;
+    const writesBefore = fake.paymentWrites().length;
+    try {
+      await expect(service.createPayment(id, { ...electricBill, idempotencyKey: key() })).rejects.toMatchObject({ code: 'insufficient_funds' });
+      const saved = await pool.query('select 1 from payments where circle_id = $1', [id]);
+      expect(saved.rowCount).toBe(0);
+      expect(fake.paymentWrites()).toHaveLength(writesBefore);
+    } finally {
+      await pool.query('delete from circles where id = $1', [id]);
+    }
+  });
+});
