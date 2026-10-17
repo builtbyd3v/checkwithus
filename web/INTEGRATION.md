@@ -40,6 +40,14 @@ Health endpoint: `GET https://checkwith.us/api/health`.
 
 Bank directory entries contain `id`, `kind` (`atm` or `branch`), `name`, `coordinates` (`latitude`, `longitude`, or null), and `address` (or null). Use only entries with coordinates for geofences; do not treat a missing coordinate as zero. Match the phone's location locally, then post `bank_during_call` when the iOS call/location rules trigger. No phone location is required by the directory endpoint. The directory is cached with Next's `hours` profile.
 
+Nessie has no ATMs or branches in Gainesville, so the expo needs a demo bank. Set `DEMO_BANK_LOCATIONS` on the server (Vercel env var) to JSON `[{name, lat, lng}]`; each entry is added after Nessie's banks as `{id: "demo-<n>", kind: "branch", name, coordinates, address: null}`. It is empty by default, works in a Release build, and needs no app change. Bad JSON or out-of-range coordinates fail the directory request with a message that names the variable. Example for the SwampHacks expo (UF Reitz Union; confirm the expo room's coordinates on site):
+
+```
+DEMO_BANK_LOCATIONS=[{"name":"SwampHacks Demo Bank","lat":29.6463,"lng":-82.3478}]
+```
+
+The phone loads the directory once per app launch, so relaunch the app after changing it. Only Nessie's part is cached; redeploy after changing the variable.
+
 ## Payment flow
 
 Create one idempotency key per attempted payment and keep it for retries. Reusing it with a different request returns `409 idempotency_conflict`.
