@@ -133,8 +133,8 @@ Tiger Data from the terminal (Haadi or Dev; macOS):
 
 ```bash
 brew install --cask timescale/tap/tiger-cli
-tiger auth login        # opens the browser; pick the project Haadi shared
-tiger service list      # the live service and its status
+tiger auth login        # opens the browser; project nv7kufxrgy
+tiger service list      # live service: wvfplso8v1 (db-79786)
 ```
 
 Run live migrations with `cd web && npm run db:migrate`, not by hand. Tell the team
