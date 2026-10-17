@@ -34,8 +34,11 @@ enum Screen: Equatable {
     var error: String?
 
     private let calls = CXCallObserver()
-    /// One key per payment attempt, reused when retrying it (web/INTEGRATION.md).
-    private var attemptKey = UUID().uuidString
+    /// One request per payment attempt, resent unchanged when retrying it, so the idempotency key always
+    /// matches the same body (web/INTEGRATION.md).
+    private var attempt: API.PaymentRequest?
+    /// The held payment survives an app restart, so polling and the lock-screen card pick up again.
+    private static let watchedKey = "watchedPaymentID"
     private var activity: Activity<PaymentActivity>?
     private var watching = false
     private var backgroundTask = UIBackgroundTaskIdentifier.invalid
@@ -61,7 +64,7 @@ enum Screen: Equatable {
 
     func go(_ next: Screen) {
         error = nil
-        if case .confirm = next { attemptKey = UUID().uuidString }
+        if case .confirm = next { attempt = nil }
         screen = next
     }
 
@@ -92,19 +95,31 @@ enum Screen: Equatable {
         // ponytail: the Guard scores the payment's own words (payee + category). There is no text here to read;
         // the server treats the score as advisory and its fixed rules decide.
         let verdict = try? Self.guardModel?.check("\(payee.name) \(payee.category.replacingOccurrences(of: "_", with: " "))")
-        let request = API.PaymentRequest(
-            idempotencyKey: attemptKey, amountCents: cents,
+        let request = attempt ?? API.PaymentRequest(
+            idempotencyKey: UUID().uuidString, amountCents: cents,
             payee: .init(name: payee.name, kind: payee.kind), category: payee.category, onCall: isOnCall,
             guard: verdict.map { .init(score: $0.probability, modelVersion: "guard-ngram-1") }, explanation: nil)
+        attempt = request
         await run {
             let payment = try await API.pay(request, token: token)
             self.payment = payment
             self.go(.status)
             if !payment.isSettled {
-                self.startActivity(payment)
+                UserDefaults.standard.set(payment.id, forKey: Self.watchedKey)
+                await self.startActivity(payment)
                 Task { await self.watch() }
             }
         }
+    }
+
+    /// After a restart: reload the held payment and its lock-screen card, then keep polling.
+    func resume() async {
+        guard payment == nil, let token, let id = UserDefaults.standard.string(forKey: Self.watchedKey),
+              let latest = try? await API.payment(id: id, token: token) else { return }
+        payment = latest
+        activity = Activity<PaymentActivity>.activities.first
+        await updateActivity(latest)
+        if latest.isSettled { UserDefaults.standard.removeObject(forKey: Self.watchedKey) } else { await watch() }
     }
 
     /// Polls the held payment every 5 seconds until it settles. This polling is also what makes the server
@@ -119,10 +134,11 @@ enum Screen: Equatable {
             do {
                 let latest = try await API.payment(id: current.id, token: token)
                 delay = 5
-                if latest != current {
-                    payment = latest
-                    await updateActivity(latest)
-                }
+                // A newer payment may have replaced this one while the request was in flight.
+                guard payment?.id == latest.id, latest != payment else { continue }
+                payment = latest
+                await updateActivity(latest)
+                if latest.isSettled { UserDefaults.standard.removeObject(forKey: Self.watchedKey) }
             } catch {
                 delay = min(delay * 2, 30)
             }
@@ -141,7 +157,9 @@ enum Screen: Equatable {
         backgroundTask = .invalid
     }
 
-    private func startActivity(_ payment: API.Payment) {
+    private func startActivity(_ payment: API.Payment) async {
+        // One card at a time: a new held payment replaces the previous one's card.
+        for old in Activity<PaymentActivity>.activities { await old.end(nil, dismissalPolicy: .immediate) }
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         let attributes = PaymentActivity(amount: dollars(payment.amountCents), payee: payment.payee.name)
         activity = try? Activity.request(attributes: attributes, content: .init(state: .init(outcome: payment.outcome), staleDate: nil))

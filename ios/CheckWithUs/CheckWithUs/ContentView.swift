@@ -20,7 +20,10 @@ struct ContentView: View {
                 }
             }
         }
-        .task { await model.loadConfig() }
+        .task {
+            await model.loadConfig()
+            await model.resume()
+        }
     }
 }
 

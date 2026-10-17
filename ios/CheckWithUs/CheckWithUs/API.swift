@@ -96,7 +96,9 @@ struct API {
 /// Dollars typed on screen to integer cents, without floats. "84.12" -> 8412. Nil for anything else.
 func cents(fromDollars text: String) -> Int? {
     let parts = text.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "$", with: "").split(separator: ".", omittingEmptySubsequences: false)
-    guard (1...2).contains(parts.count), let dollars = Int(parts[0]), dollars >= 0 else { return nil }
+    // Digits only (no signs), and at most $999,999: no overflow, and under the server's $1M cap.
+    guard (1...2).contains(parts.count), parts.allSatisfy({ $0.allSatisfy { ("0"..."9").contains($0) } }),
+          (1...6).contains(parts[0].count), let dollars = Int(parts[0]) else { return nil }
     var c = dollars * 100
     if parts.count == 2 {
         guard (1...2).contains(parts[1].count), let fraction = Int(parts[1]) else { return nil }
