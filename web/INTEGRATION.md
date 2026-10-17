@@ -1,6 +1,6 @@
 # Backend integration
 
-Production base URL: `https://checkwith.us/api/v1`.
+Production base URL: `https://www.checkwith.us/api/v1`.
 
 ## Authentication and money
 
@@ -38,7 +38,7 @@ All paths below are relative to the base URL.
 | `POST /family/circles/:id/top-up` | Family (approver, fresh login) | `{amountCents, idempotencyKey}` -> `{id, movedCents, status}`: money from the member's own Nessie account into spending |
 | `POST /agent/bills/run` | Bill-pay agent (Auth0 M2M token, `pay:bills`) | `{circleId?, dueWithinDays?}` -> `{proposals:[...]}`; see "Bill-pay agent" below |
 
-Health endpoint: `GET https://checkwith.us/api/health`.
+Health endpoint: `GET https://www.checkwith.us/api/health`.
 
 Bank directory entries contain `id`, `kind` (`atm` or `branch`), `name`, `coordinates` (`latitude`, `longitude`, or null), and `address` (or null). Use only entries with coordinates for geofences; do not treat a missing coordinate as zero. Match the phone's location locally, then post `bank_during_call` when the iOS call/location rules trigger. No phone location is required by the directory endpoint. The directory is cached with Next's `hours` profile.
 
