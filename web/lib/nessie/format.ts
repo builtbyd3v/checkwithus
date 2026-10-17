@@ -194,6 +194,7 @@ export function depositBody(input: MovementInput) {
  * (`taggedDescription`) as the nickname.
  */
 export function paidBillBody(input: {
+  dueDate?: string;
   payee: string;
   nickname: string;
   amountCents: Cents;
@@ -206,7 +207,7 @@ export function paidBillBody(input: {
     payee: input.payee,
     nickname: input.nickname,
     payment_date: paymentDate,
-    recurring_date: dayOfMonth(paymentDate),
+    recurring_date: dayOfMonth(input.dueDate ?? paymentDate),
     payment_amount: toNessieDollars(input.amountCents),
   };
 }

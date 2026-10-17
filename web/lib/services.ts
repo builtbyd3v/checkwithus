@@ -29,13 +29,14 @@ export function approvalsUseCiba(): boolean {
 export function cibaApprovals(): CibaApprovals | null {
   if (approvals === undefined) {
     if (approvalsUseCiba()) {
-      const { AUTH0_DOMAIN, AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET } = auth0Env();
+      const { AUTH0_DOMAIN, AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET, AUTH0_AUDIENCE } = auth0Env();
       approvals = createCibaApprovals({
         pool: db(),
         ciba: createCibaClient({
           domain: AUTH0_DOMAIN,
           clientId: AUTH0_CLIENT_ID,
           clientSecret: AUTH0_CLIENT_SECRET,
+          audience: AUTH0_AUDIENCE,
         }),
         payments,
       });

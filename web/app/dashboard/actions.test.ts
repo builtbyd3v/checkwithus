@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/lib/auth0/web', () => ({ auth0: { getSession: mocks.getSession } }));
 vi.mock('@/lib/db', () => ({ db: () => ({ query: mocks.query }) }));
 vi.mock('@/lib/family', () => mocks);
+vi.mock('@/lib/permissions', () => ({ requirePermission: mocks.requireMembership }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 
 import { addPayeeAction, inviteAction, joinAction, pairingAction, saveSettingsAction } from './actions';

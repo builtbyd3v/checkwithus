@@ -76,6 +76,23 @@ describe('createCibaClient', () => {
     expect(auth0.calls[0]!.fields.requested_expiry).toBe('300');
   });
 
+  it('sends the API audience and Guardian display schema with payment details', async () => {
+    const detailed = createCibaClient({ ...FAKE_AUTH0, audience: 'https://api.checkwith.us/', fetch: auth0.fetch, keys: auth0.keys });
+    await detailed.start({ sub: 'auth0|maria', bindingMessage: 'Payment', expirySeconds: 300,
+      payment: { amountCents: toCents(12345), payee: 'City Power', reasons: ['over_limit'] } });
+    const fields = auth0.calls[0]!.fields;
+    expect(fields.audience).toBe('https://api.checkwith.us/');
+    expect(JSON.parse(fields.authorization_details!)).toEqual([{
+      type: 'urn:auth0:schemas:authorization-details:v1:payment',
+      instruction: 'Approve or deny this held payment.',
+      properties: {
+        amount: { display: true, name: 'Amount (USD)', display_order: 1, value: '$123.45' },
+        payee: { display: true, name: 'Payee', display_order: 2, value: 'City Power' },
+        reason: { display: true, name: 'Why it paused', display_order: 3, value: 'over_limit' },
+      },
+    }]);
+  });
+
   it('reports a member who is not enrolled in Guardian', async () => {
     auth0.notEnrolled.add('auth0|leo');
     await expect(start('auth0|leo')).rejects.toBeInstanceOf(CibaError);

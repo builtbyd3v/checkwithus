@@ -21,7 +21,7 @@ function keys() {
   ));
 }
 
-export type FamilyUser = { sub: string; name: string | null };
+export type FamilyUser = { sub: string; name: string | null; authTime?: number };
 
 /** The signed-in family member, or AuthError (401). */
 export async function requireFamilyUser(request: Request): Promise<FamilyUser> {
@@ -35,7 +35,7 @@ export async function requireFamilyUser(request: Request): Promise<FamilyUser> {
     });
     if (!payload.sub) throw new AuthError('Token has no subject');
     const name = typeof payload.name === 'string' ? payload.name : null;
-    return { sub: payload.sub, name };
+    return { sub: payload.sub, name, ...(typeof payload.auth_time === 'number' ? { authTime: payload.auth_time } : {}) };
   } catch (error) {
     if (error instanceof AuthError) throw error;
     if (error instanceof errors.JWTExpired) throw new AuthError('Sign-in expired');

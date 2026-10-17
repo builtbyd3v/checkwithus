@@ -56,7 +56,7 @@ export function createCibaApprovals(deps: CibaApprovalsDeps) {
          from payments p
          join circles c on c.id = p.circle_id
          join circle_members m on m.circle_id = p.circle_id
-        where p.id = $1 and p.status = 'held'`,
+        where p.id = $1 and p.status = 'held' and m.role = 'approver'`,
       [payment.id],
     );
 
@@ -72,6 +72,7 @@ export function createCibaApprovals(deps: CibaApprovalsDeps) {
               payeeName: payment.payeeName,
             }),
             expirySeconds: member.seconds_left,
+            payment: { amountCents: payment.amountCents, payee: payment.payeeName, reasons: payment.holdReasons },
           });
           await pool.query(
             `insert into ciba_requests
@@ -103,6 +104,11 @@ export function createCibaApprovals(deps: CibaApprovalsDeps) {
    * only cause polling for its own circle's payments.
    */
   async function pollPayment(paymentId: string, circleId: string): Promise<void> {
+    await pool.query(
+      `update ciba_requests r set state = 'superseded' from circle_members m, payments p
+       where r.member_id = m.id and r.payment_id = p.id and p.id = $1 and p.circle_id = $2
+         and m.role <> 'approver' and r.state in ('pending', 'approved', 'denied')`, [paymentId, circleId],
+    );
     const { rows: claimed } = await pool.query<{
       id: string;
       auth_req_id: string;
@@ -180,10 +186,10 @@ export function createCibaApprovals(deps: CibaApprovalsDeps) {
                and other.state = 'pending'
                and (other.last_polled_at is null or other.last_polled_at <= r.answered_at))
         order by r.answered_at, r.id
-        limit 1`,
+        `,
       [paymentId, circleId],
     );
-    if (approvals[0]) await decide(paymentId, approvals[0].member_id, 'approve');
+    for (const approval of approvals) await decide(paymentId, approval.member_id, 'approve');
   }
 
   /**
