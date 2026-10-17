@@ -16,6 +16,9 @@ final class MessageFilterExtension: ILMessageFilterExtension {}
 extension MessageFilterExtension: ILMessageFilterQueryHandling, ILMessageFilterCapabilitiesQueryHandling {
     private static let log = Logger(subsystem: "us.checkwith.MessageFilter", category: "Guard")
 
+    /// Fallback when the model fails to load; needs no weights.
+    private static let rules = ScamRules()
+
     /// Loaded once per extension process. Weights are memory-mapped (about 1 MB).
     private static let guardModel: Guard? = {
         do { return Guard(scorer: try NGramScorer()) } catch {
@@ -34,14 +37,17 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling, ILMessageFilterC
                 completion: @escaping (ILMessageFilterQueryResponse) -> Void) {
         let response = ILMessageFilterQueryResponse()
         let start = Date()
-        // ponytail: fail open. If the model is missing or errors, the text reaches the inbox rather than being lost.
-        if let verdict = try? Self.guardModel?.check(queryRequest.messageBody ?? "") {
+        let text = queryRequest.messageBody ?? ""
+        // If the model is missing or errors, the rules still run: a rule hit goes to Junk, anything else reaches the inbox.
+        if let verdict = try? Self.guardModel?.check(text) {
             response.action = verdict.isScam ? .junk : .allow
             let ms = Date().timeIntervalSince(start) * 1000
             // Score, timing, memory and reasons are public so the device log shows them; the message text is never logged.
             Self.log.notice("Guard: scam=\(verdict.isScam, privacy: .public) p=\(verdict.probability, format: .fixed(precision: 3), privacy: .public) ms=\(ms, format: .fixed(precision: 1), privacy: .public) footprintMB=\(Self.footprintMB(), format: .fixed(precision: 1), privacy: .public) reasons=\(verdict.reasons.joined(separator: " | "), privacy: .public)")
         } else {
-            response.action = .allow
+            let hits = Self.rules.hits(text)
+            response.action = hits.isEmpty ? .allow : .junk
+            Self.log.error("Guard: model unavailable, rules only: scam=\(!hits.isEmpty, privacy: .public) reasons=\(hits.map(\.reason).joined(separator: " | "), privacy: .public)")
         }
         completion(response)
     }
