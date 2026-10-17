@@ -19,7 +19,7 @@
 
 **On screen:** Paying a bill is four screens: `ChoosePayeeView` ("Who do you want to pay?"), `AmountView` ("How much to ...?"), `ConfirmView` ("Yes, pay" or "No, go back"), `StatusView` ("OK"). All in `ContentView.swift`. The role picker has two choices and nothing else (`RolePickerView`, `RoleViews.swift`, PR #30).
 
-**Source:** Apple HIG, Accessibility (2025): "Break up multistep workflows so people can focus on a single interaction per screen." NN/g, Nielsen (2013): users 65 and older are 43% slower. Research finding 11.
+**Source:** Apple HIG, Accessibility (2025), guidance for Assistive Access mode: "Break up multistep workflows so people can focus on a single interaction per screen." We apply it to every screen the older adult sees. NN/g, Nielsen (2013): users 65 and older are 43% slower. Research finding 11.
 
 ## 3. Big text, big targets
 
@@ -49,6 +49,6 @@
 
 **Rule:** Lead with safety. Show state with an icon and words, never color alone. No timers for the older adult to beat.
 
-**On screen:** Green shield and "You're safe"; orange pause and "Paused"; raised hand and "Stopped" (`OutcomeText.symbol` and `OutcomeText.color`). VoiceOver reads the family's answer aloud when it arrives (`StatusView`). The only countdown is on the family's side, and if it runs out, nothing is sent.
+**On screen:** Green shield and "You're safe" (`checkmark.shield.fill` in `HomeView`, `ContentView.swift`); orange pause and "Paused"; red raised hand and "Stopped" (`OutcomeText.symbol` and `OutcomeText.color` in `ios/CheckWithUs/Shared/PaymentActivity.swift`). VoiceOver reads the family's answer aloud when it arrives (`StatusView`). The only countdown is on the family's side, and if it runs out, nothing is sent.
 
 **Source:** Apple HIG, Accessibility: "Convey information with more than color alone." and "Minimize use of time-boxed interface elements." FTC (2025): "about 74% of older adults' fraud reports did not indicate any monetary loss", so we treat them as capable, not helpless. Research findings 9, 11 and 14.

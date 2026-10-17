@@ -1,7 +1,7 @@
 # Research: scams against older adults, and designing for them
 
 - Older adults lose more per scam, and the biggest losses are growing fastest. So we protect the payment itself, not only the inbox.
-- Phone calls, gift cards, crypto and "take out cash, then go to the machine" are the patterns that cost the most. Each one is a fixed hold rule in our code.
+- Phone scams have the highest median loss. Bank transfers and crypto lose the most money in total. Gift cards are among the most often reported payment methods for impersonation, tech support and romance scams. Each one is a fixed hold rule in our code.
 - Scammers win by rushing people before they can talk to family. So a held payment pauses and the family decides.
 - Older users read slower, tap less precisely and blame themselves for errors. So the older adult's screens use big text, big buttons, plain words and one action per screen.
 - Every number below is quoted from a source we opened and read on Oct 17, 2026. Parent interview quotes are still a TODO.
@@ -53,14 +53,14 @@ We read government data on fraud (FTC, FBI IC3, CFPB) and usability research on 
 
 ### 5. "Take out cash, then go to this machine"
 
-- **Finding:** Scammers send older adults to the bank for cash, then to a Bitcoin ATM, often while on the phone with them.
+- **Finding:** Scammers tell people to take cash out of the bank, then send them to a Bitcoin ATM (BTM). Older adults report these losses far more often than younger adults.
 - **Source:** FTC Data Spotlight, *Bitcoin ATMs: A payment portal for scammers*, September 3, 2024. https://www.ftc.gov/news-events/data-visualizations/data-spotlight/2024/09/bitcoin-atms-payment-portal-scammers
-  - "people 60 and over were more than three times as likely as younger adults to report a loss using a BTM"
+  - "In the first half of the year, people 60 and over were more than three times as likely as younger adults" ... "to report a loss using a BTM." (The year is 2024.)
   - "They direct you to go to your bank to take out cash." "Next, they send you to a nearby BTM location"
-  - "Phone calls were the initial contact method in about 47% of these reports"
+  - For all ages, "Phone calls were the initial contact method in about 47% of these reports" (footnote 11). "These reports" means all Bitcoin ATM loss reports, not only older adults. The spotlight does not say the scammer stays on the phone during the cash withdrawal.
 - **Source:** FTC, *Protecting Older Consumers 2024-2025*, December 2025, p. 24: bank impersonators tell people "to transfer money or deposit cash into Bitcoin ATM machines to keep it “safe.”"
 - **What we built because of it:**
-  - The "ATM cash then gift cards" sequence holds as a scam sequence (PR #32, open).
+  - The "ATM cash, then a gift card" hold (PR #32, open). This rule is our own heuristic. No source above documents that exact sequence. It combines two documented behaviors: scammers tell people to take out cash (this spotlight), and impersonators demand gift cards (finding 3). The FTC report lists both demands side by side: scammers "convince people to buy gift cards and share the codes, send cash or gold, transfer money, or put cash into a cryptocurrency ATM" (p. 29).
   - The bank-while-on-a-call alert tells the family only the bank's name, never the exact location (PR #34, open; screen in `docs/gallery/04-older-adult-bank-safety.png`).
 
 ### 6. Scammers rush people so they cannot ask family
@@ -77,7 +77,7 @@ We read government data on fraud (FTC, FBI IC3, CFPB) and usability research on 
 
 ### 7. Family is already the first line of help
 
-- **Finding:** Family members often report scams for people 80 and over, and regulators tell banks to hold suspicious payments and contact a trusted family member.
+- **Finding:** Family members often report scams for people 80 and over. Regulators give banks examples of practices that can help, such as transaction holds and trusted contacts. The statement does not set new rules or expectations.
 - **Source:** FTC, *Protecting Older Consumers 2024-2025*, December 2025, pp. 21 and 27. https://www.ftc.gov/system/files/ftc_gov/pdf/P144400-OlderAdultsReportDec2025.pdf
   - "In 2024, about 16% of reports filed for people 80 and over indicated they were submitted by a person on behalf of the consumer, a far higher rate than any other age group."
   - "most consumers do not report being victimized to anyone other than family and friends."
@@ -111,7 +111,7 @@ We read government data on fraud (FTC, FBI IC3, CFPB) and usability research on 
 - **Source:** Lexie Kane, Nielsen Norman Group, *Usability for Older Adults: Challenges and Changes*, September 8, 2019. https://www.nngroup.com/articles/usability-for-senior-citizens/
   - "Websites and apps with tiny type are common."
   - Buttons and links "are often displayed at a small size that is difficult for older users to click on or tap."
-  - The study had 123 participants aged 65 and older.
+  - NN/g ran three rounds of research (2001, 2013 and 2018-19) with "a total of 123 participants aged 65 and older".
 - **Source:** Apple, *Human Interface Guidelines: Accessibility* (last changed June 9, 2025). https://developer.apple.com/design/human-interface-guidelines/accessibility
   - The default control size for iOS is 44x44 pt.
   - "Ideally, give people the option to enlarge text by at least 200 percent".
@@ -132,10 +132,11 @@ We read government data on fraud (FTC, FBI IC3, CFPB) and usability research on 
 
 ### 12. Errors must say how to fix them, because users blame themselves
 
-- **Finding:** Older users blame themselves for errors, so error messages must be clear and easy to act on.
+- **Finding:** Older users make more mistakes, users tend to blame themselves for them, and unclear error messages make it worse. So error messages must be clear and easy to act on.
 - **Source:** Lexie Kane, Nielsen Norman Group, *Usability for Older Adults: Challenges and Changes*, September 8, 2019. https://www.nngroup.com/articles/usability-for-senior-citizens/
   - "It's a classic finding in usability research that users blame themselves"
-  - "many participants were apprehensive and hesitant in their behavior online."
+  - "Older users make more mistakes than younger users do."
+  - Older users "often had problems reading error messages, either because the wording was obscure or imprecise". (Kane also notes that today's older users are more confident online than the 2001 group, so we design for capable people, not fearful ones.)
 - **Source:** Jakob Nielsen, Nielsen Norman Group, *Usability for Senior Citizens: Improved, But Still Lacking*, May 28, 2013. https://www.nngroup.com/articles/usability-seniors-improvements/
   - "focus on the error, explain it clearly, and make it as easy as possible to fix."
 - **What we built because of it:** Plain-words reasons. The amount screen shows "Use whole dollars, like 50" or "Type an amount like 84.12", with an example to copy (`AmountView`). A stopped payment says "Your money is safe. Nothing was sent." and never just "Declined". The family sees each hold reason in plain words, such as "Paid while on a phone call" (`HOLD_REASON_LABELS` in `web/lib/rules.ts`).
@@ -152,7 +153,7 @@ We read government data on fraud (FTC, FBI IC3, CFPB) and usability research on 
 - **Finding:** Some people cannot tell colors apart, so state must also show in words and shapes.
 - **Source:** Apple, *Human Interface Guidelines: Accessibility*. https://developer.apple.com/design/human-interface-guidelines/accessibility
   - "Convey information with more than color alone."
-- **What we built because of it:** Every state has an icon, a headline and a color together: a shield and "You're safe", a pause symbol and "Paused", a raised hand and "Stopped" (`OutcomeText.symbol` in `PaymentActivity.swift`). VoiceOver reads the family's answer aloud when it arrives (`StatusView`).
+- **What we built because of it:** Every state has an icon, a headline and a color together: a green shield and "You're safe" (`checkmark.shield.fill` in `HomeView`, `ContentView.swift`), an orange pause symbol and "Paused", a red raised hand and "Stopped" (`OutcomeText.symbol` and `OutcomeText.color` in `PaymentActivity.swift`). VoiceOver reads the family's answer aloud when it arrives (`StatusView`).
 
 ## Interview quotes
 
