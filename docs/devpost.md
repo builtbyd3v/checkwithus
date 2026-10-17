@@ -2,7 +2,7 @@
 
 Copy each section into the matching Devpost field. Check every `TODO(Dev):` before submitting. Due **Sun Oct 18, 8:00 AM ET**.
 
-TODO(Dev): cut anything not merged on `main` by submission. These parts depend on open PRs: the family iPhone app, Face ID approvals and the allowance screen (#30); the weekly and per-payee aggregates and the 1M-row numbers (#31); Freeze, the vault account, Nessie transfers and the "cash then gift card" hold (#32); the landing page widget (#33); the bank-while-on-a-call alert (#34).
+TODO(Dev): this draft describes `main` with #30 to #44 merged and deployed. Use the PR checklist at the top of the README: for each PR not merged by submission, cut the claims it lists here too. Delete the "Bill-pay agent" section unless the PR for #19 merges.
 
 - **Project name:** checkwith.us
 - **Elevator pitch (max 200 characters):** Scam protection where the older adult does nothing and the family does the work. Scam texts filtered on the phone, scam calls labeled, risky payments paused for family approval.
@@ -26,14 +26,17 @@ checkwith.us is one iPhone app with two roles, plus a web dashboard.
 **For the older adult, nothing new to do:**
 - **Scam texts never reach the inbox.** Our own scam model runs inside an iOS Message Filter extension, on the phone. Scam texts go to Spam.
 - **Scam calls ring as "Possible scam."** A Call Directory extension labels known scam numbers.
-- **Risky payments pause.** The app has one big "Pay a bill" flow. Our server checks every payment against fixed rules: gift cards, crypto, wire transfers, new payees, amounts over the family's limit, spending far above her usual, payments made during a phone call, and ATM cash followed by a gift card. A held payment shows "Paused, waiting for family" on the phone and on a lock-screen card.
+- **Risky payments pause.** The app has one big "Pay a bill" flow. Our server checks every payment against fixed rules: gift cards, crypto, wire transfers, new payees, amounts over the family's limit, spending far above her usual, payments made during a phone call, and ATM cash followed by a gift card. A held payment shows "Paused, waiting for family" on the phone and on a lock-screen card, which updates while the app checks the server.
 - **"Ask my family."** One big button sends the family an alert.
 - **Bank while on a call.** If the phone is at a bank or ATM during a phone call, the family gets an alert. Only the bank's name is sent, never her location.
+- **Built for older eyes.** Tested at the largest accessibility text size, with VoiceOver announcements, high-contrast colors, 56 pt tap targets and Reduce Motion support.
 
 **For the family:**
-- **Approve or deny** each held payment on the family iPhone app (approve needs Face ID) or the web dashboard. Each reason is in plain words, with a short note written on the older adult's phone by Apple's on-device model.
+- **Approve or deny** each held payment on the family iPhone app or the web dashboard. On the phone, Approve asks for Face ID first; the server checks the approver's signed Auth0 token. Each reason is in plain words, with a short note written on the older adult's phone by Apple's on-device model. TODO(Dev): keep "a phone with no passcode cannot approve" out until that fix merges.
 - **Family circle:** approvers and viewers. Over $1,000 (default), two approvers must say yes; one no stops it.
 - **Freeze:** one tap moves the whole spending balance to a vault account.
+- **Top up:** an approver adds money from their own account (API built; no phone screen yet).
+- **Alerts and context:** "Ask my family" and bank alerts in a list, and "About 8x Rosa's usual at this store" next to a held payment.
 - **Allowances:** a scoped, expiring "yes in advance", for example utilities up to $400 until Nov 30. It lifts only the amount limits for a known payee, never a scam hold.
 
 **Three hard rules:** AI suggests, code decides money. Money is integer cents everywhere. The older adult's texts and bills never go to a cloud AI model.
@@ -45,7 +48,7 @@ checkwith.us is one iPhone app with two roles, plus a web dashboard.
 - **Backend (Next.js App Router, TypeScript, Vercel):** a payment API with idempotency keys, a pure `decideHold` rule function, the family API and dashboard, and a landing page whose "Try a payment" widget runs the same `decideHold` code.
 - **Data:** Tiger Data (TimescaleDB on Tiger Cloud) holds the spending ledger as a hypertable with compression and real-time continuous aggregates.
 - **Money:** Capital One Nessie is the bank. Every allowed payment becomes a Nessie purchase or bill.
-- **Identity:** Auth0 for logins, API tokens, roles and fresh-login checks. A CIBA Guardian push is implemented but off by default.
+- **Identity:** Auth0 for logins, API tokens, roles, an optional `approve:payments` permission, and fresh-login checks. A CIBA Guardian push is implemented but off by default.
 
 ## Challenges we ran into
 
@@ -54,7 +57,8 @@ checkwith.us is one iPhone app with two roles, plus a web dashboard.
 - **Nessie surprises.** Purchases must be whole dollars. The reported account balance does not change after payments. So Tiger Data keeps the payment ledger, and each payment is still a real Nessie purchase or bill.
 - **Exactly once.** A payment must never be sent twice, even when a phone retries, an app restarts mid-request, or two family members tap at once. Idempotency keys, row locks and several rounds of review fixed real race conditions.
 - **The on-device model invents things.** Asked to explain a hold on its own, Apple's model wrote "the caller asked for gift cards" when there was no call. Now code picks only true facts, the model only rewords them, and the note is dropped if it loses a fact.
-- **Nessie's banks are all near Washington, DC.** To demo the bank alert in Gainesville, a debug-only button makes the current spot a test bank.
+- **Nessie's banks are all near Washington, DC.** To demo the bank alert in Gainesville, the server can add demo bank locations from an environment variable (`DEMO_BANK_LOCATIONS`), and debug builds have a "make this spot a test bank" button.
+- **A Guardian push bug only the real tenant showed.** Our CIBA request always sent `audience`, and the real Auth0 tenant rejected it, so every push would have failed. Tests against our fake Auth0 had passed. Now `audience` is sent only with payment details turned on.
 
 ## Accomplishments that we're proud of
 
@@ -74,7 +78,8 @@ checkwith.us is one iPhone app with two roles, plus a web dashboard.
 
 - A real scam-number feed for the Call Directory (for example FTC complaint data), instead of a demo list.
 - Push notifications for alerts (today the family app polls every 10 seconds).
-- Use the per-payee aggregate in the rules ("6x her usual at this store").
+- Use the per-payee aggregate in the hold rules too, not only on the dashboard.
+- A top-up screen in the family app.
 - Better coverage of "wrong number" investment scams (13% recall on our probe set).
 - A usability test with older adults and their families.
 
@@ -86,37 +91,45 @@ swift, swiftui, core-ml, foundation-models, callkit, identitylookup, activitykit
 
 ## Sponsor challenges
 
+### Bill-pay agent (placeholder)
+TODO(Dev): keep only if the PR for #19 merges; otherwise delete this section. Describe from the merged code: what the agent pays, its own Auth0 machine-to-machine identity, and how a family allowance bounds it.
+
 ### Capital One: Best Use of Nessie
 Nessie is the bank in every step. Each endpoint has a job:
 - **Customers and accounts:** a spending account and a vault account for the older adult.
 - **Merchants:** payees with categories, which drive the hold rules.
 - **Purchases and bills:** every payment the rules or the family allow is sent to Nessie.
 - **Withdrawals and ATMs:** ATM cash at a real Nessie ATM, followed by a gift card within 2 hours, is held as a scam sequence.
-- **Transfers:** Freeze moves the whole spending balance to the vault, exactly once.
-- **ATMs and branches:** the phone watches the nearest ones and alerts the family if she is there during a phone call.
-- **Deposits:** read when matching a payment to its Nessie record, so a deposit is never mistaken for a payment.
+- **Transfers:** Freeze moves the whole spending balance to the vault, exactly once. Family top-up moves money from an approver's own account, counted only once Nessie confirms it.
+- **Deposits:** Rosa's monthly pension is written as Nessie deposits and adds to her ledger balance.
+- **ATMs and branches:** the phone watches the nearest ones and alerts the family if she is there during a phone call. Demo locations can be added for the expo.
+- **Balance:** Nessie's sandbox never updates stored balances, so the available balance is our ledger minus reserved payments, with Nessie's reported balance shown for information.
 
 ### MLH: Best Use of Auth0
 - Auth0 login on the family dashboard, and native PKCE login in the family iPhone app.
 - Every family API route checks a signed Auth0 access token for our API audience.
 - Roles on the server: approvers decide, viewers watch. Payments over the threshold need two different approvers.
-- Fresh login (no older than 5 minutes, from `auth_time`) before granting an allowance or changing roles.
-- **Auth0 for AI Agents:** we implemented Client-Initiated Backchannel Authentication (CIBA). In CIBA mode, a held payment sends a Guardian push with the amount, payee and hold reasons as rich `authorization_details`, and waits for a human out of band. Honest status: it is tested against a fake Auth0 only, it is off by default (`APPROVAL_MODE=app`, where the family app approves with Face ID), and a live Guardian push is not verified.
+- Optional RBAC (`AUTH0_RBAC=true`): approving needs the `approve:payments` permission in the access token; a missing claim counts as no. Denying needs only the circle role, because it only stops money.
+- Fresh login (no older than 5 minutes, from `auth_time`) before granting an allowance, changing roles, unfreezing or topping up.
+- **Auth0 for AI Agents:** we implemented Client-Initiated Backchannel Authentication (CIBA). With `APPROVAL_MODE=ciba`, a held payment sends a Guardian push and waits for a human out of band. With `AUTH0_CIBA_RAR=true` as well, the push carries the amount, payee and hold reasons as rich `authorization_details`. Honest status: both are off by default (`APPROVAL_MODE=app`, where the family app approves), tested against a fake Auth0 only, and a live Guardian push is not verified. We did fix one bug only the real tenant showed (an `audience` it rejects).
 
 ### MLH: Best Use of Tiger Data
 - `spending` is a hypertable (7-day chunks) with columnstore compression, segmented by family circle.
-- Real-time continuous aggregates: `spending_daily` feeds the "much more than usual" rule and the dashboard. `spending_weekly` is built on top of it (hierarchical). `spending_payee_daily` holds per-payee totals.
+- Real-time continuous aggregates: `spending_daily` feeds the "much more than usual" hold rule. `spending_weekly`, built on top of it (hierarchical), feeds the dashboard's weekly chart. `spending_payee_daily` feeds the dashboard's "About Nx Rosa's usual at this payee" line.
+- The dashboard's speed card times the real weekly chart query on the aggregate and on raw rows, live, and shows the compression ratio of the whole table.
 - A time-window query on the hypertable catches "ATM cash, then a gift card within 2 hours".
 - Measured on 1,000,000 rows (200 circles, 3 years) on Tiger Cloud: weekly totals for all circles over 3 years drop from 2077.43 ms to 150.23 ms (13.8x faster). The dashboard weekly chart drops from 2.61 ms to 1.10 ms (2.4x). Compression: 163.3 MB to 50.3 MB (3.2x smaller). Aggregate times are a best case (fully materialized). Full method in the README.
 
 ### Easy On The Eyes (Best UI/UX)
 - Older adult screens: large Dynamic Type text, big tap targets, plain words, one action per screen. Home says "You're safe". A held payment says "Your money is safe. Your family will call you."
 - The family sees every hold reason in plain words, never "the AI said so".
-- Stopping money is one tap; releasing money needs Face ID.
-- TODO(Dev): add 3 or 4 screenshots to the gallery (older adult Home, held screen, family Approvals, Freeze) with one sentence each on the design choice.
+- Stopping money is one tap; approving asks for Face ID first.
+- Accessibility pass at the largest text size: pinned buttons on an opaque bar, no mid-word breaks, VoiceOver announces the real outcome, darker colors for contrast, 56 pt tap targets, Reduce Motion.
+- Six design principles, each tied to a cited finding and a real screen: `docs/design-principles.md` and `docs/research.md`.
+- TODO(Dev): upload 3 or 4 shots from `docs/gallery/` (for example 03-older-adult-home-safe, 05-family-approvals, 06-family-why-we-paused, dashboard-full) with one sentence each on the design choice.
 
 ### MLH: Best Domain Name from GoDaddy Registry
-checkwith.us is the product name, the brand and the live site. The name is the promise: before money moves, it checks with us, the family. Registered through GoDaddy Registry with the MLH offer.
+checkwith.us is the product name, the brand and the live site. The name is the promise: before money moves, it checks with us, the family. TODO(Dev): confirm the MLH GoDaddy Registry code was used (whois shows registrar Porkbun; .us is run by GoDaddy Registry), then write one sentence on how it was registered.
 
 ### MLH: DEV Writing Challenge
 TODO(Dev): add the DEV post link (draft in `docs/dev-post.md`).
