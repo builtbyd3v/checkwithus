@@ -10,9 +10,8 @@
  *   - input  -> `parseDollars` converts once, at the edge
  *   - output -> `formatCents` converts once, for display
  *
- * Nessie: its amount fields accept whole numbers only, so we send cents
- * directly and read its balances back as cents. Do not "convert to dollars"
- * for Nessie -- that is what would introduce a fraction.
+ * Nessie works in dollars and has its own rules about cents. Never convert for
+ * it here: everything bound for Nessie goes through `lib/nessie/format.ts`.
  */
 
 /** An integer number of cents. 1234 is $12.34. Never fractional. */
@@ -43,9 +42,8 @@ export function toCents(value: number): Cents {
 }
 
 /**
- * The single dollars -> cents conversion. Use this at every input boundary
- * (form fields, Nessie bill payloads that quote dollars, seed data) and
- * nowhere else.
+ * The single dollars -> cents conversion for user and seed input (form fields,
+ * seed data). Use it at those boundaries and nowhere else.
  *
  * Accepts "12.34", "$1,234.56", " 12 ", 12, 12.34.
  * Rejects anything with more than two decimal places rather than silently
@@ -71,26 +69,9 @@ export function parseDollars(input: string | number): Cents {
 
 /** Cents -> display string. Output only; never feed this back into math. */
 export function formatCents(cents: Cents): string {
-  const sign = cents < 0 ? '-' : '';
-  const abs = Math.abs(cents);
-  const dollars = Math.floor(abs / 100);
-  const remainder = String(abs % 100).padStart(2, '0');
-  return `${sign}$${dollars.toLocaleString('en-US')}.${remainder}`;
-}
-
-/**
- * Cents -> the number Nessie wants. Identity by design: Nessie takes whole
- * numbers and we treat its unit as cents. This exists as a named function so
- * the boundary is greppable and so that if Nessie ever turns out to want
- * dollars, there is exactly one line to change.
- */
-export function toNessieAmount(cents: Cents): number {
-  return toCents(cents);
-}
-
-/** The number Nessie gave back -> cents. */
-export function fromNessieAmount(amount: number): Cents {
-  return toCents(Math.round(amount));
+  const dollars = Math.floor(cents / 100);
+  const remainder = String(cents % 100).padStart(2, '0');
+  return `$${dollars.toLocaleString('en-US')}.${remainder}`;
 }
 
 /** Adds cent amounts without ever leaving integer space. */

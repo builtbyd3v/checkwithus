@@ -66,6 +66,10 @@ license. Required by Devpost rule 10 and `docs/RULES.md`.
 | [typescript](https://github.com/microsoft/TypeScript) | 5.9.3 | Apache-2.0 |
 | [eslint](https://github.com/eslint/eslint) | 9.39.5 | MIT |
 | [node-postgres (`pg`)](https://github.com/brianc/node-postgres) | 8.23.1 | MIT |
+| [zod](https://github.com/colinhacks/zod) | 4.6.7 | MIT |
+| [jose](https://github.com/panva/jose) | 6.2.12 | MIT |
+| [server-only](https://www.npmjs.com/package/server-only) | 0.0.1 | MIT |
+| [vitest](https://github.com/vitest-dev/vitest) | 5.0.5 | MIT |
 
 Type definitions (`@types/*`) come from
 [DefinitelyTyped](https://github.com/DefinitelyTyped/DefinitelyTyped) (MIT).
