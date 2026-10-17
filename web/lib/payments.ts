@@ -667,6 +667,23 @@ export function createPaymentService(deps: PaymentServiceDeps) {
     return reconcileIfStuck(payment);
   }
 
+  /** Newest first, across circles, with overdue holds expired first. */
+  async function listPayments(
+    circleIds: string[],
+    options: { heldOnly: boolean; limit: number },
+  ): Promise<Payment[]> {
+    if (circleIds.length === 0) return [];
+    await Promise.all(circleIds.map(expireOverdue));
+    const { rows } = await pool.query<PaymentRow>(
+      `select ${COLUMNS} from payments
+        where circle_id = any($1::uuid[]) and (not $2 or status = 'held')
+        order by created_at desc
+        limit $3`,
+      [circleIds, options.heldOnly, options.limit],
+    );
+    return rows.map(toPayment);
+  }
+
   return {
     createPayment,
     decidePayment,
@@ -674,6 +691,7 @@ export function createPaymentService(deps: PaymentServiceDeps) {
     executePayment,
     paymentForCircle,
     getPayment,
+    listPayments,
   };
 }
 
