@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "preview:dashboard": "node scripts/preview-dashboard.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

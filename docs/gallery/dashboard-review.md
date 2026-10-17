@@ -25,6 +25,12 @@ npm exec -- playwright install chromium
 npm exec -- playwright test --config playwright.dashboard.config.ts
 ```
 
+For a local interactive preview without any service credentials, run
+`npm run preview:dashboard` and open
+`http://127.0.0.1:3106/dashboard/preview`. This command uses fake settings only
+for that server process; it does not change `.env.local` or connect the preview
+to Auth0, Tiger Data or Nessie.
+
 The browser suite starts a local server using explicitly fake Auth0 configuration,
 tests keyboard approval/denial and persistent result focus, partial approvals,
 Guardian/viewer controls, button text contrast (at least 4.5:1), 200% text size,
