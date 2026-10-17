@@ -12,7 +12,7 @@ Built at SwampHacks XII (Oct 16–18, 2026).
 ## Repo layout
 
 ```
-ios/    older adult app, family app, Message Filter + Call Directory extensions
+ios/    older adult app, Message Filter + Call Directory extensions
 web/    Next.js backend + family dashboard (Vercel)
 ml/     datasets, training, eval scripts, exported models
 docs/   rules, Devpost write-up, demo script, research
