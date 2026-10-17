@@ -270,7 +270,7 @@ import SwiftUI
         payments = [
             payment("p1", "held", 50000, "Gift card store", "merchant", false, ("gift_cards", "Gift cards"), true,
                     [("gift_card", "Gift card purchase"), ("new_payee", "Someone they have not paid before"), ("during_call", "Paid while on a phone call")],
-                    "Rosa is paying $500 to Gift card store while on a phone call. Gift cards are the most common way scammers ask to be paid, because they cannot be traced or refunded.", 1, nil),
+                    "Rosa is paying $500 to Gift card store while on a phone call. Scammers often ask to be paid with gift cards, because the money is hard to trace or get back.", 1, nil),
             payment("p2", "held", 32000, "City Power & Light", "biller", true, ("utilities", "Utilities"), false,
                     [("over_limit", "Over the limit you set")], nil, 2, nil),
             payment("p3", "paid", 8412, "Sunrise Grocery", "merchant", true, ("groceries", "Groceries"), false, [], nil, 90, nil),

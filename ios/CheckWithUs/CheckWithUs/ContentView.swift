@@ -59,6 +59,7 @@ struct PairView: View {
 
 struct HomeView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         let outcome = model.payment?.outcome
@@ -80,27 +81,45 @@ struct HomeView: View {
             .frame(maxWidth: .infinity)
             .multilineTextAlignment(.center)
             .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(paused ? .isButton : [])
+            .accessibilityHint(paused ? "Shows the paused payment." : "")
             .onTapGesture { if paused { model.go(.status) } }
+            // Read the change aloud when a payment pauses or settles while Home is open.
+            .onChange(of: paused) { _, now in
+                AccessibilityNotification.Announcement(now ? OutcomeText.headline("waiting") : "You're safe").post()
+            }
             ErrorText()
+            // Very large text: only the main button stays pinned, the rest scrolls with the page.
+            if typeSize.isAccessibilitySize { more }
             #if DEBUG
-            BankDebugPanel()
+            // Hidden in -preview screenshots.
+            if UserDefaults.standard.string(forKey: "preview") == nil { BankDebugPanel() }
             #endif
         } action: {
             BigButton("Ask my family", symbol: "person.2.fill") { await model.askFamily() }
-            BigButton("Pay a bill", symbol: "dollarsign.circle", prominent: false) { model.go(.choosePayee) }
-            BankAlwaysNote()
-            if model.callLabelsOff {
-                // One-time setup, usually done by the family: iOS only lets Settings turn the extension on.
-                Button("Turn on scam call warnings") { model.openCallSettings() }
-                    .font(.title3.weight(.semibold))
-                    .frame(minHeight: 56)
+            if !typeSize.isAccessibilitySize { more }
+        }
+    }
+
+    @ViewBuilder private var more: some View {
+        BigButton("Pay a bill", symbol: "dollarsign.circle", prominent: false) { model.go(.choosePayee) }
+        BankAlwaysNote()
+        if model.callLabelsOff {
+            // One-time setup, usually done by the family: iOS only lets Settings turn the extension on.
+            Button { model.openCallSettings() } label: {
+                Text("Turn on scam call warnings")
+                    .frame(maxWidth: .infinity, minHeight: 56)
+                    .contentShape(.rect)
             }
+            .font(.title3.weight(.semibold))
+            .multilineTextAlignment(.center)
         }
     }
 }
 
 struct ChoosePayeeView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         Page(back: .home) {
@@ -108,10 +127,21 @@ struct ChoosePayeeView: View {
                 .font(.largeTitle.bold())
             ForEach(Payee.all) { payee in
                 Button { model.go(.amount(payee)) } label: {
-                    Label(payee.name, systemImage: payee.symbol)
-                        .font(.title2.weight(.semibold))
-                        .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
-                        .padding(.horizontal)
+                    // Very large text: icon above the name, so the name gets the full width.
+                    Group {
+                        if typeSize.isAccessibilitySize {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Image(systemName: payee.symbol).accessibilityHidden(true)
+                                Text(payee.name)
+                            }
+                        } else {
+                            Label(payee.name, systemImage: payee.symbol)
+                        }
+                    }
+                    .font(.title2.weight(.semibold))
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+                    .padding(.horizontal)
                 }
                 .buttonStyle(.bordered)
                 .buttonBorderShape(.roundedRectangle(radius: 16))
@@ -149,7 +179,7 @@ struct AmountView: View {
             if !text.isEmpty && amount == nil {
                 Text(payee.kind == "biller" ? "Type an amount like 84.12" : "Use whole dollars, like 50")
                     .font(.title3)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Color.errorText)
             }
         } action: {
             BigButton("Next", symbol: "arrow.right") { if let amount { model.go(.confirm(payee, cents: amount)) } }
@@ -171,7 +201,7 @@ struct ConfirmView: View {
             if model.isOnCall {
                 Text("You are on a phone call. We will ask your family first.")
                     .font(.title2)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Color.warningText)
             }
             ErrorText()
         } action: {
@@ -183,6 +213,7 @@ struct ConfirmView: View {
 
 struct StatusView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let outcome = model.payment?.outcome ?? "failed"
@@ -191,7 +222,7 @@ struct StatusView: View {
                 Image(systemName: OutcomeText.symbol(outcome))
                     .font(.system(size: 120))
                     .foregroundStyle(OutcomeText.color(outcome))
-                    .symbolEffect(.pulse, isActive: outcome == "waiting")
+                    .symbolEffect(.pulse, isActive: outcome == "waiting" && !reduceMotion)
                     .accessibilityHidden(true)
                 Text(OutcomeText.headline(outcome))
                     .font(.largeTitle.bold())
@@ -200,7 +231,6 @@ struct StatusView: View {
                 if let payment = model.payment {
                     Text("\(dollars(payment.amountCents)) to \(payment.payee.name)")
                         .font(.title2.weight(.semibold))
-                        .foregroundStyle(.secondary)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -270,16 +300,25 @@ struct Page<Content: View, Actions: View>: View {
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        // Shows the scroll bar briefly, a hint that very large text continues below.
+        .scrollIndicatorsFlash(onAppear: true)
         .safeAreaInset(edge: .bottom) {
-            VStack(spacing: 12) { action }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 8)
+            // No bar at all on a page without actions.
+            if Actions.self != EmptyView.self {
+                VStack(spacing: 12) { action }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 12)
+                    .padding(.bottom, 8)
+                    // Opaque, so text scrolling under the buttons never shows through them.
+                    .background(.background)
+            }
         }
     }
 }
 
 struct BigButton: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.dynamicTypeSize) private var typeSize
     let title: String
     let symbol: String
     var prominent = true
@@ -294,9 +333,12 @@ struct BigButton: View {
 
     var body: some View {
         let button = Button { Task { await action() } } label: {
-            Label(title, systemImage: symbol)
-                .font(.title.bold())
-                .frame(maxWidth: .infinity, minHeight: 80)
+            Group {
+                // Very large text: the words get the full width instead of wrapping beside the icon.
+                if typeSize.isAccessibilitySize { Text(title) } else { Label(title, systemImage: symbol) }
+            }
+            .font(.title.bold())
+            .frame(maxWidth: .infinity, minHeight: 80)
         }
         Group {
             if prominent { button.buttonStyle(.borderedProminent) } else { button.buttonStyle(.bordered) }
@@ -314,9 +356,17 @@ struct ErrorText: View {
         if let error = model.error {
             Text(error)
                 .font(.title3)
-                .foregroundStyle(.red)
+                .foregroundStyle(Color.errorText)
         }
     }
+}
+
+extension Color {
+    /// Text colors with at least 4.5:1 contrast on the light background. System orange and red text fall short.
+    static let warningText = Color(UIColor { $0.userInterfaceStyle == .dark ? .systemOrange : UIColor(red: 0.64, green: 0.28, blue: 0, alpha: 1) })
+    static let errorText = Color(UIColor { $0.userInterfaceStyle == .dark ? .systemRed : UIColor(red: 0.77, green: 0.12, blue: 0.12, alpha: 1) })
+    /// Button tint: white on it is 6.4:1 in light mode (system blue is 3.5:1). Dark mode keeps system blue.
+    static let action = Color(UIColor { $0.userInterfaceStyle == .dark ? .systemBlue : UIColor(red: 0, green: 0.34, blue: 0.8, alpha: 1) })
 }
 
 #Preview {

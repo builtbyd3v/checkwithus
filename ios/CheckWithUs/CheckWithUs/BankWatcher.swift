@@ -232,7 +232,6 @@ struct BankPermissionView: View {
                 .font(.title3)
             Text("We only tell your family the bank's name, never your exact location.")
                 .font(.title3)
-                .foregroundStyle(.secondary)
         } action: {
             BigButton("Turn on", symbol: "location.fill") { BankWatcher.shared.requestPermission() }
             BigButton("Not now", symbol: "xmark", prominent: false) { BankWatcher.shared.skipped = true }
@@ -248,11 +247,12 @@ struct BankAlwaysNote: View {
                 Text("Bank alerts only work if location is set to Always.")
                     .font(.title3)
                     .multilineTextAlignment(.center)
-                Button("Open Settings") {
+                Button {
                     if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                } label: {
+                    Text("Open Settings").frame(maxWidth: .infinity, minHeight: 56).contentShape(.rect)
                 }
                 .font(.title3.weight(.semibold))
-                .frame(minHeight: 56)
             }
         }
     }
