@@ -36,8 +36,13 @@ enum Screen: Equatable {
 
     private let calls = CXCallObserver()
     /// One request per payment attempt, resent unchanged when retrying it, so the idempotency key always
-    /// matches the same body (web/INTEGRATION.md).
-    private var attempt: API.PaymentRequest?
+    /// matches the same body (web/INTEGRATION.md). Saved until the server answers, so a restart after a lost
+    /// response resends the same key instead of paying twice.
+    @ObservationIgnored private var attempt = UserDefaults.standard.data(forKey: AppModel.attemptKey)
+        .flatMap { try? JSONDecoder().decode(API.PaymentRequest.self, from: $0) } {
+        didSet { UserDefaults.standard.set(attempt.flatMap { try? JSONEncoder().encode($0) }, forKey: Self.attemptKey) }
+    }
+    private static let attemptKey = "paymentAttempt"
     /// The held payment survives an app restart, so polling and the lock-screen card pick up again.
     private static let watchedKey = "watchedPaymentID"
     private var activity: Activity<PaymentActivity>?
@@ -66,7 +71,10 @@ enum Screen: Equatable {
 
     func go(_ next: Screen) {
         error = nil
-        if case .confirm = next { attempt = nil }
+        // Confirming the same payee and amount again is a retry of the unanswered attempt, not a new payment.
+        if case let .confirm(payee, cents) = next, attempt?.payee.name != payee.name || attempt?.amountCents != cents {
+            attempt = nil
+        }
         screen = next
     }
 
@@ -119,6 +127,11 @@ enum Screen: Equatable {
 
     func pay(_ payee: Payee, cents: Int) async {
         guard let token else { return }
+        // One held payment at a time: only the watched payment is polled, and polling is what hears the family.
+        if let held = payment, !held.isSettled { go(.status); return }
+        // A call that started since the first try must reach the server. A duplicate this causes is held for the
+        // family, while a stale "not on a call" could skip them.
+        if attempt?.onCall == false, isOnCall { attempt = nil }
         // ponytail: the Guard scores the payment's own words (payee + category). There is no text here to read;
         // the server treats the score as advisory and its fixed rules decide.
         let verdict = try? Self.guardModel?.check("\(payee.name) \(payee.category.replacingOccurrences(of: "_", with: " "))")
@@ -129,6 +142,7 @@ enum Screen: Equatable {
         attempt = request
         await run {
             let payment = try await API.pay(request, token: token)
+            self.attempt = nil
             self.payment = payment
             self.go(.status)
             if !payment.isSettled {
