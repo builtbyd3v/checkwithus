@@ -71,6 +71,15 @@ describe('requireFamilyUser', () => {
     });
   });
 
+  it('passes on the Auth0 RBAC permissions claim, and treats a malformed one as no permissions', async () => {
+    await expect(requireFamilyUser(request(await sign({ permissions: ['approve:payments'] })))).resolves.toMatchObject({
+      permissions: ['approve:payments'],
+    });
+    await expect(requireFamilyUser(request(await sign({ permissions: 'approve:payments' })))).resolves.toMatchObject({
+      permissions: [],
+    });
+  });
+
   it('rejects no token', async () => {
     await expect(requireFamilyUser(request())).rejects.toBeInstanceOf(AuthError);
   });

@@ -13,7 +13,18 @@ export const FAKE_AUTH0 = {
 const ISSUER = `https://${FAKE_AUTH0.domain}/`;
 
 type Answer = 'pending' | 'approve' | 'deny' | 'expire' | 'slow_down';
-type PushRequest = { sub: string; message: string; expiry: number; answer: Answer; tokenSub?: string };
+type PushRequest = {
+  sub: string;
+  message: string;
+  expiry: number;
+  answer: Answer;
+  tokenSub?: string;
+  audience?: string;
+  /** The parsed authorization_details, when sent. */
+  details?: unknown;
+  /** RBAC claim for the access token; without it the access token is opaque. */
+  permissions?: string[];
+};
 
 export type FakeAuth0 = Awaited<ReturnType<typeof createFakeAuth0>>;
 
@@ -25,6 +36,8 @@ export async function createFakeAuth0() {
   const pushes = new Map<string, PushRequest>();
   const notEnrolled = new Set<string>();
   const calls: Array<{ path: string; fields: Record<string, string> }> = [];
+  /** Off: like a tenant whose API has not registered the details type. */
+  const settings = { rarRegistered: true };
   let next = 1;
 
   const json = (status: number, body: unknown) =>
@@ -50,6 +63,9 @@ export async function createFakeAuth0() {
       if (message.length > 64) {
         return json(400, { error: 'invalid_request', error_description: 'binding_message should not exceed 64 characters' });
       }
+      if (fields.authorization_details && !settings.rarRegistered) {
+        return json(400, { error: 'invalid_request', error_description: 'authorization_details type is not allowed' });
+      }
       const sub = (JSON.parse(fields.login_hint ?? '{}') as { sub?: string }).sub ?? '';
       if (notEnrolled.has(sub)) {
         return json(400, { error: 'invalid_request', error_description: 'User has no enrolled push notification device' });
@@ -57,7 +73,10 @@ export async function createFakeAuth0() {
       // Unique across fake instances, like Auth0's: the column is unique, so ids
       // restarting at 1 in each test would collide with earlier tests' rows.
       const id = `fake-auth-req-${next++}-${crypto.randomUUID()}`;
-      pushes.set(id, { sub, message, expiry: Number(fields.requested_expiry), answer: 'pending' });
+      pushes.set(id, {
+        sub, message, expiry: Number(fields.requested_expiry), answer: 'pending', audience: fields.audience,
+        details: fields.authorization_details ? JSON.parse(fields.authorization_details) : undefined,
+      });
       return json(200, { auth_req_id: id, expires_in: Number(fields.requested_expiry), interval: 5 });
     }
 
@@ -85,7 +104,17 @@ export async function createFakeAuth0() {
             .setIssuedAt()
             .setExpirationTime('5m')
             .sign(privateKey);
-          return json(200, { access_token: 'opaque', id_token: idToken, token_type: 'Bearer', expires_in: 86400 });
+          const accessToken = push.permissions && push.audience
+            ? await new SignJWT({ permissions: push.permissions })
+                .setProtectedHeader({ alg: 'RS256', kid: 'k1' })
+                .setSubject(push.tokenSub ?? push.sub)
+                .setIssuer(ISSUER)
+                .setAudience(push.audience)
+                .setIssuedAt()
+                .setExpirationTime('5m')
+                .sign(privateKey)
+            : 'opaque';
+          return json(200, { access_token: accessToken, id_token: idToken, token_type: 'Bearer', expires_in: 86400 });
         }
       }
     }
@@ -98,12 +127,14 @@ export async function createFakeAuth0() {
     calls,
     pushes,
     notEnrolled,
+    settings,
     /** What the member taps in Guardian, on their most recent push. */
-    answer(sub: string, answer: Answer, options: { tokenSub?: string } = {}) {
+    answer(sub: string, answer: Answer, options: { tokenSub?: string; permissions?: string[] } = {}) {
       const entry = [...pushes.values()].reverse().find((p) => p.sub === sub);
       if (!entry) throw new Error(`no push was sent to ${sub}`);
       entry.answer = answer;
       entry.tokenSub = options.tokenSub;
+      entry.permissions = options.permissions;
     },
     tokenPolls: () => calls.filter((c) => c.path === '/oauth/token'),
   };

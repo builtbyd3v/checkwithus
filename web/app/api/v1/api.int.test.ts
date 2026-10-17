@@ -28,7 +28,13 @@ vi.mock('@/lib/auth/family', async () => {
       const sub = request.headers.get('x-test-sub');
       if (!sub) throw new AuthError('Missing bearer token');
       const authTime = request.headers.get('x-test-auth-time');
-      return { sub, name: null, ...(authTime ? { authTime: Number(authTime) } : {}) };
+      // Stands in for the verified token's Auth0 RBAC `permissions` claim.
+      const permissions = request.headers.get('x-test-permissions');
+      return {
+        sub, name: null,
+        ...(authTime ? { authTime: Number(authTime) } : {}),
+        ...(permissions !== null ? { permissions: permissions.split(',').filter(Boolean) } : {}),
+      };
     },
   };
 });
@@ -81,11 +87,12 @@ let circleId: string;
 let inviteCode: string;
 let deviceToken: string;
 
-type Init = { body?: unknown; sub?: string; device?: string; method?: string };
+type Init = { body?: unknown; sub?: string; device?: string; method?: string; permissions?: string[] };
 function req(path: string, init: Init = {}) {
   const headers: Record<string, string> = {};
   if (init.body !== undefined) headers['content-type'] = 'application/json';
   if (init.sub) headers['x-test-sub'] = init.sub;
+  if (init.permissions) headers['x-test-permissions'] = init.permissions.join(',');
   if (init.device) headers.authorization = `Bearer ${init.device}`;
   return new Request(`${BASE}${path}`, {
     method: init.method ?? (init.body === undefined ? 'GET' : 'POST'),
@@ -474,5 +481,75 @@ describe('Freeze over HTTP (the family app contract)', () => {
     fresh.headers.set('x-test-auth-time', String(Math.floor(Date.now() / 1000)));
     expect(await read(await routes.unfreeze.POST(fresh, params(circleId))))
       .toEqual({ status: 200, body: { frozen: false, movedCents: 10_000 } });
+  });
+});
+
+describe('over the two-approval limit, through the family app', () => {
+  // Its own circle: the circle above ends frozen with its phone revoked.
+  const MARIA2 = 'test|two-maria';
+  const LEO = 'test|two-leo';
+  const VIEWER = 'test|two-viewer';
+  let twoCircleId: string;
+  let largeId: string;
+  const holdLarge = async (key: string) => {
+    const { payments } = await import('@/lib/services');
+    const held = await payments().createPayment(twoCircleId, {
+      idempotencyKey: key, amountCents: toCents(150_000), payeeName: 'QuickGift Cards', payeeKind: 'merchant',
+      category: 'gift_cards', onCall: false, guard: null, explanation: null,
+    });
+    expect(held).toMatchObject({ status: 'held', approvalsRequired: 2 });
+    largeId = held.id;
+  };
+  const decide = async (sub: string, decision: 'approve' | 'deny', permissions?: string[]) =>
+    read(await routes.decision.POST(
+      req(`/family/payments/${largeId}/decision`, { sub, body: { decision }, ...(permissions ? { permissions } : {}) }),
+      params(largeId),
+    ));
+  const writesFor = (id: string) => fake.paymentWrites().filter((w) => JSON.stringify(w.body).includes(id));
+
+  beforeAll(async () => {
+    const { rows } = await db().query<{ id: string }>(
+      `insert into circles (protected_name, nessie_customer_id, nessie_account_id, opening_balance_cents)
+       values ('Two Approvals Test (synthetic)', 'test-customer', $1, 500000) returning id`,
+      ['test-account-' + crypto.randomUUID()],
+    );
+    twoCircleId = rows[0]!.id;
+    await db().query(
+      `insert into circle_members (circle_id, auth0_sub, display_name, role)
+       values ($1, $2, 'Maria', 'approver'), ($1, $3, 'Leo', 'approver'), ($1, $4, 'Vi', 'viewer')`,
+      [twoCircleId, MARIA2, LEO, VIEWER],
+    );
+    await holdLarge(`api-two-approvals-${crypto.randomUUID()}`);
+  });
+
+  afterAll(async () => {
+    await db().query('delete from circles where id = $1', [twoCircleId]);
+  });
+
+  it('a token whose Auth0 permissions lack approve:payments cannot decide, even for an approver', async () => {
+    expect(await decide(MARIA2, 'approve', ['read:payments'])).toMatchObject({ status: 403, body: { error: 'permission_required' } });
+    expect(await decide(MARIA2, 'deny', [])).toMatchObject({ status: 403, body: { error: 'permission_required' } });
+  });
+
+  it('a viewer cannot decide, even with approve:payments in the token', async () => {
+    expect((await decide(VIEWER, 'approve', ['approve:payments'])).status).toBe(404);
+  });
+
+  it('one approval keeps it held; a repeat by the same person does not count twice', async () => {
+    expect(await decide(MARIA2, 'approve', ['approve:payments'])).toMatchObject({ status: 200, body: { status: 'held', approvalsRequired: 2 } });
+    expect(await decide(MARIA2, 'approve')).toMatchObject({ status: 200, body: { status: 'held' } });
+    expect(writesFor(largeId)).toHaveLength(0);
+  });
+
+  it('a second approver releases it, once', async () => {
+    expect(await decide(LEO, 'approve')).toMatchObject({ status: 200, body: { status: 'paid', decidedVia: 'app' } });
+    expect(writesFor(largeId)).toHaveLength(1);
+  });
+
+  it('one approval then one deny: the deny stops it', async () => {
+    await holdLarge(`api-two-approvals-${crypto.randomUUID()}`);
+    expect(await decide(MARIA2, 'approve')).toMatchObject({ status: 200, body: { status: 'held' } });
+    expect(await decide(LEO, 'deny')).toMatchObject({ status: 200, body: { status: 'denied' } });
+    expect(writesFor(largeId)).toHaveLength(0);
   });
 });
