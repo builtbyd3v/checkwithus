@@ -7,10 +7,11 @@ import { auth0 } from '@/lib/auth0/web';
 import { CATEGORIES, PAYEE_KINDS } from '@/lib/categories';
 import { db } from '@/lib/db';
 import { createPairingCode, joinCircle, rotateInviteCode } from '@/lib/family';
-import { parseDollars } from '@/lib/money';
+import { formatCents, parseDollars } from '@/lib/money';
 import { normalizeName } from '@/lib/names';
 import { requirePermission } from '@/lib/permissions';
 import { allowanceBody, grantAllowance, revokeAllowance } from '@/lib/allowances';
+import { freeze } from '@/lib/services';
 
 export type FormState = { message: string; code?: string; expiresAt?: string };
 const fail = (error: unknown): FormState => ({
@@ -93,6 +94,29 @@ export async function pairingAction(_state: FormState, form: FormData): Promise<
   try {
     const pairing = await createPairingCode(db(), sub, circleId.data);
     return { message: 'Enter this code on the older adult’s phone.', ...pairing };
+  } catch (error) { return fail(error); }
+}
+
+export async function freezeAction(_state: FormState, form: FormData): Promise<FormState> {
+  const circleId = z.uuid().safeParse(value(form, 'circleId'));
+  if (!circleId.success) return { message: 'Circle not found.' };
+  const sub = await actor();
+  try {
+    const { movedCents } = await freeze().freeze(sub, circleId.data);
+    revalidatePath('/dashboard');
+    return { message: `Spending is frozen. ${formatCents(movedCents)} moved to the vault.` };
+  } catch (error) { return fail(error); }
+}
+
+export async function unfreezeAction(_state: FormState, form: FormData): Promise<FormState> {
+  const parsed = z.object({ circleId: z.uuid(), dollars: z.string().trim().regex(/^\d+$/) })
+    .safeParse({ circleId: value(form, 'circleId'), dollars: value(form, 'dollars') });
+  if (!parsed.success) return { message: 'Enter a whole dollar amount.' };
+  const sub = await actor();
+  try {
+    const { movedCents } = await freeze().unfreeze(sub, parsed.data.circleId, parseDollars(parsed.data.dollars));
+    revalidatePath('/dashboard');
+    return { message: `Spending is back on. ${formatCents(movedCents)} moved back from the vault.` };
   } catch (error) { return fail(error); }
 }
 

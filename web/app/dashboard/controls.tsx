@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useEffect, useState } from 'react';
-import { addPayeeAction, inviteAction, joinAction, pairingAction, saveSettingsAction, type FormState } from './actions';
+import { addPayeeAction, freezeAction, inviteAction, joinAction, pairingAction, saveSettingsAction, unfreezeAction, type FormState } from './actions';
 
 const initial: FormState = { message: '' };
 const inputClass = 'h-11 w-full rounded-lg border border-stone-300 bg-white px-3 text-stone-900 outline-none focus:border-teal-700 focus:ring-2 focus:ring-teal-700/20';
@@ -36,6 +36,32 @@ export function JoinForm() {
     <button disabled={pending} className={buttonClass}>{pending ? 'Joining…' : 'Join family circle'}</button>
     <Feedback state={state} />
   </form>;
+}
+
+/** One tap during a live scam: the spending money goes to the vault and every payment waits. */
+export function FreezeControl({ circleId, frozen, firstName, vaultLabel, vaultDollars }: {
+  circleId: string; frozen: boolean; firstName: string; vaultLabel: string; vaultDollars: string;
+}) {
+  const [frozeState, freezeNow, freezing] = useActionState(freezeAction, initial);
+  const [unfrozeState, unfreezeNow, unfreezing] = useActionState(unfreezeAction, initial);
+  if (!frozen) return <section aria-labelledby="freeze-title" className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-rose-900/15 bg-rose-50 p-5 sm:p-7">
+    <div><h2 id="freeze-title" className="text-2xl font-semibold">Freeze spending</h2>
+      <p className="mt-1 max-w-2xl text-stone-700">During a scam, move {firstName}’s spending money to the vault. Every payment waits for the family until you unfreeze.</p>
+      <Feedback state={frozeState} /></div>
+    <form action={freezeNow}><input type="hidden" name="circleId" value={circleId} />
+      <button disabled={freezing} className="inline-flex min-h-14 items-center justify-center rounded-lg bg-rose-800 px-6 text-lg font-semibold text-white hover:bg-rose-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-800 disabled:opacity-60">{freezing ? 'Freezing…' : 'Freeze now'}</button></form>
+  </section>;
+  return <section aria-labelledby="freeze-title" className="mb-6 rounded-2xl border border-rose-900/20 bg-rose-100 p-5 sm:p-7">
+    <h2 id="freeze-title" className="text-2xl font-semibold">Spending is frozen</h2>
+    <p className="mt-1 text-stone-700">{vaultLabel} is safe in the vault. Every payment waits for the family.</p>
+    <Feedback state={frozeState} />
+    <form action={unfreezeNow} className="mt-4 flex flex-wrap items-end gap-3">
+      <input type="hidden" name="circleId" value={circleId} />
+      <div className="min-w-40"><label htmlFor="unfreezeDollars" className="mb-1 block text-sm font-medium">Dollars to move back</label>
+        <input id="unfreezeDollars" name="dollars" inputMode="numeric" defaultValue={vaultDollars} required className={inputClass} /></div>
+      <button disabled={unfreezing} className={buttonClass}>{unfreezing ? 'Unfreezing…' : 'Unfreeze'}</button>
+    </form><Feedback state={unfrozeState} />
+  </section>;
 }
 
 export function SettingsForms({ circleId, holdDollars }: { circleId: string; holdDollars: string }) {
