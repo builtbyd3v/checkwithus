@@ -3,7 +3,7 @@
  * We store only their SHA-256; the plaintext exists once, in the response
  * that hands it over.
  */
-import { createHash, randomBytes, randomInt } from 'node:crypto';
+import { createHash, createHmac, randomBytes, randomInt } from 'node:crypto';
 
 /** Prefixed so a leaked token is recognizable in a log, a paste or a commit. */
 const DEVICE_TOKEN_PREFIX = 'cwd_';
@@ -17,8 +17,22 @@ export function looksLikeDeviceToken(value: string): boolean {
   return /^cwd_[A-Za-z0-9_-]{43}$/.test(value);
 }
 
+/**
+ * For device tokens: 256 random bits cannot be brute-forced from their hash,
+ * so a plain SHA-256 is enough.
+ */
 export function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
+}
+
+/**
+ * For short codes, a plain hash is not enough: 40 bits is ~10^12 codes, which
+ * a GPU tries against a SHA-256 in minutes. So codes are hashed with a key
+ * that lives in the server's environment, not the database: a leaked
+ * database alone cannot be used to recover a working code.
+ */
+export function hashShortCode(canonicalCode: string, key: string): string {
+  return createHmac('sha256', key).update(canonicalCode).digest('hex');
 }
 
 /**

@@ -7,8 +7,15 @@
 import 'server-only';
 import type pg from 'pg';
 import { transaction } from '@/lib/db';
+import { codeHashKey } from '@/lib/env';
 import { AuthError, bearerToken } from './http-auth';
-import { looksLikeDeviceToken, newDeviceToken, normalizeShortCode, sha256 } from './tokens';
+import {
+  hashShortCode,
+  looksLikeDeviceToken,
+  newDeviceToken,
+  normalizeShortCode,
+  sha256,
+} from './tokens';
 
 export type Device = { id: string; circleId: string };
 
@@ -49,7 +56,7 @@ export async function pairDevice(
       `update pairing_codes set used_at = now()
         where code_hash = $1 and used_at is null and expires_at > now()
        returning circle_id`,
-      [sha256(code)],
+      [hashShortCode(code, codeHashKey())],
     );
     const circleId = spent.rows[0]?.circle_id;
     if (!circleId) return null;

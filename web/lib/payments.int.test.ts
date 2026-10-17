@@ -184,6 +184,20 @@ describe('the family circle', () => {
       expect(joins.filter((j) => j.status === 'fulfilled')).toHaveLength(3);
       const count = await pool.query('select count(*)::int as n from circle_members where circle_id = $1', [id]);
       expect(count.rows[0].n).toBe(3);
+
+      // The trigger itself lets an existing member's duplicate insert through
+      // to ON CONFLICT, instead of calling a full circle full at them.
+      const member = await pool.query<{ auth0_sub: string }>(
+        'select auth0_sub from circle_members where circle_id = $1 limit 1',
+        [id],
+      );
+      await expect(
+        pool.query(
+          `insert into circle_members (circle_id, auth0_sub, display_name) values ($1, $2, 'Again')
+           on conflict (circle_id, auth0_sub) do nothing`,
+          [id, member.rows[0]!.auth0_sub],
+        ),
+      ).resolves.toMatchObject({ rowCount: 0 });
     } finally {
       await pool.query('delete from circles where id = $1', [id]);
     }
@@ -286,6 +300,22 @@ describe('money moves exactly once', () => {
     expect(fake.paymentWrites()).toHaveLength(1); // looked, never sent again
     const ledger = await pool.query('select 1 from spending where payment_id = $1', [payment.id]);
     expect(ledger.rowCount).toBe(0);
+  });
+
+  it('a reconcile racing the original send backs off instead of declaring it failed', async () => {
+    fake.failNext('/bills', 'lostThen500');
+    const payment = await service.createPayment(circleId, { ...electricBill, idempotencyKey: key() });
+    await pool.query(`update payments set updated_at = now() - interval '31 seconds' where id = $1`, [payment.id]);
+
+    // While the reconcile is looking at Nessie, the slow original request
+    // restarts the clock right before it sends.
+    fake.duringNextLookup(async () => {
+      await pool.query(`update payments set updated_at = now() where id = $1`, [payment.id]);
+    });
+    const settled = await service.paymentForCircle(circleId, payment.id);
+
+    // Not failed: that request is about to send, and its send must be recordable.
+    expect(settled.status).toBe('paying');
   });
 
   it('a slow write that lands after the first look is found later, not declared failed', async () => {

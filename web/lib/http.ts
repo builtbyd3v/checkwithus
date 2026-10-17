@@ -9,7 +9,7 @@ import 'server-only';
 import { unstable_rethrow } from 'next/navigation';
 import { connection } from 'next/server';
 import type { z } from 'zod';
-import { AuthError } from '@/lib/auth/http-auth';
+import { AuthError, AuthUnavailableError } from '@/lib/auth/http-auth';
 import { PaymentError, type PaymentErrorCode } from '@/lib/payments';
 
 export class HttpError extends Error {
@@ -75,6 +75,12 @@ export function errorResponse(error: unknown): Response {
     return Response.json(
       { error: 'unauthorized', message: error.message },
       { status: 401, headers: { 'Cache-Control': 'no-store', 'WWW-Authenticate': 'Bearer' } },
+    );
+  }
+  if (error instanceof AuthUnavailableError) {
+    return Response.json(
+      { error: 'auth_unavailable', message: error.message },
+      { status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '5' } },
     );
   }
   if (error instanceof PaymentError) {

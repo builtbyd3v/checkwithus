@@ -508,10 +508,17 @@ export function createPaymentService(deps: PaymentServiceDeps) {
     // Restart the reconcile clock at the send itself, not at the claim: the
     // merchant lookup above can take a while, and a concurrent read must not
     // conclude "failed" while this send is still about to happen.
-    await pool.query(
+    // If that touches no row, a concurrent read already concluded this payment
+    // (preparation ran past the reconcile window), so it must not be sent.
+    const stillPaying = await pool.query(
       `update payments set updated_at = now() where id = $1 and status = 'paying'`,
       [payment.id],
     );
+    if (stillPaying.rowCount === 0) {
+      const current = await getPayment(id);
+      if (!current) throw new PaymentError('not_found', 'Payment not found');
+      return current;
+    }
 
     // Only the send is guarded here. Once Nessie has said yes, nothing that
     // goes wrong afterwards may mark this payment failed: the money moved.
@@ -568,7 +575,11 @@ export function createPaymentService(deps: PaymentServiceDeps) {
   async function reconcile(
     payment: Payment,
     nessieAccountId: string,
-    { mayConcludeFailed }: { mayConcludeFailed: boolean },
+    conclusion:
+      | { mayConcludeFailed: false }
+      // `observedUpdatedAt`: the payment's updated_at when it was judged stale,
+      // as Postgres text (microseconds; a JS Date would drop them).
+      | { mayConcludeFailed: true; observedUpdatedAt: string },
   ): Promise<Payment> {
     let record;
     try {
@@ -580,11 +591,18 @@ export function createPaymentService(deps: PaymentServiceDeps) {
     if (record && record.kind !== 'deposit') {
       return recordPaid(payment, record.kind, record.nessieId);
     }
-    if (!mayConcludeFailed) {
+    if (!conclusion.mayConcludeFailed) {
       await notePaying(payment.id, 'Nessie has not confirmed this payment yet; checking again shortly');
       return (await getPayment(payment.id)) ?? payment;
     }
-    return markFailed(payment.id, 'Nessie never confirmed this payment and has no record of it');
+    // Conclude only if nobody touched the payment while we were looking. A
+    // slow original request restarts updated_at just before it sends; if that
+    // happened, this update matches nothing and the send goes ahead. If this
+    // lands first, that request sees the payment is no longer `paying` and
+    // does not send. The row lock makes the two mutually exclusive.
+    return markFailed(payment.id, 'Nessie never confirmed this payment and has no record of it', {
+      ifUpdatedAt: conclusion.observedUpdatedAt,
+    });
   }
 
   /**
@@ -594,14 +612,18 @@ export function createPaymentService(deps: PaymentServiceDeps) {
    */
   async function reconcileIfStuck(payment: Payment): Promise<Payment> {
     if (payment.status !== 'paying') return payment;
-    const { rowCount } = await pool.query(
-      `select 1 from payments where id = $1 and status = 'paying'
+    const { rows } = await pool.query<{ observed: string }>(
+      `select updated_at::text as observed from payments
+        where id = $1 and status = 'paying'
           and updated_at < now() - make_interval(secs => $2)`,
       [payment.id, STUCK_PAYING_SECONDS],
     );
-    if (!rowCount) return payment;
+    if (!rows[0]) return payment;
     const circle = await circleSettings(payment.circleId);
-    return reconcile(payment, circle.nessieAccountId, { mayConcludeFailed: true });
+    return reconcile(payment, circle.nessieAccountId, {
+      mayConcludeFailed: true,
+      observedUpdatedAt: rows[0].observed,
+    });
   }
 
   /** paying -> paid, and the ledger row, in one transaction; once only. */
@@ -637,12 +659,18 @@ export function createPaymentService(deps: PaymentServiceDeps) {
     });
   }
 
-  async function markFailed(id: string, failure: string): Promise<Payment> {
+  /** paying -> failed. With `ifUpdatedAt`, only if the row is unchanged since then. */
+  async function markFailed(
+    id: string,
+    failure: string,
+    options: { ifUpdatedAt?: string } = {},
+  ): Promise<Payment> {
     const { rows } = await pool.query<PaymentRow>(
       `update payments set status = 'failed', failure = $2, updated_at = now()
         where id = $1 and status = 'paying'
+          and ($3::timestamptz is null or updated_at = $3::timestamptz)
        returning ${COLUMNS}`,
-      [id, failure.slice(0, 500)],
+      [id, failure.slice(0, 500), options.ifUpdatedAt ?? null],
     );
     if (rows[0]) return toPayment(rows[0]);
     const current = await getPayment(id);

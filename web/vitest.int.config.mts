@@ -8,8 +8,12 @@ export default defineConfig({
   test: {
     include: ['**/*.int.test.ts'],
     exclude: ['node_modules/**', '.next/**'],
-    // Loads .env.local, which holds DATABASE_URL.
-    env: loadEnv('test', process.cwd(), ''),
+    // .env.local holds DATABASE_URL. CODE_HASH_KEY gets a test-only default
+    // so the suite does not depend on that secret being configured.
+    env: {
+      CODE_HASH_KEY: 'test-only-code-hash-key-not-a-real-secret',
+      ...loadEnv('test', process.cwd(), ''),
+    },
     // The files share one database and clean up shared rows (fake Nessie
     // merchants), so they run one at a time rather than racing each other.
     fileParallelism: false,

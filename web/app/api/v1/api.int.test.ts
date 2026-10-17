@@ -40,7 +40,7 @@ vi.mock('@/lib/services', async () => {
 
 const { db } = await import('@/lib/db');
 const { normalizeName } = await import('@/lib/names');
-const { newShortCode, sha256 } = await import('@/lib/auth/tokens');
+const { issueInviteCode } = await import('@/lib/family');
 const routes = {
   pairingCode: await import('./family/circles/[id]/pairing-code/route'),
   pair: await import('./device/pair/route'),
@@ -89,13 +89,13 @@ const scamBody = {
 };
 
 beforeAll(async () => {
-  inviteCode = newShortCode();
   const { rows } = await db().query<{ id: string }>(
-    `insert into circles (protected_name, nessie_customer_id, nessie_account_id, opening_balance_cents, invite_code_hash)
-     values ('Rosa Test (synthetic)', 'test-customer', $1, 500000, $2) returning id`,
-    ['test-account-' + crypto.randomUUID(), sha256(inviteCode)],
+    `insert into circles (protected_name, nessie_customer_id, nessie_account_id, opening_balance_cents)
+     values ('Rosa Test (synthetic)', 'test-customer', $1, 500000) returning id`,
+    ['test-account-' + crypto.randomUUID()],
   );
   circleId = rows[0]!.id;
+  inviteCode = (await issueInviteCode(db(), circleId)).code;
   await db().query(
     `insert into circle_members (circle_id, auth0_sub, display_name) values ($1, $2, 'Maria')`,
     [circleId, MARIA],
@@ -293,6 +293,21 @@ describe('alerts and the family circle', () => {
       await routes.join.POST(req('/family/join', { sub: 'test|fourth', body: { inviteCode, displayName: 'Four' } }), noParams),
     );
     expect(fourth).toMatchObject({ status: 409, body: { error: 'circle_full' } });
+
+    // Someone already in the full circle using the invite again is a no-op, not "full".
+    const again = await routes.join.POST(
+      req('/family/join', { sub: 'test|leo', body: { inviteCode, displayName: 'Leo' } }),
+      noParams,
+    );
+    expect(again.status).toBe(200);
+  });
+
+  it('an expired invite gets the same answer as a wrong one', async () => {
+    await db().query(`update circles set invite_expires_at = now() - interval '1 second' where id = $1`, [circleId]);
+    const response = await read(
+      await routes.join.POST(req('/family/join', { sub: 'test|late', body: { inviteCode, displayName: 'Late' } }), noParams),
+    );
+    expect(response).toMatchObject({ status: 404, body: { error: 'invalid_invite' } });
   });
 
   it('a wrong invite code is just "not valid"', async () => {

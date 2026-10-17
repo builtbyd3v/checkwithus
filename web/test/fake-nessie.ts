@@ -23,6 +23,9 @@ export function createFakeNessie() {
   let pendingFailure: { pathIncludes: string; mode: 'recordedThen500' | 'lostThen500' | 'timeout' } | null =
     null;
 
+  /** Runs once, in the middle of the next account list read: for staging races. */
+  let listHook: (() => Promise<void>) | null = null;
+
   const id = () => `fake-${nextId++}`;
 
   const json = (status: number, body: unknown) =>
@@ -50,6 +53,11 @@ export function createFakeNessie() {
     const accountRoute = pathname.match(/^\/accounts\/([^/]+)\/(purchases|withdrawals|deposits|bills)$/);
     if (accountRoute) {
       const [, accountId, kind] = accountRoute as [string, string, Stored['kind']];
+      if (method === 'GET' && listHook) {
+        const hook = listHook;
+        listHook = null;
+        await hook();
+      }
       if (method === 'POST') {
         const record = { ...body, _id: id() };
         if (failure?.mode !== 'lostThen500') records.push({ kind, accountId, body: record });
@@ -75,6 +83,10 @@ export function createFakeNessie() {
       calls.filter((c) => c.method === 'POST' && c.path !== '/merchants'),
     failNext(pathIncludes: string, mode: 'recordedThen500' | 'lostThen500' | 'timeout') {
       pendingFailure = { pathIncludes, mode };
+    },
+    /** Run `hook` while the next lookup of an account's records is in flight. */
+    duringNextLookup(hook: () => Promise<void>) {
+      listHook = hook;
     },
   };
 }
