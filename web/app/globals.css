@@ -17,3 +17,86 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
+
+/* Landing option "cinematic" (app/_landing-apple). Black, white and parchment tiles, one blue for actions. */
+@theme {
+  --color-ap-blue: #0066cc;
+  --color-ap-blue-press: #0058b0;
+  --color-ap-sky: #2997ff;
+  --color-ap-ink: #1d1d1f;
+  --color-ap-parch: #f5f5f7;
+  --color-ap-tile: #1c1c1e;
+  --color-ap-mute: #6e6e73;
+  --color-ap-mute-dark: #a1a1a6;
+  --color-ap-ok: #1d7a35;
+  --color-ap-stop: #d70015;
+}
+
+@theme inline {
+  --font-ap: var(--font-inter-ap);
+}
+
+@keyframes ap-rise {
+  from { opacity: 0; transform: translateY(28px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes ap-lift {
+  from { transform: scale(0.9); }
+  to { transform: none; }
+}
+
+@keyframes ap-in {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Entrances tied to scroll. Without view timelines, or with reduced motion, content shows as is. */
+@utility ap-rise {
+  @media (prefers-reduced-motion: no-preference) {
+    @supports (animation-timeline: view()) {
+      animation: ap-rise linear both;
+      animation-timeline: view();
+      animation-range: cover 0px cover 220px;
+    }
+  }
+}
+@utility ap-rise-2 {
+  @media (prefers-reduced-motion: no-preference) {
+    @supports (animation-timeline: view()) {
+      animation: ap-rise linear both;
+      animation-timeline: view();
+      animation-range: cover 30px cover 260px;
+    }
+  }
+}
+@utility ap-rise-3 {
+  @media (prefers-reduced-motion: no-preference) {
+    @supports (animation-timeline: view()) {
+      animation: ap-rise linear both;
+      animation-timeline: view();
+      animation-range: cover 60px cover 300px;
+    }
+  }
+}
+
+/* The hero phone rises and settles as the page scrolls. */
+@utility ap-lift {
+  @media (prefers-reduced-motion: no-preference) {
+    @supports (animation-timeline: scroll()) {
+      animation: ap-lift linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0 70vh;
+    }
+  }
+}
+
+/* First-load entrance for the hero, staggered with ap-delay-*. */
+@utility ap-in {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: ap-in 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+@utility ap-delay-1 { animation-delay: 90ms; }
+@utility ap-delay-2 { animation-delay: 180ms; }
+@utility ap-delay-3 { animation-delay: 300ms; }
