@@ -2,7 +2,8 @@
  * Puts the demo back to a known state between expo demos. `npm run demo:reset`
  *
  *   seed-demo   Rosa's circle, accounts, purchase history, aggregates, vault
- *   then        no pending holds, not frozen, no recent ATM cash, the utility-bill allowance (#19)
+ *   then        no pending holds, not frozen, no recent ATM cash, the utility-bill allowance (#19),
+ *               and a $350 water bill last paid 25 days ago for the bill-pay agent
  *
  * Refuses to run unless the tables resolve to a throwaway wt_* schema, or the
  * caller passes --live for the live schema. Safe to run again.
@@ -11,11 +12,19 @@ import { pathToFileURL } from 'node:url';
 import pg from 'pg';
 import { transaction } from '@/lib/db';
 import { dbEnv, nessieEnv } from '@/lib/env';
+import { normalizeName } from '@/lib/names';
 import { createNessieClient, type NessieClient } from '@/lib/nessie/client';
 import { seedDemo } from './seed-demo';
 
 /** Utility bills up to $400 until Nov 30: above the $300 hold limit, so step 6 shows it at work. */
 export const DEMO_ALLOWANCE = { category: 'utilities', maxAmountCents: 40_000, expiresAt: '2026-11-30T23:59:59-05:00' } as const;
+
+/**
+ * The bill-pay agent's demo biller: last bill $350, 25 days ago, so its next
+ * bill is due within the agent's 7-day window. Over the $300 hold limit and
+ * inside the $400 allowance, so the allowance is what lets the agent pay.
+ */
+export const DEMO_AGENT_BILL = { name: 'Sunshine Water Co.', category: 'utilities', amountCents: 35_000, daysAgo: 25 } as const;
 
 /** The schema the tables resolve to. Throws unless it is wt_*, or `live` is set. */
 export async function demoTarget(pool: pg.Pool, live: boolean): Promise<string> {
@@ -81,6 +90,21 @@ export async function resetDemo(input: { pool: pg.Pool; nessie: NessieClient; cu
         [circleId, DEMO_ALLOWANCE.category, DEMO_ALLOWANCE.maxAmountCents, DEMO_ALLOWANCE.expiresAt, approver.rows[0].id],
       );
     }
+    // The agent's biller, with one fresh last bill. Last demo's agent payment
+    // and its ledger row go, so the agent pays it again in this demo.
+    // ponytail: the history row is ledger-only (no Nessie record); a bank feed would supply it.
+    await q.query(
+      `insert into payees (circle_id, name, normalized_name, kind, category) values ($1, $2, $3, 'biller', $4)
+       on conflict (circle_id, kind, normalized_name) do nothing`,
+      [circleId, DEMO_AGENT_BILL.name, normalizeName(DEMO_AGENT_BILL.name), DEMO_AGENT_BILL.category],
+    );
+    await q.query('delete from spending where circle_id = $1 and payee_name = $2', [circleId, DEMO_AGENT_BILL.name]);
+    await q.query(`delete from payments where circle_id = $1 and initiated_by = 'agent' and payee_name = $2`, [circleId, DEMO_AGENT_BILL.name]);
+    await q.query(
+      `insert into spending (occurred_at, circle_id, amount_cents, category, payee_name)
+       values (now() - make_interval(days => $4), $1, $2, $3, $5)`,
+      [circleId, DEMO_AGENT_BILL.amountCents, DEMO_AGENT_BILL.category, DEMO_AGENT_BILL.daysAgo, DEMO_AGENT_BILL.name],
+    );
     const members = approver.rows[0] ? [] : (await q.query<{ id: string; display_name: string; role: string }>(
       'select id, display_name, role from circle_members where circle_id = $1 order by created_at', [circleId],
     )).rows;
@@ -107,7 +131,7 @@ async function main() {
     console.log(`Nessie records created: ${r.created}; ledger rows added: ${r.ledgerAdded}`);
     console.log(`Holds expired: ${r.holdsExpired}; vault rows cleared: ${r.vaultRowsCleared}; ATM cash rows cleared: ${r.atmRowsCleared}; not frozen`);
     const rerun = `npm run demo:reset${live ? ' -- --live' : ''}`;
-    if (r.allowance) console.log('Allowance: utilities up to $400 until Nov 30');
+    if (r.allowance) console.log('Allowance: utilities up to $400 until Nov 30. npm run agent:bills pays the $350 water bill under it.');
     else if (!r.members.length) console.log(`No allowance: nobody has joined the circle. Join with the invite code, make that member an approver, then ${rerun}.`);
     else {
       // Roles are the family's call, so reset never changes them; it says what to run.

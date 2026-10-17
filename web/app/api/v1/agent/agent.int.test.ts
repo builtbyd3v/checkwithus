@@ -50,6 +50,8 @@ tenant.keys = auth0.keys as unknown as typeof tenant.keys;
 const { db } = await import('@/lib/db');
 const { normalizeName } = await import('@/lib/names');
 const { fetchAgentToken } = await import('@/lib/auth0/agent-token');
+const { toCents } = await import('@/lib/money');
+const { nextDueDate } = await import('@/lib/bill-agent');
 const routes = {
   run: await import('./bills/run/route'),
   decision: await import('../family/payments/[id]/decision/route'),
@@ -77,13 +79,20 @@ const req = (path: string, token: string | undefined, body: unknown = {}, method
 const noParams = { params: Promise.resolve({}) };
 const read = async (response: Response) => ({ status: response.status, body: await response.json() });
 const run = async (token: string, circleId: string) =>
-  read(await routes.run.POST(req('/agent/bills/run', token, { circleId, dueWithinDays: 31 }), noParams));
+  read(await routes.run.POST(req('/agent/bills/run', token, { circleId, dueWithinDays: 14 }), noParams));
+/** The older adult's phone paying the same biller now, with no due date. */
+const phonePays = async (circleId: string) => (await import('@/lib/services')).payments().createPayment(circleId, {
+  idempotencyKey: `phone-${crypto.randomUUID()}`, amountCents: toCents(BILL_CENTS), payeeName: BILLER, payeeKind: 'biller',
+  category: 'utilities', onCall: false, guard: null, explanation: null,
+});
 
 /**
  * A circle whose hold limit ($50) is below the utility bill, so only an
- * allowance lets the agent's payment through. Last bill paid 15 days ago.
+ * allowance lets the agent's payment through. Last bill paid 25 days ago, so
+ * the next is due within the 14-day window. `pharmacy` adds a second, unrelated
+ * allowance, so the circle stays opted in when the utilities one is revoked.
  */
-async function circleWithBill(allowanceCapCents: number | null) {
+async function circleWithBill(allowanceCapCents: number | null, options: { pharmacy?: boolean } = {}) {
   const { rows } = await db().query<{ id: string }>(
     `insert into circles (protected_name, nessie_customer_id, nessie_account_id, opening_balance_cents, hold_over_cents)
      values ('Rosa Agent Test (synthetic)', 'test-customer', $1, 500000, 5000) returning id`,
@@ -101,7 +110,7 @@ async function circleWithBill(allowanceCapCents: number | null) {
   );
   await db().query(
     `insert into spending (occurred_at, circle_id, amount_cents, category, payee_name)
-     values (now() - interval '15 days', $1, $2, 'utilities', $3)`,
+     values (now() - interval '25 days', $1, $2, 'utilities', $3)`,
     [circleId, BILL_CENTS, BILLER],
   );
   let allowanceId: string | null = null;
@@ -112,6 +121,12 @@ async function circleWithBill(allowanceCapCents: number | null) {
       [circleId, allowanceCapCents, member.rows[0]!.id],
     );
     allowanceId = allowance.rows[0]!.id;
+  }
+  if (options.pharmacy) {
+    await db().query(
+      `insert into allowances (circle_id, category, max_amount_cents, expires_at, granted_by)
+       values ($1, 'pharmacy', 5000, now() + interval '30 days', $2)`, [circleId, member.rows[0]!.id],
+    );
   }
   return { circleId, allowanceId };
 }
@@ -157,7 +172,7 @@ describe('the bill-pay agent pays inside its allowance and asks outside it', () 
   });
 
   it('stops auto-paying once the family revokes the allowance', async () => {
-    const { circleId, allowanceId } = await circleWithBill(20_000);
+    const { circleId, allowanceId } = await circleWithBill(20_000, { pharmacy: true });
     const revoked = await routes.allowance.DELETE(
       req(`/family/circles/${circleId}/allowances/${allowanceId}`, mariaToken, undefined, 'DELETE'),
       { params: Promise.resolve({ id: circleId, allowanceId: allowanceId! }) },
@@ -166,6 +181,66 @@ describe('the bill-pay agent pays inside its allowance and asks outside it', () 
     const { body } = await run(agentToken, circleId);
     expect(body.proposals[0]).toMatchObject({ status: 'held', allowanceId: null });
     expect(onHeld).toHaveBeenCalledTimes(1);
+
+    // With no live allowance left, the family has not opted in: the agent cannot act.
+    await db().query('update allowances set revoked_at = now() where circle_id = $1', [circleId]);
+    expect(await run(agentToken, circleId)).toMatchObject({ status: 403, body: { error: 'agent_not_invited' } });
+  });
+
+  it('does not ask again after the family says no', async () => {
+    const { circleId } = await circleWithBill(5_000);
+    const first = (await run(agentToken, circleId)).body.proposals[0];
+    expect(first.status).toBe('held');
+    const denied = await routes.decision.POST(
+      req(`/family/payments/${first.paymentId}/decision`, mariaToken, { decision: 'deny' }), { params: Promise.resolve({ id: first.paymentId }) },
+    );
+    expect(denied.status).toBe(200);
+    const again = await run(agentToken, circleId);
+    expect(again.body.proposals).toEqual([expect.objectContaining({ status: 'skipped', skipped: 'family_said_no', paymentId: null })]);
+    expect(onHeld).toHaveBeenCalledTimes(1);
+  });
+
+  it('never pays twice in one cycle: the phone paid today with no due date', async () => {
+    const { circleId } = await circleWithBill(20_000);
+    expect((await phonePays(circleId)).status).toBe('paid');
+    expect((await run(agentToken, circleId)).body.proposals).toEqual([]);
+  });
+
+  it('never pays twice in one cycle: the agent prepaid, then the phone paid too', async () => {
+    const { circleId } = await circleWithBill(20_000);
+    expect((await run(agentToken, circleId)).body.proposals[0].status).toBe('paid');
+    expect((await phonePays(circleId)).status).toBe('paid');
+    expect((await run(agentToken, circleId)).body.proposals).toEqual([]);
+    const { rows } = await db().query('select initiated_by from payments where circle_id = $1 order by created_at', [circleId]);
+    expect(rows).toEqual([{ initiated_by: 'agent' }, { initiated_by: 'device' }]);
+  });
+
+  it('records one bill\'s refusal and goes on with the next', async () => {
+    const { circleId } = await circleWithBill(20_000);
+    // A second biller whose agent key is already taken by a different payment: idempotency_conflict.
+    const water = await db().query<{ id: string }>(
+      `insert into payees (circle_id, name, normalized_name, kind, category) values ($1, 'Aqua Water', $2, 'biller', 'utilities') returning id`,
+      [circleId, normalizeName('Aqua Water')],
+    );
+    await db().query(
+      `insert into spending (occurred_at, circle_id, amount_cents, category, payee_name) values (now() - interval '25 days', $1, 3000, 'utilities', 'Aqua Water')`,
+      [circleId],
+    );
+    const { rows } = await db().query<{ last: string }>(
+      `select to_char((now() - interval '25 days') at time zone 'America/New_York', 'YYYY-MM-DD') as last`,
+    );
+    const due = nextDueDate(rows[0]!.last);
+    await db().query(
+      `insert into payments (circle_id, idempotency_key, amount_cents, payee_name, payee_kind, category, on_call, payee_known, status, expires_at)
+       values ($1, $2, 1, 'Aqua Water', 'biller', 'utilities', false, true, 'held', now() + interval '5 minutes')`,
+      [circleId, `agent-bill:${water.rows[0]!.id}:${due}`],
+    );
+    const { status, body } = await run(agentToken, circleId);
+    expect(status).toBe(200);
+    expect(body.proposals).toEqual([
+      expect.objectContaining({ payee: 'Aqua Water', status: 'error', error: 'idempotency_conflict' }),
+      expect.objectContaining({ payee: BILLER, status: 'paid' }),
+    ]);
   });
 });
 
@@ -212,6 +287,15 @@ describe('the agent token is least privilege', () => {
     } finally {
       auth0.settings.agentScopes = ['pay:bills'];
     }
+  });
+
+  it('acts only in circles that granted an allowance, and only on bills due within 14 days', async () => {
+    const { circleId } = await circleWithBill(null);
+    expect(await run(agentToken, circleId)).toMatchObject({ status: 403, body: { error: 'agent_not_invited' } });
+    const tooFar = await routes.run.POST(req('/agent/bills/run', agentToken, { circleId, dueWithinDays: 15 }), noParams);
+    expect(tooFar.status).toBe(400);
+    const { rowCount } = await db().query('select 1 from payments where circle_id = $1', [circleId]);
+    expect(rowCount).toBe(0);
   });
 
   it('refuses a family member\'s token, another M2M app, and a wrong audience', async () => {

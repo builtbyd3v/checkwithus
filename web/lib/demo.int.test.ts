@@ -50,7 +50,9 @@ vi.mock('@/lib/services', async () => {
 
 const { db } = await import('@/lib/db');
 const { createNessieClient } = await import('@/lib/nessie/client');
-const { demoTarget, resetDemo, DEMO_ALLOWANCE } = await import('@/scripts/demo-reset');
+const { demoTarget, resetDemo, DEMO_ALLOWANCE, DEMO_AGENT_BILL } = await import('@/scripts/demo-reset');
+const { runBillAgent } = await import('@/lib/bill-agent');
+const { payments } = await import('@/lib/services');
 const routes = {
   pairingCode: await import('@/app/api/v1/family/circles/[id]/pairing-code/route'),
   pair: await import('@/app/api/v1/device/pair/route'),
@@ -173,6 +175,15 @@ describe('the demo, steps 3 to 6', () => {
       req(`/family/circles/${circleId}/unfreeze`, { sub: MARIA, fresh: true, body: { amountCents: frozen.body.movedCents } }), params(circleId),
     ));
     expect(back).toMatchObject({ status: 200, body: { frozen: false } });
+  }));
+
+  it('step 6a', () => step('step 6a: the bill-pay agent pays the $350 water bill under the allowance with no push', async () => {
+    // The route's Auth0 M2M checks are covered in app/api/v1/agent/agent.int.test.ts.
+    const pushes = fakeAuth0.pushes.size;
+    const proposals = await runBillAgent({ pool: db(), payments: payments() }, { circleId, dueWithinDays: 7 });
+    expect(proposals.filter(p => p.payeeName === DEMO_AGENT_BILL.name).map(p => [p.payeeName, p.amountCents, p.payment?.status, p.payment?.allowanceId ? 'allowance' : null]))
+      .toEqual([[DEMO_AGENT_BILL.name, DEMO_AGENT_BILL.amountCents, 'paid', 'allowance']]);
+    expect(fakeAuth0.pushes.size).toBe(pushes);
   }));
 
   it('step 6', () => step('step 6: a known $350 utility bill pays with no push under the allowance, and is held without it', async () => {

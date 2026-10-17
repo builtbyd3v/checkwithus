@@ -170,19 +170,32 @@ signed in with the client credentials grant. `npm run agent:bills` (from
 `web/`, needs `AUTH0_AGENT_CLIENT_ID`, `AUTH0_AGENT_CLIENT_SECRET`,
 `AUTH0_DOMAIN`, `AUTH0_AUDIENCE`, `APP_BASE_URL`) gets a token and calls
 `POST /api/v1/agent/bills/run`. Options: `-- --circle <id> --within <days>`
-(default: every circle with a live allowance, bills due within 7 days).
+(default: every circle with a live allowance, bills due within 7 days; at most
+14). The agent acts only in circles whose family granted a live allowance;
+any other `circleId` answers `403 agent_not_invited`.
 
 - What it proposes: each known biller's next bill, due one month after the
-  last one we paid, for the same amount. A fixed rule, no AI model; bill data
-  never leaves our server.
+  latest bill we paid (its due date, or the day paid), for the last amount.
+  History is matched by biller name and category. A biller paid by anyone in
+  the last 20 days is skipped, so the phone and the agent never pay one cycle
+  twice. A fixed rule, no AI model; bill data never leaves our server.
 - Who decides: nobody new. Each proposal goes through `createPayment`, the same
   rules as the phone. Inside an allowance it pays with no push and stores
   `allowanceId`; otherwise it is held and the family is asked (CIBA push with
   `APPROVAL_MODE=ciba`, the family app otherwise). One proposal per biller per
-  due date: a rerun replays it and never asks twice.
+  due date: a rerun replays a held or paid one. A denied, expired or failed one
+  is not asked again: it is listed with `status: "skipped"` and `skipped`
+  (`family_said_no`, `expired`, `failed`). A payment error on one bill is listed
+  with `status: "error"` and `error`, and the run goes on.
 - Every agent payment stores `initiated_by = 'agent'` (migration 020). Family
-  payment views include `initiatedBy` (`device` or `agent`); the dashboard shows
-  "Paid by the bill agent under your Utilities allowance".
+  payment views include `initiatedBy` (`device` or `agent`). The dashboard
+  shows "Paid by the bill agent under your Utilities allowance" (paid with an
+  allowance), "Paid by the bill agent" (paid without), or "Asked by the bill
+  agent" (waiting or sending).
+- Demo: `demo:reset` adds the biller `Sunshine Water Co.` with a ledger-only
+  $350 bill 25 days ago. Its next bill is due within 7 days, over the $300 hold
+  limit and inside the $400 allowance, so the agent pays it only because of the
+  allowance. `smoke:demo` step 6a checks this.
 - Token checks (`lib/auth/agent.ts`): RS256, our issuer, `AUTH0_AUDIENCE`,
   `gty = client-credentials`, `sub = <AUTH0_AGENT_CLIENT_ID>@clients` (and
   `azp` the same id when present), and `pay:bills` in `scope`. Otherwise `403
@@ -204,9 +217,9 @@ Auth0 dashboard steps (Dev):
 3. Put its Client ID in `AUTH0_AGENT_CLIENT_ID` on Vercel and in `.env.local`.
    Put its Client Secret in `AUTH0_AGENT_CLIENT_SECRET` only where the agent
    runs (`.env.local`). The API never needs the secret.
-4. Run `npm run agent:bills -- --within 31`. It prints `Signed in as the
-   bill-pay agent (scope: pay:bills)`, then one line per bill: paid under the
-   allowance, or "Asked the family".
+4. Run `npm run demo:reset`, then `npm run agent:bills`. It prints `Signed in as the
+   bill-pay agent (scope: pay:bills)`, then `Paid under the family's
+   allowance: Sunshine Water Co. $350.00`.
 5. Never give this app `approve:payments`. Family routes refuse machine tokens
    anyway.
 
