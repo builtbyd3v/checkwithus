@@ -16,7 +16,7 @@ Related: [demo.md](demo.md) (device setup, how to film the judge video, live "sh
 4. Every claim has a proof that a judge can see: a phone, the dashboard, a terminal, or a README table. Keep both phones live on the table.
 5. Use synthetic Rosa only. Show no real names, numbers, tokens or pairing codes.
 
-**Judges rotate (science-fair style).** When a sponsor judge walks up, start with their block and stretch it to about 60 s. Cut the other blocks to one line each. Know your audience before you speak: ask "Which sponsor are you judging?"
+**Judges rotate (science-fair style).** When a sponsor judge walks up, start with their block's 60 s version. Cut the other blocks to one line each. Know your audience before you speak: ask "Which sponsor are you judging?"
 
 ## Flow (2:30 of the 3:00 limit)
 
@@ -46,13 +46,12 @@ Shoot it on the real phones with the pinned `main` build. How to film each shot:
 
 ## Part 2: the talk
 
-Each block has three parts: **Tech** (what we use), **Benefit** (why it matters to Rosa and her family), and **Proof** (what to point at).
+Each sponsor block has a **20 s** version for the default order and a **60 s** version for when that sponsor's judge is at the table. Bold brackets are actions, not words. Each block ends with **Proof** (what to point at) and **If asked** (true facts to answer with). At about 150 words a minute, 20 s is about 50 words and 60 s about 140, less when you pause for an action.
 
 ### Opener (15 s): how we differ
-> "Every scam tool asks the victim to act, and scammers talk victims right past warnings. The bank can't stop it, because she makes the payment herself. Monitoring apps alert the family after the money is gone. We move the decision. Rosa changes nothing. A payment that looks like a scam waits for her family before it reaches the bank. And one rule: AI suggests, code decides money."
+> "Scammers talk victims past every warning, and the bank can't stop a payment she makes herself. So we move the decision. Rosa changes nothing: a payment that looks like a scam waits for her family before it reaches the bank. One rule: AI suggests, code decides money."
 
-### Capital One Nessie (20 s, 60 s if the Nessie judge is here)
-**Tech.** Nessie is our bank, not just a data source. Our client calls 10 resource types, and each one has a job:
+### Capital One Nessie
 
 | Nessie resource | Its job in checkwith.us |
 | --- | --- |
@@ -65,51 +64,56 @@ Each block has three parts: **Tech** (what we use), **Benefit** (why it matters 
 | Transfers | Freeze (spending to vault). A family top-up also uses transfers, but it is API only, with no button yet: do not demo it |
 | Deposits | Rosa's monthly pension in the seeded history; deposits count toward her spending balance |
 
-> "Nessie is our bank. Ten resource types, and each one has a job. Every payee is a Nessie merchant with a category. Purchases and bills are the payments. Withdrawals catch ATM cash. ATMs and branches tell us she is at a bank during a call. Transfers power Freeze. Freeze runs exactly once, even if the family taps twice."
+**20 s**
+> "Nessie is Rosa's bank, and ten resource types each do a job. Every payee is a Nessie merchant with a category, so our rules know a gift card from a power bill. Purchases and bills are the real payments. A Nessie ATM withdrawal starts the scam we catch. One transfer powers Freeze, exactly once."
 
-**Benefit:** the family protects real money flows, not a mock-up.
-**Proof:** tap Freeze on the family phone. In the terminal, `npm run demo:atm` prints a real sandbox withdrawal.
+**60 s**
+> "Nessie isn't a data source for us. It's Rosa's bank, and ten resource types each have a job. She has a spending account and a vault. Her pension arrives as deposits. Every payee becomes a Nessie merchant tagged with a category, and that category drives our rules: a gift card is always held. Approved payments post as real purchases, and her power bill is a real Nessie bill. **[MacBook: Enter on `npm run demo:atm`.]** That's a real sandbox withdrawal at a Nessie ATM. Now a gift card within two hours is held as a scam sequence. Nessie's ATMs and branches also feed a geofence, so the family hears when she walks into a bank during a call. **[iPhone B: Money, Freeze.]** And one transfer sweeps her balance into the vault. It's claimed under a database lock, so even a double tap moves money once."
 
-### Auth0 (20 s, 60 s if the MLH judge is here)
-**Tech.**
-- iOS native login with PKCE. The server checks the signed Auth0 token on every family request.
-- Family roles: approvers and viewers. Only an approver can approve. When Auth0 RBAC is on for our API, the token must also carry the `approve:payments` permission (see "Unverified").
-- Over $1,000 (the default; the family can change it), two approvers must say yes, and one no stops it.
-- Approve asks for Face ID (or the passcode) on the phone first. Step-up: Freeze, unfreeze, allowances and policy changes need an Auth0 sign-in from the last 5 minutes, and the app asks for one when it is older.
-- **Auth0 for AI Agents:** a bill-pay agent signs in as its own Machine-to-Machine client with one scope, `pay:bills`. It can only ask to pay. Inside an allowance the family set, which expires ("utilities up to $400 until Nov 30"), the bill pays; outside one it is held for the family like any payment. Every family route rejects machine tokens.
-- CIBA (Guardian push with the payment details): built and tested against a fake Auth0, not live. See "Unverified".
+**Proof:** the `demo:atm` output in the terminal, then Freeze on iPhone B ("Frozen. Money is in the safe account.").
+**If asked:** Nessie only takes whole dollars for some payees, so the server refuses cents there instead of letting Nessie truncate them. A payment whose Nessie result is unknown is looked up, never re-sent, so a timeout cannot pay twice.
 
-> "Auth0 is the family's authority, not just a login. Approvers and viewers are separate roles. Over $1,000 two approvers must agree, and one no wins. Approve needs Face ID, and Freeze or a new allowance needs a fresh Auth0 sign-in. And for AI agents: our bill-pay agent has its own Auth0 identity with exactly one scope. It can never approve anything. Without the family's limited, expiring allowance, its bills wait for the family."
+### Auth0
 
-**Benefit:** the person who says yes is provably the right family member, and an AI agent can never act like one.
-**Proof:** approve a held payment with Face ID. Show the Allowances tab.
+**20 s**
+> "Auth0 is the family's authority, not just a login. The family app signs in with PKCE, and the server verifies every token. Only approvers can say yes; over $1,000, two must agree, and one no wins. Our bill-pay agent has its own machine identity with one scope. It can never approve."
 
-### Tiger Data (20 s, 60 s if the MLH judge is here)
-**Tech.**
-- The spending ledger is a hypertable with columnstore compression.
-- Three real-time continuous aggregates. The daily one answers "is this more than 3 times her usual?" inside the payment request. The weekly and per-payee ones drive the dashboard chart and "About 4x her usual".
-- The scam sequence is a time-window query: ATM cash, then a gift card, within two hours.
-- Measured on 1,000,000 rows: weekly totals for all families are 13.8 times faster, and the data is 3.2 times smaller ([perf.md](perf.md)).
+**60 s**
+> "Auth0 decides who can say yes to Rosa's money. The family app signs in with Authorization Code plus PKCE, and the server checks the signature, issuer and audience of every token. Approvers and viewers are separate roles. Over $1,000, two approvers must agree, and a single no stops it. **[iPhone B: Approve a held payment, Face ID.]** Approve needs Face ID on the phone. Riskier changes, like Freeze or a new allowance, need a fresh Auth0 sign-in from the last five minutes. For AI agents, our bill-pay agent signs in as its own Machine-to-Machine client with exactly one scope, `pay:bills`. It can only ask. **[iPhone B: Allowances tab.]** Inside the family's allowance, utilities up to $400 until November 30th, a bill pays. Outside it, the bill waits for the family. And every family route rejects machine tokens, so the agent can never approve, freeze or change a rule."
 
-> "Her spending lives in a Tiger Data hypertable with compression and real-time continuous aggregates: daily, weekly and per payee. The daily one answers 'is this more than 3 times her usual?' in about a millisecond, while the payment waits. The scam pattern is a time-window query: ATM cash, then a gift card, within two hours. We measured it on a million rows: 13.8 times faster, 3.2 times smaller."
+**Proof:** approve with Face ID on iPhone B; the Allowances tab.
+**If asked:** the Guardian push (CIBA) with the payment details is built and tested against a fake Auth0, not verified live; say exactly that. Only say "Auth0 RBAC" or "`approve:payments` permission" once RBAC is confirmed on the live API (see "Unverified").
 
-**Benefit:** the rules know her history right away, so the hold happens before money moves.
-**Proof:** the live speed card on the dashboard, and the table in [perf.md](perf.md).
+### Tiger Data
 
-### Easy On The Eyes (20 s, 60 s if the SwampHacks judge is here)
-**Tech.** Two users with two different designs.
-- Older adult: the best interface is no new interface. Protection runs inside iOS (Message Filter, call labels, lock-screen card). When she sees the app: one action per screen, plain words, the largest text sizes, VoiceOver, text colors with at least 4.5:1 contrast, Reduce Motion, 56 pt tap targets.
-- Family: every hold reason in plain words, "About 4x her usual", a spending chart.
+**20 s**
+> "Rosa's spending is a Tiger Data hypertable with compression. A real-time continuous aggregate answers 'more than three times her usual?' in about a millisecond, while the payment waits. A two-hour time-window query catches ATM cash, then a gift card. On a million rows: 13.8 times faster, 3.2 times smaller."
 
-> "The best interface for a scared 80-year-old is no new interface. Our protection runs inside iOS itself. When she does see our app, each screen has one action and plain words: 'Paused, waiting for family. Your money is safe. Your family will call you.' The family sees the reason in plain words too, never a risk score."
+**60 s**
+> "Every payment Rosa makes lands in a Tiger Data hypertable, in seven-day chunks. After 30 days they move to the columnstore, segmented by family. On top sit three real-time continuous aggregates. The daily one is in the payment path: is this more than three times what she usually spends on this? That answers in about a millisecond, while the payment waits. A weekly aggregate, built on the daily one, draws the family's chart, and a per-payee one gives 'about 4x her usual'. The scam sequence is a time-window query on the hypertable: ATM cash, then a gift card, within two hours. **[MacBook: point at the speed card.]** This card times the weekly chart on her real data, aggregate against raw rows. On a million rows, weekly totals for 200 families went from 2 seconds to 150 milliseconds: 13.8 times faster, and 3.2 times smaller."
 
-**Benefit:** nothing new to learn for the person under pressure.
-**Proof:** Rosa's phone at the largest text size. The gallery and [design-principles.md](design-principles.md).
+**Proof:** the dashboard's "How fast this page is" card, then the table in [perf.md](perf.md).
+**If asked:** the aggregate times in perf.md are a best case (fully materialized; in production the current week is computed live). Daily baseline: 1.18 ms from the aggregate against 2.57 ms from raw rows.
 
-### Best Use of AI/ML (10 s, side entry; go deep only if asked)
-> "We trained our own scam model. It runs inside the iOS Message Filter in 1 MB, so her texts never leave the phone. It can add a hold reason, never remove one."
+### Easy On The Eyes
 
-Have ready if asked: our DistilBERT model is 67 MB, and iOS kills the Message Filter above about 25 to 30 MB, so we shipped a 1 MB n-gram model. It catches 96.0% of real scam texts with 2.4% false holds. We found a train/test leak and fixed it by clustering scam campaigns. Apple's on-device model writes the family note from facts our code picks.
+**20 s**
+> "The best interface for a scared 80-year-old is no new interface. Protection runs inside iOS: the Message Filter, the call label, the lock-screen card. In our app, each screen has one action and plain words: 'Paused, waiting for family.' Her family sees plain reasons too, never a risk score."
+
+**60 s**
+> "We designed for two people under different pressure. Rosa is scared and rushed, so she learns nothing new. Scam texts go to Spam, calls say 'Possible scam', and the lock screen says 'Paused, waiting for family. Your money is safe.' **[iPhone A at the largest text size.]** When she opens the app, there's one thing to read and one big button: 'Ask my family'. Every screen works at the largest Dynamic Type sizes and scrolls, so nothing is cut off. Nothing tappable is smaller than 56 points. Text colors keep at least 4.5 to 1 contrast. VoiceOver reads the family's answer aloud when it arrives, and Reduce Motion stops the animation. The family is the opposite: they need to decide fast. They get the amount, the payee and every reason in plain words, like 'Paid while on a phone call'. Never a risk score. The only countdown is on the family's side."
+
+**Proof:** iPhone A at the largest text size; a held payment on iPhone B; the gallery and [design-principles.md](design-principles.md).
+
+### Best Use of AI/ML (10 s, side entry; 60 s only if the AI/ML judge asks)
+
+**10 s**
+> "Our own scam model runs inside the iOS Message Filter in 1 MB, so her texts never leave the phone. It can add a hold reason, never remove one."
+
+**60 s**
+> "We trained two models. A DistilBERT model scored well, but it's 67 MB, and iOS kills the Message Filter above about 25 to 30 MB. So we shipped Guard tiny: character and word n-grams with logistic regression, 1 MB of weights, 0.14 milliseconds a text in Swift, together with fixed rules. On 884 real texts it catches 96.0% of scams with 2.4% false holds. The hard part was honest data. We found near-duplicate scam campaigns leaking between train and test, so we cluster similar texts and keep each cluster in one split. Then the rule that matters: the model can only add a hold reason, never remove one, so a fooled model makes us more careful, never less. And when a payment is held, Apple's on-device model writes a short note for the family, from facts our code picked."
+
+**Proof:** the README "Model evaluation" table.
 
 ### GoDaddy + close (10 s)
 > "The name is the promise: before money moves, check with us. checkwith.us."
@@ -127,7 +131,7 @@ Checked against `main` on Oct 17 (Hitesh, with Claude Code): the 10 Nessie resou
 ## Next steps for Hitesh
 
 1. ~~Have your agents check every claim here against the code.~~ Done Oct 17; see the list above.
-2. Make each sponsor block deeper and sharper. Stay at 20 s each in the default order.
-3. Write the 60 s version of each block, for when that sponsor's judge is at the table.
+2. ~~Make each sponsor block deeper and sharper.~~ Done Oct 17: each 20 s block is about 50 words.
+3. ~~Write the 60 s version of each block.~~ Done Oct 17, plus a 60 s AI/ML answer. Time each one out loud and cut if it runs long.
 4. Film the 30 s judge video on the real phones ([demo.md](demo.md)). Then record the Devpost video ([video-script.md](video-script.md)).
 5. Run the video plus the 2:00 talk with a timer, twice, with the whole team.
