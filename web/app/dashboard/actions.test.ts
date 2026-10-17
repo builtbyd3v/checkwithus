@@ -15,6 +15,7 @@ vi.mock('@/lib/services', () => ({
 }));
 
 import { addPayeeAction, decideAction, inviteAction, joinAction, pairingAction, saveSettingsAction } from './actions';
+import { PaymentError } from '@/lib/payments';
 
 const circleId = '11111111-1111-4111-8111-111111111111';
 const cases: { name: string; action: typeof joinAction; fields: Record<string, string> }[] = [
@@ -65,5 +66,45 @@ it('with CIBA on, the dashboard can deny but never approve', async () => {
     .resolves.toEqual({ message: 'Denied. The payment will not go through.', decided: true });
   expect(mocks.decidePayment).toHaveBeenCalledWith({
     paymentId: circleId, member: { auth0Sub: 'auth0|maria' }, decision: 'deny', via: 'dashboard',
+  });
+});
+
+describe('dashboard decisions', () => {
+  beforeEach(() => {
+    mocks.getSession.mockResolvedValue({ user: { sub: 'auth0|maria' } });
+    mocks.approvalsUseCiba.mockReturnValue(false);
+  });
+
+  it('approves through the authenticated payment service in app mode', async () => {
+    mocks.decidePayment.mockResolvedValue({ status: 'paid' });
+    await expect(decideAction({ message: '' }, form({ paymentId: circleId, decision: 'approve' })))
+      .resolves.toEqual({ message: 'Approved. The payment is on its way.', decided: true });
+    expect(mocks.decidePayment).toHaveBeenCalledWith({
+      paymentId: circleId, member: { auth0Sub: 'auth0|maria' }, decision: 'approve', via: 'dashboard',
+    });
+  });
+
+  it('keeps a multi-approver payment waiting after the first approval', async () => {
+    mocks.decidePayment.mockResolvedValue({ status: 'held' });
+    await expect(decideAction({ message: '' }, form({ paymentId: circleId, decision: 'approve' })))
+      .resolves.toEqual({ message: 'Your approval is in. It still needs another approver.' });
+  });
+
+  it('shows permission failures without claiming a decision succeeded', async () => {
+    mocks.decidePayment.mockRejectedValue(new Error('approve:payments permission required'));
+    await expect(decideAction({ message: '' }, form({ paymentId: circleId, decision: 'approve' })))
+      .resolves.toEqual({ message: 'approve:payments permission required' });
+  });
+
+  it.each(['expired', 'already_decided'] as const)('refreshes a stale %s card', async (code) => {
+    mocks.decidePayment.mockRejectedValue(new PaymentError(code, 'Payment is no longer waiting.'));
+    await expect(decideAction({ message: '' }, form({ paymentId: circleId, decision: 'approve' })))
+      .resolves.toEqual({ message: 'Payment is no longer waiting.', decided: true });
+  });
+
+  it('rejects malformed decisions before calling the payment service', async () => {
+    await expect(decideAction({ message: '' }, form({ paymentId: circleId, decision: 'send' })))
+      .resolves.toEqual({ message: 'Payment not found.' });
+    expect(mocks.decidePayment).not.toHaveBeenCalled();
   });
 });

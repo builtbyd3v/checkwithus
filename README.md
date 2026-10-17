@@ -47,6 +47,7 @@ Required by SwampHacks and MLH rules, and disclosed on Devpost.
 | Codex (GPT-6) | Continued the `web/` backend: approval and reconciliation fixes, synthetic demo seed, and family dashboard. |
 | Claude Code (Opus 5.5) | `ml/` and `ios/`: dataset pipeline, training and eval scripts, Core ML export, GuardKit Swift package, Message Filter extension. Haiku subagents searched for datasets; every license was then checked by hand. |
 | Codex CLI (review panel) | Read-only review of the `ml/` dataset; found near-duplicate leaks and label conflicts that were then fixed. |
+| Codex | Dashboard accessibility fixes, decision UI tests, and synthetic gallery captures for issue #16. |
 
 All code in this repository was written during the event window. The on-device
 models are fine-tuned by us; the project is not a reskin of an existing AI tool.
@@ -81,6 +82,7 @@ license. Required by Devpost rule 10 and `docs/RULES.md`.
 | [jose](https://github.com/panva/jose) | 6.2.12 | MIT |
 | [server-only](https://www.npmjs.com/package/server-only) | 0.0.1 | MIT |
 | [vitest](https://github.com/vitest-dev/vitest) | 5.0.5 | MIT |
+| [@playwright/test](https://github.com/microsoft/playwright) | 1.64.1 | Apache-2.0 |
 | [@auth0/nextjs-auth0](https://github.com/auth0/nextjs-auth0) | 4.32.1 | MIT |
 | [tsx](https://github.com/privatenumber/tsx) | 4.23.15 | MIT |
 

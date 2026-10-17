@@ -14,6 +14,7 @@ import { cachedSpeed } from '@/lib/speed';
 import { herUsual, usualLabel, type UsualRow } from '@/lib/usual';
 import { Countdown, DecisionButtons, DecisionStatus, FreezeControl, JoinForm, SettingsForms } from './controls';
 import { alertHeadline, timeAgo } from './format';
+import { PaymentCard, StateBadge } from './payment-card';
 
 type SpendRow = { day: Date; category: Category; total_cents: string };
 type CircleRow = { hold_over_cents: string; protected_name: string; frozen: boolean; vault_cents: number };
@@ -21,20 +22,6 @@ type MemberRow = { id: string; display_name: string };
 type PayeeRow = { id: string; name: string; kind: string; category: Category };
 const money = (cents: bigint | number | string) => formatCents(toCents(Number(cents)));
 
-/** One look per payment state: colour plus words, never colour alone. */
-const STATES: Record<string, { label: string; className: string }> = {
-  held: { label: 'Waiting for family', className: 'bg-amber-100 text-amber-950 ring-amber-900/20' },
-  approved: { label: 'Approved', className: 'bg-teal-100 text-teal-950 ring-teal-900/20' },
-  paying: { label: 'Approved, sending', className: 'bg-teal-100 text-teal-950 ring-teal-900/20' },
-  paid: { label: 'Paid', className: 'bg-teal-100 text-teal-950 ring-teal-900/20' },
-  denied: { label: 'Denied', className: 'bg-rose-100 text-rose-950 ring-rose-900/20' },
-  expired: { label: 'Expired, blocked', className: 'bg-stone-200 text-stone-900 ring-stone-900/20' },
-  failed: { label: 'Bank error', className: 'bg-stone-200 text-stone-900 ring-stone-900/20' },
-};
-function StateBadge({ status }: { status: string }) {
-  const state = STATES[status] ?? { label: status, className: 'bg-stone-100 text-stone-800 ring-stone-900/10' };
-  return <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ${state.className}`}>{state.label}</span>;
-}
 const ms = (value: number) => value < 10 ? value.toFixed(2) : value.toFixed(0);
 
 export default function Dashboard(props: { searchParams: Promise<{ circle?: string }> }) {
@@ -130,16 +117,9 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
             : active.role !== 'approver' ? 'An approver in your family decides these.'
             : canApproveHere ? 'Approve or deny here, or from the family app.' : 'Deny here. Approve from the Guardian notification on your phone.'}</p></div>
         <DecisionStatus />
-        {held.length > 0 && <ul role="list" className="mt-6 grid gap-4 lg:grid-cols-2">{held.map((payment) => { const usualLine = usualLabel(usual.get(payment.id), payment.payee.name, firstName); return <li key={payment.id} className="rounded-xl border border-teal-900/10 bg-white p-5">
-          <div className="flex flex-wrap items-center justify-between gap-2"><StateBadge status={payment.status} />
-            <p className="text-sm font-semibold text-amber-950">{payment.expiresAt && <Countdown expiresAt={payment.expiresAt} />}</p></div>
-          <div className="mt-3 flex flex-wrap items-start justify-between gap-4"><div className="min-w-0 flex-1 basis-40 [overflow-wrap:anywhere]"><p className="text-sm text-stone-600">{payment.protectedName} is paying</p><h3 className="mt-1 text-xl font-semibold">{payment.payee.name}</h3></div>
-            <strong className="shrink-0 text-xl tabular-nums">{money(payment.amountCents)}</strong></div>
-          {usualLine && <p className="mt-3 text-base font-semibold text-rose-900">{usualLine}</p>}
-          <p className="mt-3 text-sm leading-6 text-stone-700">{payment.explanation || 'This payment triggered a safety rule and needs a family decision.'}</p>
-          <ul className="mt-4 flex flex-wrap gap-2" aria-label="Reasons for hold">{payment.holdReasons.map((reason) => <li key={reason.code} className="rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-700">{reason.label}</li>)}</ul>
+        {held.length > 0 && <ul role="list" className="mt-6 grid gap-4 lg:grid-cols-2">{held.map((payment) => { const usualLine = usualLabel(usual.get(payment.id), payment.payee.name, firstName); return <li key={payment.id} className="min-w-0"><PaymentCard payment={payment} usualLine={usualLine} deadline={payment.expiresAt ? <Countdown expiresAt={payment.expiresAt} /> : null}>
           {active.role === 'approver' && <DecisionButtons paymentId={payment.id} canApproveHere={canApproveHere} />}
-        </li>; })}</ul>}
+        </PaymentCard></li>; })}</ul>}
         {decided.length > 0 && <div className="mt-6"><h3 id="decided-title" tabIndex={-1} className="text-sm font-bold uppercase tracking-widest text-teal-900 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal-800">Recently decided</h3>
           <ul role="list" className="mt-3 grid gap-3 lg:grid-cols-2">{decided.map((payment) => <li key={payment.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-900/10 bg-white/70 px-5 py-4">
             <div><p className="font-semibold">{payment.payee.name} <span className="ml-1 font-normal tabular-nums text-stone-700">{money(payment.amountCents)}</span></p>
