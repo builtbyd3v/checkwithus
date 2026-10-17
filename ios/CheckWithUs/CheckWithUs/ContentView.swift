@@ -48,7 +48,8 @@ struct PairView: View {
                 .textInputAutocapitalization(.characters)
                 .autocorrectionDisabled()
                 .padding()
-                .background(.quaternary, in: .rect(cornerRadius: 16))
+                .background(AppPalette.surface, in: .rect(cornerRadius: 10))
+                .overlay { RoundedRectangle(cornerRadius: 10).strokeBorder(AppPalette.line) }
                 .accessibilityLabel("Family code")
             ErrorText()
             // Very large text: Connect scrolls with the page, so the code box is fully in view at first.
@@ -73,21 +74,21 @@ struct HomeView: View {
         let paused = outcome == "waiting" || outcome == "sending"
         Page {
             if let name = model.config?.protectedName {
-                Text("Hi \(name)").font(.title)
+                Text("Hi \(name)").font(.title3.weight(.medium)).foregroundStyle(AppPalette.muted)
             }
             VStack(spacing: 16) {
-                Image(systemName: paused ? "pause.circle.fill" : "checkmark.shield.fill")
-                    .font(.system(size: 120))
-                    .foregroundStyle(paused ? .orange : .green)
-                    .accessibilityHidden(true)
+                AppStatusSymbol(symbol: paused ? "pause.circle.fill" : "checkmark.shield.fill",
+                                color: paused ? AppPalette.warning : AppPalette.positive)
                 Text(paused ? OutcomeText.headline("waiting") : "You're safe")
                     .font(.largeTitle.bold())
                 Text(paused ? OutcomeText.detail("waiting") : "Your family is looking out for you.")
                     .font(.title2)
+                    .foregroundStyle(AppPalette.body)
             }
             .frame(maxWidth: .infinity)
             .multilineTextAlignment(.center)
             .accessibilityElement(children: .combine)
+            .appCard(feature: true)
             .accessibilityAddTraits(paused ? .isButton : [])
             .accessibilityHint(paused ? "Shows the paused payment." : "")
             .onTapGesture { if paused { model.go(.status) } }
@@ -152,8 +153,7 @@ struct ChoosePayeeView: View {
                     .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
                     .padding(.horizontal)
                 }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.roundedRectangle(radius: 16))
+                .buttonStyle(AppActionButtonStyle(prominent: false))
             }
         }
     }
@@ -184,7 +184,8 @@ struct AmountView: View {
                     .accessibilityLabel("Amount in dollars")
             }
             .padding()
-            .background(.quaternary, in: .rect(cornerRadius: 16))
+            .background(AppPalette.surface, in: .rect(cornerRadius: 18))
+            .overlay { RoundedRectangle(cornerRadius: 18).strokeBorder(AppPalette.line) }
             if !text.isEmpty && amount == nil {
                 Text(payee.kind == "biller" ? "Type an amount like 84.12" : "Use whole dollars, like 50")
                     .font(.title3)
@@ -207,6 +208,8 @@ struct ConfirmView: View {
         Page(back: .amount(payee)) {
             Text("Pay \(dollars(cents)) to \(payee.name)?")
                 .font(.largeTitle.bold())
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .appCard(feature: true)
             if model.isOnCall {
                 Text("You are on a phone call. We will ask your family first.")
                     .font(.title2)
@@ -222,21 +225,17 @@ struct ConfirmView: View {
 
 struct StatusView: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let outcome = model.payment?.outcome ?? "failed"
         Page {
             VStack(spacing: 16) {
-                Image(systemName: OutcomeText.symbol(outcome))
-                    .font(.system(size: 120))
-                    .foregroundStyle(OutcomeText.color(outcome))
-                    .symbolEffect(.pulse, isActive: outcome == "waiting" && !reduceMotion)
-                    .accessibilityHidden(true)
+                AppStatusSymbol(symbol: OutcomeText.symbol(outcome), color: AppPalette.outcome(outcome))
                 Text(OutcomeText.headline(outcome))
                     .font(.largeTitle.bold())
                 Text(OutcomeText.detail(outcome))
                     .font(.title2)
+                    .foregroundStyle(AppPalette.body)
                 if let payment = model.payment {
                     Text("\(dollars(payment.amountCents)) to \(payment.payee.name)")
                         .font(.title2.weight(.semibold))
@@ -245,6 +244,7 @@ struct StatusView: View {
             .frame(maxWidth: .infinity)
             .multilineTextAlignment(.center)
             .accessibilityElement(children: .combine)
+            .appCard(feature: true)
             // Read the change aloud when the family decides, without the user having to look for it.
             .onChange(of: outcome) { _, new in
                 AccessibilityNotification.Announcement(OutcomeText.headline(new)).post()
@@ -261,18 +261,17 @@ struct AskedView: View {
     var body: some View {
         Page {
             VStack(spacing: 16) {
-                Image(systemName: "phone.arrow.down.left.fill")
-                    .font(.system(size: 100))
-                    .foregroundStyle(.green)
-                    .accessibilityHidden(true)
+                AppStatusSymbol(symbol: "phone.arrow.down.left.fill", color: AppPalette.positive)
                 Text("We told your family")
                     .font(.largeTitle.bold())
                 Text("They will call you soon. Do not send money to anyone until you talk to them.")
                     .font(.title2)
+                    .foregroundStyle(AppPalette.body)
             }
             .frame(maxWidth: .infinity)
             .multilineTextAlignment(.center)
             .accessibilityElement(children: .combine)
+            .appCard(feature: true)
         } action: {
             BigButton("OK", symbol: "house.fill") { model.go(.home) }
         }
@@ -299,6 +298,7 @@ struct Page<Content: View, Actions: View>: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
+                AppWordmark()
                 if let back {
                     Button { model.go(back) } label: {
                         Label("Back", systemImage: "chevron.left")
@@ -312,6 +312,7 @@ struct Page<Content: View, Actions: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollPosition($position)
+        .background(AppPalette.canvas)
         // Shows the scroll bar briefly, a hint that very large text continues below.
         .scrollIndicatorsFlash(onAppear: true)
         .safeAreaInset(edge: .bottom) {
@@ -325,7 +326,8 @@ struct Page<Content: View, Actions: View>: View {
                     .padding(.top, 12)
                     .padding(.bottom, 8)
                     // Opaque, so text scrolling under the buttons never shows through them.
-                    .background(.background)
+                    .background(AppPalette.canvas)
+                    .overlay(alignment: .top) { Rectangle().fill(AppPalette.line).frame(height: 1) }
                     .environment(\.scrollToBottom) {
                         withAnimation(reduceMotion ? nil : .default) { position.scrollTo(edge: .bottom) }
                     }
@@ -380,11 +382,9 @@ struct BigButton: View {
             .font(.title.bold())
             .frame(maxWidth: .infinity, minHeight: 80)
         }
-        Group {
-            if prominent { button.buttonStyle(.borderedProminent) } else { button.buttonStyle(.bordered) }
-        }
-        .buttonBorderShape(.roundedRectangle(radius: 20))
-        .disabled(model.busy)
+        button
+            .buttonStyle(AppActionButtonStyle(prominent: prominent))
+            .disabled(model.busy)
     }
 }
 
@@ -402,14 +402,26 @@ struct ErrorText: View {
 }
 
 extension Color {
-    /// Text colors with at least 4.5:1 contrast on the light background. System orange, red and gray text fall short.
-    static let warningText = Color(UIColor { $0.userInterfaceStyle == .dark ? .systemOrange : UIColor(red: 0.64, green: 0.28, blue: 0, alpha: 1) })
-    static let secondaryText = Color(UIColor { $0.userInterfaceStyle == .dark ? .secondaryLabel : UIColor(white: 0.36, alpha: 1) })
-    static let errorText = Color(UIColor { $0.userInterfaceStyle == .dark ? .systemRed : UIColor(red: 0.77, green: 0.12, blue: 0.12, alpha: 1) })
-    /// Button tint: white on it is 6.4:1 in light mode (system blue is 3.5:1). Dark mode keeps system blue.
-    static let action = Color(UIColor { $0.userInterfaceStyle == .dark ? .systemBlue : UIColor(red: 0, green: 0.34, blue: 0.8, alpha: 1) })
+    static let warningText = AppPalette.warning
+    static let secondaryText = AppPalette.muted
+    static let errorText = AppPalette.negative
+    static let action = AppPalette.action
 }
 
 #Preview {
-    ContentView().environment(AppModel())
+    HomeView()
+        .environment(AppModel())
+        .foregroundStyle(AppPalette.ink)
+        .tint(AppPalette.link)
+        .fontDesign(.rounded)
+}
+
+#Preview("Home — largest text, dark") {
+    HomeView()
+        .environment(AppModel())
+        .environment(\.dynamicTypeSize, .accessibility5)
+        .preferredColorScheme(.dark)
+        .foregroundStyle(AppPalette.ink)
+        .tint(AppPalette.link)
+        .fontDesign(.rounded)
 }

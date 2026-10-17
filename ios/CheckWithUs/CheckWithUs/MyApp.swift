@@ -11,7 +11,10 @@ import SwiftUI
         WindowGroup {
             RootView()
                 .environment(model)
-                .tint(Color.action)
+                .tint(AppPalette.link)
+                .foregroundStyle(AppPalette.ink)
+                .fontDesign(.rounded)
+                .environment(\.defaultMinListRowHeight, 56)
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { model.keepPollingInBackground() }

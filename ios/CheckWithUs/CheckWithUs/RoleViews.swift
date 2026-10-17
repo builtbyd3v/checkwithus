@@ -22,11 +22,11 @@ struct RootView: View {
                             Button { settings = true } label: {
                                 Image(systemName: "gearshape.fill").font(.title2).frame(width: 56, height: 56)
                             }
-                            .tint(.secondary)
+                            .tint(AppPalette.link)
                             .accessibilityLabel("Settings")
                             .padding(.trailing, 8)
                         }
-                        .background(.background)
+                        .background(AppPalette.canvas)
                     }
                 }
                 .sheet(isPresented: $settings) { ProtectedSettingsView() }
@@ -46,6 +46,7 @@ struct RolePickerView: View {
 
     var body: some View {
         Page {
+            AppStatusSymbol(symbol: "person.2.fill", color: AppPalette.link)
             Text("Who uses this phone?")
                 .font(.largeTitle.bold())
             Text("You can change this later in Settings.")
@@ -71,9 +72,10 @@ struct ProtectedSettingsView: View {
                         .frame(minHeight: 56)
                 } footer: {
                     // Primary color: the gray footer text is under 4.5:1 on the grouped background.
-                    Text("Only do this if a family member will use this phone.").font(.body).foregroundStyle(Color.primary)
+                    Text("Only do this if a family member will use this phone.").font(.body).foregroundStyle(AppPalette.body)
                 }
             }
+            .appListSurface()
             .navigationTitle("Settings")
             .toolbar { Button("Done") { dismiss() }.font(.title3.weight(.semibold)) }
         }

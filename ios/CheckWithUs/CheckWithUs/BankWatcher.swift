@@ -219,11 +219,8 @@ import os
 struct BankPermissionView: View {
     var body: some View {
         Page {
-            Image(systemName: "building.columns.fill")
-                .font(.system(size: 100))
-                .foregroundStyle(.tint)
+            AppStatusSymbol(symbol: "building.columns.fill", color: AppPalette.link)
                 .frame(maxWidth: .infinity)
-                .accessibilityHidden(true)
             Text("Bank safety")
                 .font(.largeTitle.bold())
             Text("If someone keeps you on the phone and sends you to the bank, we tell your family.")

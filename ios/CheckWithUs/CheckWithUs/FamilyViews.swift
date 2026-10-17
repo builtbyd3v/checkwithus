@@ -8,6 +8,8 @@ struct FamilyRootView: View {
         Group {
             if model.tokens == nil {
                 FamilySignInView()
+            } else if model.circles == nil {
+                FamilyLoadingView()
             } else if model.circles?.isEmpty == true {
                 JoinCircleView()
             } else {
@@ -38,6 +40,36 @@ struct FamilyTabs: View {
 
 // MARK: - Sign in and join
 
+struct FamilyLoadingView: View {
+    @Environment(FamilyModel.self) private var model
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                AppWordmark()
+                VStack(alignment: .leading, spacing: 16) {
+                    if let error = model.error {
+                        Text("We couldn’t load your family.").font(.title.bold())
+                        Text(error).foregroundStyle(AppPalette.body)
+                        Button { Task { await model.refresh() } } label: {
+                            Text("Try again").font(.headline).frame(maxWidth: .infinity, minHeight: 56)
+                        }
+                        .buttonStyle(AppActionButtonStyle())
+                        .disabled(model.busy)
+                    } else {
+                        ProgressView("Loading your family…").tint(AppPalette.link)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .appCard(feature: true)
+                Button("Sign out", role: .destructive) { model.signOut() }
+                    .frame(minHeight: 56)
+            }.padding(24)
+        }
+        .background(AppPalette.canvas)
+    }
+}
+
 struct FamilySignInView: View {
     @Environment(FamilyModel.self) private var model
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -46,34 +78,34 @@ struct FamilySignInView: View {
         // Scrolls, so very large text is never cut off; centered while it fits.
         ScrollView {
             VStack(spacing: 20) {
-                Image(systemName: "person.2.badge.key.fill")
-                    .font(.system(size: 72))
-                    .foregroundStyle(.tint)
-                    .accessibilityHidden(true)
+                AppWordmark()
+                AppStatusSymbol(symbol: "person.2.badge.key.fill", color: AppPalette.link)
                 Text("Sign in to help your family").font(.title.bold())
                 Text("You will approve payments, see alerts and freeze money if something looks wrong.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppPalette.muted)
                 if let error = model.error { Text(error).foregroundStyle(Color.errorText) }
                 // Very large text: only Sign in stays pinned.
                 if typeSize.isAccessibilitySize { SwitchRoleButton() }
             }
-            .padding(24)
             .frame(maxWidth: .infinity)
+            .appCard(feature: true)
+            .padding(24)
         }
         .defaultScrollAnchor(.center, for: .alignment)
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 20) {
                 Button { Task { await model.signIn() } } label: {
-                    Text("Sign in").font(.headline).frame(maxWidth: .infinity, minHeight: 50)
+                    Text("Sign in").font(.headline).frame(maxWidth: .infinity, minHeight: 56)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(AppActionButtonStyle())
                 .disabled(model.busy)
                 if !typeSize.isAccessibilitySize { SwitchRoleButton() }
             }
             .padding(24)
-            .background(.background)
+            .background(AppPalette.canvas)
         }
         .multilineTextAlignment(.center)
+        .background(AppPalette.canvas)
     }
 }
 
@@ -93,11 +125,12 @@ struct JoinCircleView: View {
                 } footer: {
                     Text("Ask the person who set up Check With Us for the invite code on their dashboard.")
                 }
-                if let error = model.error { Text(error).foregroundStyle(.red) }
+                if let error = model.error { Text(error).foregroundStyle(AppPalette.negative) }
                 Button("Join") { Task { await model.join(code: code.trimmingCharacters(in: .whitespaces), name: name) } }
                     .disabled(model.busy || code.count < 8 || name.isEmpty)
                 Button("Sign out", role: .destructive) { model.signOut() }
             }
+            .appListSurface()
             .navigationTitle("Join your family")
         }
     }
@@ -113,18 +146,36 @@ struct HoldsView: View {
         let recent = model.payments.filter { $0.status != "held" }
         NavigationStack(path: $model.holdsPath) {
             List {
+                Section {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Looking out for \(model.protectedName)")
+                            .font(.headline)
+                            .foregroundStyle(.white.opacity(0.85))
+                        Text("\(model.held.count) \(model.held.count == 1 ? "payment" : "payments") waiting")
+                            .font(.largeTitle.weight(.semibold))
+                            .foregroundStyle(.white)
+                        Text("Review the reasons. Check in before deciding.")
+                            .font(.subheadline)
+                            .foregroundStyle(.white.opacity(0.85))
+                    }
+                    .padding(.vertical, 12)
+                    .accessibilityElement(children: .combine)
+                }
+                .listRowBackground(AppPalette.navy)
                 Section("Waiting for you") {
                     if model.held.isEmpty {
                         Label("Nothing is waiting. \(model.protectedName) is safe.", systemImage: "checkmark.shield")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(AppPalette.muted)
                     }
                     ForEach(model.held) { PaymentRow(payment: $0) }
                 }
+                .listRowBackground(AppPalette.surface)
                 if !recent.isEmpty {
                     Section("Recent") { ForEach(recent) { PaymentRow(payment: $0) } }
                 }
                 FamilyStatus()
             }
+            .appListSurface()
             .navigationTitle("Approvals")
             .navigationDestination(for: String.self) { PaymentDetailView(id: $0) }
             .refreshable { await model.refresh() }
@@ -143,15 +194,16 @@ struct PaymentRow: View {
             layout {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(payment.payee.name).font(.headline)
+                        .foregroundStyle(AppPalette.ink)
                     Text(payment.holdReasons.first?.label ?? payment.category.label)
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppPalette.muted)
                         // Very large text: the whole reason, not "Gift card pur...".
                         .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
                 }
                 Spacer(minLength: 0)
                 VStack(alignment: typeSize.isAccessibilitySize ? .leading : .trailing, spacing: 4) {
-                    Text(dollars(payment.amountCents)).font(.headline.monospacedDigit())
+                    Text(dollars(payment.amountCents)).font(.headline.monospacedDigit()).foregroundStyle(AppPalette.ink)
                     StatusBadge(status: payment.status)
                 }
             }
@@ -172,19 +224,23 @@ struct PaymentDetailView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         StatusBadge(status: payment.status)
                         Text(dollars(payment.amountCents))
-                            .font(.system(size: 48, weight: .bold).monospacedDigit())
+                            .font(.largeTitle.weight(.semibold).monospacedDigit())
                         Text("\(payment.protectedName) wants to pay \(payment.payee.name)")
                             .font(.title3)
                         Text(StatusWords.detail(payment))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(AppPalette.muted)
                     }
                     .padding(.vertical, 6)
                 }
+                .listRowBackground(AppPalette.surface)
                 if !payment.holdReasons.isEmpty {
                     Section("Why we paused it") {
-                        ForEach(payment.holdReasons, id: \.code) {
-                            Label($0.label, systemImage: "exclamationmark.triangle.fill")
-                                .symbolRenderingMode(.multicolor)
+                        ForEach(payment.holdReasons, id: \.code) { reason in
+                            Label {
+                                Text(reason.label).foregroundStyle(AppPalette.body)
+                            } icon: {
+                                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(AppPalette.warning)
+                            }
                         }
                     }
                 }
@@ -209,9 +265,10 @@ struct PaymentDetailView: View {
                     }
                 }
                 if let error = model.error {
-                    Text(error).foregroundStyle(.red)
+                    Text(error).foregroundStyle(AppPalette.negative)
                 }
             }
+            .appListSurface()
             .navigationTitle(payment.payee.name)
             .navigationBarTitleDisplayMode(.inline)
             .safeAreaInset(edge: .bottom) {
@@ -220,27 +277,25 @@ struct PaymentDetailView: View {
                         if (payment.approvalsRequired ?? 1) > 1 {
                             Text("This needs \(payment.approvalsRequired ?? 2) family approvals.")
                                 .font(.footnote)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(AppPalette.muted)
                         }
                         // Very large text: stacked, so "Approve" and "Deny" are not broken mid-word.
                         let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 8)) : AnyLayout(HStackLayout(spacing: 12))
                         layout {
                             Button(role: .destructive) { Task { await model.decide(payment, approve: false) } } label: {
-                                Label("Deny", systemImage: "xmark").font(.headline).frame(maxWidth: .infinity, minHeight: 50)
+                                Label("Deny", systemImage: "xmark").font(.headline).frame(maxWidth: .infinity, minHeight: 56)
                             }
-                            .buttonStyle(.bordered)
-                            .tint(.red)
+                            .buttonStyle(AppActionButtonStyle(prominent: false, destructive: true))
                             Button { Task { await model.decide(payment, approve: true) } } label: {
-                                Label("Approve", systemImage: "checkmark").font(.headline).frame(maxWidth: .infinity, minHeight: 50)
+                                Label("Approve", systemImage: "checkmark").font(.headline).frame(maxWidth: .infinity, minHeight: 56)
                             }
-                            .buttonStyle(.borderedProminent)
-                            .tint(.green)
+                            .buttonStyle(AppActionButtonStyle())
                         }
                         .disabled(model.busy)
                     }
                     .padding(.horizontal)
                     .padding(.vertical, 8)
-                    .background(.bar)
+                    .background(AppPalette.canvas)
                 }
             }
         } else {
@@ -253,12 +308,16 @@ struct StatusBadge: View {
     let status: String
 
     var body: some View {
-        // Dark text on a tinted capsule: colored caption text on its own tint is under 3:1.
-        Text(StatusWords.label(status))
-            .font(.caption.weight(.semibold))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(StatusWords.color(status).opacity(0.25), in: .capsule)
+        HStack(spacing: 6) {
+            Circle().fill(StatusWords.color(status)).frame(width: 7, height: 7).accessibilityHidden(true)
+            Text(StatusWords.label(status))
+        }
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(AppPalette.ink)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(AppPalette.panel, in: .capsule)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -276,10 +335,10 @@ enum StatusWords {
 
     static func color(_ status: String) -> Color {
         switch status {
-        case "held": .orange
-        case "approved", "paying", "paid": .green
-        case "expired": .gray
-        default: .red
+        case "held": AppPalette.warning
+        case "approved", "paying", "paid": AppPalette.positive
+        case "expired": AppPalette.muted
+        default: AppPalette.negative
         }
     }
 
@@ -314,14 +373,14 @@ struct AlertsView: View {
                     HStack(alignment: .top, spacing: 12) {
                         Image(systemName: AlertWords.symbol(alert.kind))
                             .font(.title2)
-                            .foregroundStyle(alert.kind == "bank_during_call" ? .red : .orange)
+                            .foregroundStyle(alert.kind == "bank_during_call" ? AppPalette.negative : AppPalette.warning)
                             .frame(width: 32)
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(AlertWords.title(alert.kind, name: alert.protectedName) ?? "").font(.headline)
                             if let detail = alert.detail { Text(detail).font(.subheadline) }
                             if let date = isoDate(alert.createdAt) {
-                                Text(date.formatted(.relative(presentation: .named))).font(.caption).foregroundStyle(.secondary)
+                                Text(date.formatted(.relative(presentation: .named))).font(.caption).foregroundStyle(AppPalette.muted)
                             }
                         }
                     }
@@ -330,6 +389,7 @@ struct AlertsView: View {
                 }
                 FamilyStatus()
             }
+            .appListSurface()
             .navigationTitle("Alerts")
             .refreshable { await model.refresh() }
         }
@@ -364,14 +424,17 @@ struct MoneyView: View {
                 Section {
                     if let balance = model.balance {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Available").foregroundStyle(.secondary)
-                            Text(dollars(balance.availableCents)).font(.system(size: 44, weight: .bold).monospacedDigit())
+                            Text("Available").foregroundStyle(.white.opacity(0.85))
+                            Text(dollars(balance.availableCents)).font(.largeTitle.weight(.semibold).monospacedDigit())
+                                .foregroundStyle(.white)
                         }
-                        .padding(.vertical, 4)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(20)
+                        .background(AppPalette.navy, in: .rect(cornerRadius: 18))
                         LabeledContent("In the account", value: dollars(balance.ledgerBalanceCents))
                         LabeledContent("Set aside for approved payments", value: dollars(balance.reservedCents))
                     } else {
-                        Text("Loading balance").foregroundStyle(.secondary)
+                        Text("Loading balance").foregroundStyle(AppPalette.muted)
                     }
                 } header: {
                     Text("\(model.protectedName)'s account")
@@ -395,8 +458,8 @@ struct MoneyView: View {
                                 .foregroundStyle(Color.errorText)
                         }
                     }
-                    if let notice = model.notice { Text(notice).foregroundStyle(.secondary) }
-                    if let error = model.error { Text(error).foregroundStyle(.red) }
+                    if let notice = model.notice { Text(notice).foregroundStyle(AppPalette.muted) }
+                    if let error = model.error { Text(error).foregroundStyle(AppPalette.negative) }
                 } header: {
                     Text("Freeze")
                 } footer: {
@@ -404,6 +467,7 @@ struct MoneyView: View {
                 }
                 .disabled(model.busy)
             }
+            .appListSurface()
             .navigationTitle("Money")
             .refreshable { await model.refresh() }
             .confirmationDialog("Freeze \(model.protectedName)'s money?", isPresented: $confirmFreeze, titleVisibility: .visible) {
@@ -434,14 +498,14 @@ struct AllowancesView: View {
             List {
                 Section {
                     if model.allowances.isEmpty {
-                        Text("None yet. Every risky payment asks you first.").foregroundStyle(.secondary)
+                        Text("None yet. Every risky payment asks you first.").foregroundStyle(AppPalette.muted)
                     }
                     ForEach(model.allowances) { allowance in
                         VStack(alignment: .leading, spacing: 2) {
                             Text("\(AllowanceWords.scope(allowance)) up to \(dollars(allowance.maxAmountCents))").font(.headline)
                             if let until = isoDate(allowance.expiresAt) {
                                 Text("Until \(until.formatted(date: .abbreviated, time: .omitted))")
-                                    .font(.subheadline).foregroundStyle(.secondary)
+                                    .font(.subheadline).foregroundStyle(AppPalette.muted)
                             }
                         }
                         .swipeActions {
@@ -451,8 +515,9 @@ struct AllowancesView: View {
                 } footer: {
                     Text("Inside an allowance, payments to people \(model.protectedName) has paid before go through without asking you. Gift cards, crypto, wires and payments during a call always ask. Swipe left to revoke.")
                 }
-                if let error = model.error { Text(error).foregroundStyle(.red) }
+                if let error = model.error { Text(error).foregroundStyle(AppPalette.negative) }
             }
+            .appListSurface()
             .navigationTitle("Allowances")
             .toolbar {
                 Button { model.addingAllowance = true } label: { Label("Add", systemImage: "plus") }
@@ -488,11 +553,12 @@ struct GrantAllowanceView: View {
                 DatePicker("Until", selection: $until, in: Date.now.addingTimeInterval(3600)...Date.now.addingTimeInterval(364 * 86400),
                            displayedComponents: .date)
                 Section {
-                    if let error = model.error { Text(error).foregroundStyle(.red) }
+                    if let error = model.error { Text(error).foregroundStyle(AppPalette.negative) }
                 } footer: {
                     Text("To keep this safe, you will sign in again before it is saved.").foregroundStyle(Color.secondaryText)
                 }
             }
+            .appListSurface()
             .navigationTitle("New allowance")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -544,6 +610,7 @@ struct FamilySettingsView: View {
                     Button("Sign out", role: .destructive) { model.signOut() }
                 }
             }
+            .appListSurface()
             .navigationTitle("Settings")
         }
     }
@@ -555,7 +622,7 @@ struct FamilyStatus: View {
 
     var body: some View {
         if let error = model.error {
-            Label(error, systemImage: "wifi.exclamationmark").font(.footnote).foregroundStyle(.secondary)
+            Label(error, systemImage: "wifi.exclamationmark").font(.footnote).foregroundStyle(AppPalette.muted)
         }
     }
 }
