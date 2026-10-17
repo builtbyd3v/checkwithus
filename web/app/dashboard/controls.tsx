@@ -6,14 +6,14 @@ import { addPayeeAction, decideAction, freezeAction, inviteAction, joinAction, p
 import { DecisionForm } from './decision-ui';
 
 const initial: FormState = { message: '' };
-const inputClass = 'h-11 w-full rounded-lg border border-stone-300 bg-white px-3 text-stone-900 outline-none focus:border-teal-700 focus:ring-2 focus:ring-teal-700/20';
-const buttonClass = 'inline-flex min-h-11 items-center justify-center rounded-lg bg-teal-800 px-4 font-semibold text-white hover:bg-teal-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800 disabled:opacity-60';
+const inputClass = 'h-11 w-full rounded-lg border border-family-line bg-white px-3 text-family-ink outline-none focus:border-family-blue focus:ring-2 focus:ring-family-blue/20';
+const buttonClass = 'inline-flex min-h-11 items-center justify-center rounded-lg bg-family-blue px-4 font-semibold text-white hover:bg-family-blue-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-family-blue disabled:opacity-60';
 
 export { Countdown } from './deadline';
 
 function Feedback({ state }: { state: FormState }) {
   if (!state.message) return null;
-  return <p role="status" className="mt-3 text-sm text-teal-900">{state.message}</p>;
+  return <p role="status" className="mt-3 text-sm text-family-ink">{state.message}</p>;
 }
 
 export function JoinForm() {
@@ -42,14 +42,14 @@ export function FreezeControl({ circleId, frozen, firstName, vaultLabel, vaultDo
   const [unfrozeState, unfreezeNow, unfreezing] = useActionState(unfreezeAction, initial);
   if (!frozen) return <section aria-labelledby="freeze-title" className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-rose-900/15 bg-rose-50 p-5 sm:p-7">
     <div><h2 id="freeze-title" className="text-2xl font-semibold">Freeze spending</h2>
-      <p className="mt-1 max-w-2xl text-stone-700">During a scam, move {firstName}’s spending money to the vault. Every payment waits for the family until you unfreeze.</p>
+      <p className="mt-1 max-w-2xl text-family-body">During a scam, move {firstName}’s spending money to the vault. Every payment waits for the family until you unfreeze.</p>
       <Feedback state={frozeState} /></div>
     <form action={freezeNow}><input type="hidden" name="circleId" value={circleId} />
       <button disabled={freezing} className="inline-flex min-h-14 items-center justify-center rounded-lg bg-rose-800 px-6 text-lg font-semibold text-white hover:bg-rose-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-800 disabled:opacity-60">{freezing ? 'Freezing…' : 'Freeze now'}</button></form>
   </section>;
   return <section aria-labelledby="freeze-title" className="mb-6 rounded-2xl border border-rose-900/20 bg-rose-100 p-5 sm:p-7">
     <h2 id="freeze-title" className="text-2xl font-semibold">Spending is frozen</h2>
-    <p className="mt-1 text-stone-700">{vaultLabel} is safe in the vault. Every payment waits for the family.</p>
+    <p className="mt-1 text-family-body">{vaultLabel} is safe in the vault. Every payment waits for the family.</p>
     <Feedback state={frozeState} />
     <form action={unfreezeNow} className="mt-4 flex flex-wrap items-end gap-3">
       <input type="hidden" name="circleId" value={circleId} />
@@ -66,9 +66,9 @@ export function SettingsForms({ circleId, holdDollars }: { circleId: string; hol
   const [invite, makeInvite, invitePending] = useActionState(inviteAction, initial);
   const [pairing, makePairing, pairingPending] = useActionState(pairingAction, initial);
   return <div className="grid gap-6 lg:grid-cols-2">
-    <section className="rounded-xl border border-stone-200 bg-white p-5">
+    <section className="rounded-xl border border-family-line bg-white p-5">
       <h3 className="text-lg font-semibold">Payment hold limit</h3>
-      <p className="mt-1 text-sm text-stone-600">Payments above this amount wait for family review.</p>
+      <p className="mt-1 text-sm text-family-muted">Payments above this amount wait for family review.</p>
       <form action={saveSettings} className="mt-4 flex flex-wrap items-end gap-3">
         <input type="hidden" name="circleId" value={circleId} />
         <div className="min-w-40 flex-1"><label htmlFor="holdDollars" className="mb-1 block text-sm font-medium">Amount in dollars</label>
@@ -76,9 +76,9 @@ export function SettingsForms({ circleId, holdDollars }: { circleId: string; hol
         <button disabled={settingsPending} className={buttonClass}>Save limit</button>
       </form><Feedback state={settings} />
     </section>
-    <section className="rounded-xl border border-stone-200 bg-white p-5">
+    <section className="rounded-xl border border-family-line bg-white p-5">
       <h3 className="text-lg font-semibold">Add a known payee</h3>
-      <p className="mt-1 text-sm text-stone-600">New payees are held until your family knows them.</p>
+      <p className="mt-1 text-sm text-family-muted">New payees are held until your family knows them.</p>
       <form action={addPayee} className="mt-4 grid gap-3 sm:grid-cols-2">
         <input type="hidden" name="circleId" value={circleId} />
         <div className="sm:col-span-2"><label htmlFor="payeeName" className="mb-1 block text-sm font-medium">Payee name</label>
@@ -90,21 +90,21 @@ export function SettingsForms({ circleId, holdDollars }: { circleId: string; hol
         <button disabled={payeePending} className={`${buttonClass} sm:col-span-2`}>Save payee</button>
       </form><Feedback state={payee} />
     </section>
-    <section className="rounded-xl border border-stone-200 bg-white p-5">
+    <section className="rounded-xl border border-family-line bg-white p-5">
       <h3 className="text-lg font-semibold">Invite family</h3>
-      <p className="mt-1 text-sm text-stone-600">Up to three family members can join this circle.</p>
+      <p className="mt-1 text-sm text-family-muted">Up to three family members can join this circle.</p>
       <form action={makeInvite} className="mt-4"><input type="hidden" name="circleId" value={circleId} />
         <button disabled={invitePending} className={buttonClass}>Create invite code</button></form>
       <Feedback state={invite} />
-      {invite.code && <p className="mt-3 rounded-lg bg-teal-50 p-3 font-mono text-xl tracking-wider text-teal-950">{invite.code}</p>}
+      {invite.code && <p className="mt-3 rounded-lg bg-teal-50 p-3 font-mono text-xl tracking-wider text-family-ink">{invite.code}</p>}
     </section>
-    <section className="rounded-xl border border-stone-200 bg-white p-5">
+    <section className="rounded-xl border border-family-line bg-white p-5">
       <h3 className="text-lg font-semibold">Pair the older adult’s phone</h3>
-      <p className="mt-1 text-sm text-stone-600">This one-time code connects their iPhone to the family circle.</p>
+      <p className="mt-1 text-sm text-family-muted">This one-time code connects their iPhone to the family circle.</p>
       <form action={makePairing} className="mt-4"><input type="hidden" name="circleId" value={circleId} />
         <button disabled={pairingPending} className={buttonClass}>Create pairing code</button></form>
       <Feedback state={pairing} />
-      {pairing.code && <p className="mt-3 rounded-lg bg-teal-50 p-3 font-mono text-xl tracking-wider text-teal-950">{pairing.code}</p>}
+      {pairing.code && <p className="mt-3 rounded-lg bg-teal-50 p-3 font-mono text-xl tracking-wider text-family-ink">{pairing.code}</p>}
     </section>
   </div>;
 }
