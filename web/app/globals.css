@@ -60,3 +60,16 @@ body {
     }
   }
 }
+
+/* Family workspace tokens from the supplied DESIGN.md. */
+@theme {
+  --color-family-canvas: #f4f5f7;
+  --color-family-panel: #eceef3;
+  --color-family-ink: #202749;
+  --color-family-body: #444b60;
+  --color-family-muted: #656c80;
+  --color-family-line: #e2e5ec;
+  --color-family-blue: #2468c9;
+  --color-family-blue-deep: #1c519d;
+  --color-family-blue-soft: #e9f2ff;
+}

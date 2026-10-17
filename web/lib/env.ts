@@ -97,7 +97,7 @@ export const appEnv = memo(() =>
   parse(
     'app',
     z.object({
-      APP_BASE_URL: z.url('must be a full URL such as https://checkwith.us'),
+      APP_BASE_URL: z.url('must be a full URL such as https://www.checkwith.us'),
       /** Family has this long to answer before a held payment is blocked. CIBA caps it at 300. */
       APPROVAL_TIMEOUT_SECONDS: optional(z.coerce.number().int().min(30).max(300).default(300)),
       /** `app`: family app calls us after Face ID. `ciba`: Auth0 CIBA push. */

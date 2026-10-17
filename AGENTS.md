@@ -93,9 +93,8 @@ docs/       Devpost write-up, demo script, research
   trained model gets a row in the eval table in `README.md`.
 - **Older adult screens:** large text (Dynamic Type), big tap targets, plain words,
   one action per screen.
-- **Env vars (names only):** `NESSIE_API_KEY`, `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`,
-  `AUTH0_CLIENT_SECRET`, Tiger Data connection string (name TBD). Keep them in
-  `.env.local`; list names in `.env.example`.
+- **Env vars:** names live in `web/.env.example`. Values live in `web/.env.local`
+  (never committed) and on Vercel. Ask Dev for the current file, not Haadi.
 
 Done-checks before calling a task done:
 
@@ -112,12 +111,23 @@ GitHub issues are the source of truth for who does what: `gh issue list --assign
 | Person | Branch | Area |
 | --- | --- | --- |
 | Dev (builtbyd3v) | `dev` | Lead. `ios/` (older adult app, Message Filter, Call Directory), `ml/`, integration |
-| Haadi (haad1r) | `haadi` | `web/` backend: Nessie, Auth0, Tiger Data migrations, deploy |
+| Haadi (haad1r) | `haadi` | `web/` backend code: Nessie, Auth0, Tiger Data migrations |
 | rgons (rgons15) | `rgons` | Design, dashboard UI, Tiger Data performance + scam sequence query, README and Devpost |
 | Hitesh (hiteshk2k6) | `hitesh` | Demo script, demo video, Devpost, DEV post (#55) |
 
 Touching someone else's area (for example a migration in `web/db`)? Agree on it in the
 team chat first.
+
+## Accounts and hosting
+
+| Service | Account owner | Ask them for |
+| --- | --- | --- |
+| Vercel (`checkwithus`, production deploys, env vars) | Dev | deploys, `web/.env.local` values |
+| Auth0 tenant | Dev | test approver sign-in, dashboard settings, client secrets |
+| Nessie (Capital One) | Dev | API key, seeded customers and accounts |
+| Tiger Data (Postgres) | Haadi | database access, running live migrations |
+
+Only Dev deploys to production. Do not paste secrets in issues, PRs, or chat logs.
 
 ## Ground rules
 

@@ -37,3 +37,6 @@ ios/CheckWithUs/MessageFilter/GuardInt8.mlpackage/
 
 # Demo scammer phone number (a real number, so never committed)
 ios/CheckWithUs/CheckWithUs/scam-numbers.local.json
+
+# Real texts from the team's phones (real numbers and links), scored locally only
+ml/data/real_local.csv
