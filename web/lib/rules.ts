@@ -17,7 +17,9 @@ import type { Cents } from '@/lib/money';
 
 /** In the order the family sees them: what it is, who it is to, how much, when. */
 export const HOLD_REASONS = [
+  'frozen',
   'gift_card',
+  'cash_then_gift_card',
   'crypto',
   'wire_transfer',
   'new_payee',
@@ -29,7 +31,9 @@ export const HOLD_REASONS = [
 export type HoldReason = (typeof HOLD_REASONS)[number];
 
 export const HOLD_REASON_LABELS: Record<HoldReason, string> = {
+  frozen: 'Your family froze spending',
   gift_card: 'Gift card purchase',
+  cash_then_gift_card: 'Cash at an ATM, then a gift card. Scammers often ask for this.',
   crypto: 'Crypto purchase',
   wire_transfer: 'Wire transfer',
   new_payee: 'Someone they have not paid before',
@@ -58,6 +62,12 @@ export const UNUSUAL_SPENDING = {
 /** Guard scores at or above this add `guard_flagged`. */
 export const GUARD_HOLD_SCORE = 0.5;
 
+/**
+ * The scam sequence: ATM cash, then a gift card within this window. Each step
+ * looks normal alone; together they are how scammers coach a victim.
+ */
+export const CASH_THEN_GIFT_CARD_WINDOW_SECONDS = 2 * 60 * 60;
+
 /** Categories that always pause, whoever is paid and however little. */
 const ALWAYS_HOLD: Partial<Record<Category, HoldReason>> = {
   gift_cards: 'gift_card',
@@ -73,6 +83,14 @@ export type PaymentFacts = {
   payeeKnown: boolean;
   /** The phone reports an active call. */
   onCall: boolean;
+};
+
+/** Facts about the circle, looked up by the server under the circle's row lock. */
+export type CircleFacts = {
+  /** The family tapped Freeze. */
+  frozen: boolean;
+  /** ATM cash in the ledger within `CASH_THEN_GIFT_CARD_WINDOW_SECONDS`. */
+  atmCashRecently: boolean;
 };
 
 /** Spending history for the payment's category, from the Tiger Data continuous aggregate. */
@@ -93,12 +111,17 @@ export function decideHold(input: {
   holdOverCents: Cents;
   baseline: Baseline;
   guard: GuardSuggestion;
+  circle?: CircleFacts;
 }): HoldDecision {
-  const { payment, holdOverCents, baseline, guard } = input;
+  const { payment, holdOverCents, baseline, guard, circle } = input;
   const reasons = new Set<HoldReason>();
+
+  if (circle?.frozen) reasons.add('frozen');
 
   const categoryReason = ALWAYS_HOLD[payment.category];
   if (categoryReason) reasons.add(categoryReason);
+
+  if (payment.category === 'gift_cards' && circle?.atmCashRecently) reasons.add('cash_then_gift_card');
 
   if (!payment.payeeKnown) reasons.add('new_payee');
 
