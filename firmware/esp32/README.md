@@ -168,6 +168,10 @@ purchase-to-press correlation exists.
 
 ## Testing and demo checklist
 
+The **ESP32 firmware** GitHub Actions workflow compiles the empty example for
+`esp32:esp32:esp32` with Arduino CLI 1.5.1 / Arduino-ESP32 3.3.12 and runs the native
+debounce assertions. It has no device credentials and does not exercise hardware.
+
 1. Run `npm run typecheck`, `npm test`, `npm run test:db`, `npm run build` from `web/`.
    Database tests create/delete synthetic circles and test real SQL with no sponsor
    bank or Auth0 calls. Firmware debounce host test:

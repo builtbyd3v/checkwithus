@@ -1,0 +1,36 @@
+name: ESP32 firmware
+on:
+  push:
+    branches: [hardware, main]
+    paths: ['firmware/esp32/**', '.github/workflows/esp32.yml']
+  pull_request:
+    paths: ['firmware/esp32/**', '.github/workflows/esp32.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: esp32-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: arduino/setup-arduino-cli@81d310742121c928ea9c8bbd407b4217b432ae02 # v2
+        with:
+          version: '1.5.1'
+      - name: Test debounce behavior
+        run: |
+          g++ -std=c++11 firmware/esp32/tests/button_state_test.cpp -o /tmp/button-test
+          /tmp/button-test
+      - name: Install pinned Espressif board package
+        run: |
+          arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core install esp32:esp32@3.3.12 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+      - name: Compile ESP32 Dev Module with empty example configuration
+        run: arduino-cli compile --fqbn esp32:esp32:esp32 firmware/esp32/checkwith_button
