@@ -98,7 +98,7 @@ describe('createCibaClient', () => {
       properties: {
         amount: { display: true, name: 'Amount (USD)', display_order: 1, value: '$1,500.00' },
         payee: { display: true, name: 'Payee', display_order: 2, value: 'QuickGift Cards' },
-        reason: { display: true, name: 'Why it paused', display_order: 3, value: 'Gift card purchase; Paid while on a phone call' },
+        reason: { display: true, name: 'Why it paused', display_order: 3, value: 'Gift card purchase, Paid while on a phone call' },
         approvals: { display: true, name: 'Approvals needed', display_order: 4, value: '2 family approvers' },
         amount_cents: { display: false, value: 150_000 },
       },
@@ -141,6 +141,50 @@ describe('createCibaClient', () => {
     await expect(withApi.poll(authReqId)).resolves.toEqual({
       kind: 'approved', sub: 'auth0|maria', permissions: ['read:payments'],
     });
+  });
+
+  describe('the API access token fails closed', () => {
+    const approveWith = async (
+      options: Parameters<FakeAuth0['answer']>[2],
+      client = createCibaClient({
+        ...FAKE_AUTH0, audience: AUDIENCE, richAuthorizationDetails: true, fetch: auth0.fetch, keys: auth0.keys,
+      }),
+    ) => {
+      const { authReqId } = await client.start({ sub: 'auth0|maria', bindingMessage: 'x', expirySeconds: 300 });
+      auth0.answer('auth0|maria', 'approve', options);
+      return client.poll(authReqId);
+    };
+
+    it('a token for our API that does not verify grants nothing', async () => {
+      await expect(approveWith({ permissions: ['approve:payments'], accessForged: true })).resolves.toMatchObject({ permissions: [] });
+    });
+
+    it('a token for our API naming someone else grants nothing', async () => {
+      await expect(approveWith({ permissions: ['approve:payments'], accessSub: 'auth0|intruder' })).resolves.toMatchObject({ permissions: [] });
+    });
+
+    it('with AUTH0_RBAC, a token for our API without the claim grants nothing', async () => {
+      const strict = createCibaClient({
+        ...FAKE_AUTH0, audience: AUDIENCE, richAuthorizationDetails: true, requirePermissionsClaim: true,
+        fetch: auth0.fetch, keys: auth0.keys,
+      });
+      await expect(approveWith({ apiToken: true }, strict)).resolves.toMatchObject({ permissions: [] });
+    });
+
+    it('without AUTH0_RBAC, a token without the claim leaves it to the circle role', async () => {
+      await expect(approveWith({ apiToken: true })).resolves.toEqual({ kind: 'approved', sub: 'auth0|maria' });
+    });
+  });
+
+  it('keeps payee and reasons in the binding message charset, and short', () => {
+    const [details] = paymentAuthorizationDetails({
+      ...payment, payee: `Tom & Jerry's "Gift" <Shop>? ${'x'.repeat(100)}`, reasons: ['Gift card; $$$', 'R'.repeat(300)],
+    });
+    const { payee, reason } = details!.properties;
+    expect(payee.value).toMatch(/^Tom Jerrys Gift Shop x+$/);
+    expect(String(payee.value).length).toBeLessThanOrEqual(64);
+    expect(reason.value).toMatch(/^[A-Za-z0-9\s+\-_.,:#]*$/);
+    expect(String(reason.value).length).toBeLessThanOrEqual(200);
   });
 
   it('reports no permissions when the access token is opaque (RBAC off)', async () => {

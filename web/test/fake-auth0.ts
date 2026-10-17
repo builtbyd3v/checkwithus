@@ -22,14 +22,20 @@ type PushRequest = {
   audience?: string;
   /** The parsed authorization_details, when sent. */
   details?: unknown;
-  /** RBAC claim for the access token; without it the access token is opaque. */
+  /** RBAC claim for the access token. */
   permissions?: string[];
+  /** Issue a JWT access token for the API (implied by `permissions`); else opaque. */
+  apiToken?: boolean;
+  /** Access token for someone else, or signed with a key Auth0 never published. */
+  accessSub?: string;
+  accessForged?: boolean;
 };
 
 export type FakeAuth0 = Awaited<ReturnType<typeof createFakeAuth0>>;
 
 export async function createFakeAuth0() {
   const { privateKey, publicKey } = await generateKeyPair('RS256');
+  const forger = (await generateKeyPair('RS256')).privateKey;
   const keys = createLocalJWKSet({
     keys: [{ ...(await exportJWK(publicKey)), kid: 'k1', alg: 'RS256' }],
   });
@@ -104,15 +110,15 @@ export async function createFakeAuth0() {
             .setIssuedAt()
             .setExpirationTime('5m')
             .sign(privateKey);
-          const accessToken = push.permissions && push.audience
-            ? await new SignJWT({ permissions: push.permissions })
+          const accessToken = (push.permissions || push.apiToken) && push.audience
+            ? await new SignJWT(push.permissions ? { permissions: push.permissions } : {})
                 .setProtectedHeader({ alg: 'RS256', kid: 'k1' })
-                .setSubject(push.tokenSub ?? push.sub)
+                .setSubject(push.accessSub ?? push.tokenSub ?? push.sub)
                 .setIssuer(ISSUER)
                 .setAudience(push.audience)
                 .setIssuedAt()
                 .setExpirationTime('5m')
-                .sign(privateKey)
+                .sign(push.accessForged ? forger : privateKey)
             : 'opaque';
           return json(200, { access_token: accessToken, id_token: idToken, token_type: 'Bearer', expires_in: 86400 });
         }
@@ -129,12 +135,16 @@ export async function createFakeAuth0() {
     notEnrolled,
     settings,
     /** What the member taps in Guardian, on their most recent push. */
-    answer(sub: string, answer: Answer, options: { tokenSub?: string; permissions?: string[] } = {}) {
+    answer(
+      sub: string,
+      answer: Answer,
+      options: Pick<PushRequest, 'tokenSub' | 'permissions' | 'apiToken' | 'accessSub' | 'accessForged'> = {},
+    ) {
       const entry = [...pushes.values()].reverse().find((p) => p.sub === sub);
       if (!entry) throw new Error(`no push was sent to ${sub}`);
       entry.answer = answer;
       entry.tokenSub = options.tokenSub;
-      entry.permissions = options.permissions;
+      Object.assign(entry, { permissions: undefined, apiToken: undefined, accessSub: undefined, accessForged: undefined }, options);
     },
     tokenPolls: () => calls.filter((c) => c.path === '/oauth/token'),
   };

@@ -526,9 +526,9 @@ describe('over the two-approval limit, through the family app', () => {
     await db().query('delete from circles where id = $1', [twoCircleId]);
   });
 
-  it('a token whose Auth0 permissions lack approve:payments cannot decide, even for an approver', async () => {
+  it('a token whose Auth0 permissions lack approve:payments cannot approve, even for an approver', async () => {
     expect(await decide(MARIA2, 'approve', ['read:payments'])).toMatchObject({ status: 403, body: { error: 'permission_required' } });
-    expect(await decide(MARIA2, 'deny', [])).toMatchObject({ status: 403, body: { error: 'permission_required' } });
+    expect(await decide(MARIA2, 'approve', [])).toMatchObject({ status: 403, body: { error: 'permission_required' } });
   });
 
   it('a viewer cannot decide, even with approve:payments in the token', async () => {
@@ -546,10 +546,10 @@ describe('over the two-approval limit, through the family app', () => {
     expect(writesFor(largeId)).toHaveLength(1);
   });
 
-  it('one approval then one deny: the deny stops it', async () => {
+  it('one approval then one deny stops it; deny needs only the circle role, not the permission', async () => {
     await holdLarge(`api-two-approvals-${crypto.randomUUID()}`);
     expect(await decide(MARIA2, 'approve')).toMatchObject({ status: 200, body: { status: 'held' } });
-    expect(await decide(LEO, 'deny')).toMatchObject({ status: 200, body: { status: 'denied' } });
+    expect(await decide(LEO, 'deny', ['read:payments'])).toMatchObject({ status: 200, body: { status: 'denied' } });
     expect(writesFor(largeId)).toHaveLength(0);
   });
 });

@@ -141,12 +141,20 @@ one. Fixed rules decide, and Auth0 decides who may override them.
 | Grant an allowance, change the threshold or roles, unfreeze | One approver with a fresh login (`auth_time` within 5 minutes) | `max_age=0` sign-in |
 | Deny, freeze, revoke an allowance | One approver, no fresh login | These only stop money |
 
-Approver means the circle role in our database. When the verified Auth0 token
-carries a `permissions` claim, it must also list `approve:payments`: the family
-API decision route returns `403 permission_required` otherwise, and a Guardian
-approval whose access token lacks it is recorded as failed, not counted. Tokens
-without the claim (RBAC off) keep working on the circle role alone. Other
+Approver means the circle role in our database. Approving also needs Auth0's
+`approve:payments` permission when the verified token carries a `permissions`
+claim, or always when `AUTH0_RBAC=true` (then a missing claim is a no). The
+family API decision route returns `403 permission_required` otherwise. Deny is
+not gated on the permission: it only stops money, so the circle role is enough.
+Without the claim and without `AUTH0_RBAC`, the circle role alone decides. Other
 approver routes (allowances, freeze, policy) check the circle role only.
+
+Guardian approvals are permission-checked only when `AUTH0_CIBA_RAR=true`:
+only then does `bc-authorize` send the API `audience`, so only then does Auth0
+return an access token for our API. That token fails closed: if it does not
+verify or names someone else, the approval is recorded as failed and not
+counted. With `AUTH0_CIBA_RAR` off (or after the plain retry) there is no API
+token, so Guardian approvals rely on the verified ID token and circle role.
 
 Two-approval quorum is tested on both paths: `app/api/v1/api.int.test.ts`
 (family app route: one approval holds, a repeat does not count, the second
@@ -164,7 +172,9 @@ and one Rich Authorization Requests object of type
 `urn:auth0:schemas:authorization-details:v1:payment` in Auth0's Guardian display
 schema: amount, payee, plain-words hold reasons, "Approvals needed" when two are
 required, and a hidden integer `amount_cents`. Never message or bill contents.
-If Auth0 answers 400, the push is retried once without audience and details.
+Payee and reasons use the binding message charset (payee up to 64 characters,
+reasons up to 200). If Auth0 answers 400, the error code is logged and the push
+is retried once without audience and details.
 Unset or `false` sends neither. That is the default because our tenant refuses
 `audience` today: a probe on October 17 (a user that does not exist, so no push)
 answered `Client ... is not authorized to access resource server`.
@@ -190,8 +200,9 @@ Docs: [CIBA with RAR](https://auth0.com/docs/get-started/authentication-and-auth
    `PATCH /api/v2/client-grants/{id}` with
    `{"authorization_details_types":["urn:auth0:schemas:authorization-details:v1:payment"]}`.
 4. Set `AUTH0_CIBA_RAR=true` and run `npm run check:auth0`. It must print
-   `✓ CIBA with audience + authorization_details`. The probe uses a user that
-   does not exist, so it sends no push.
+   `✓ CIBA audience accepted` and `✓ CIBA authorization_details accepted`. The
+   probe uses a user that does not exist, so it sends no push. Then set
+   `AUTH0_RBAC=true` so a token without the claim cannot approve.
 5. Enroll a family test account in Guardian and approve one real push. Not yet
    done: Guardian display of the details and an RBAC-carrying token are untested
    against the real tenant. Automated tests use `test/fake-auth0.ts`.

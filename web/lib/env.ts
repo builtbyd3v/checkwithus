@@ -78,6 +78,8 @@ export const auth0Env = memo(() =>
       AUTH0_AUDIENCE: required,
       /** `true`: CIBA pushes carry payment details (RAR). Needs the type registered on the API. */
       AUTH0_CIBA_RAR: optional(z.enum(['true', 'false']).default('false')),
+      /** `true`: approving needs `approve:payments` in the Auth0 token; a missing claim is a no. */
+      AUTH0_RBAC: optional(z.enum(['true', 'false']).default('false')),
     }),
   ),
 );

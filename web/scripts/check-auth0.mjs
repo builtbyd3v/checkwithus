@@ -83,13 +83,19 @@ if (process.env.AUTH0_CIBA_RAR === 'true') {
     signal: AbortSignal.timeout(15_000),
   });
   const body = await probe.json().catch(() => ({}));
-  const said = `${body.error ?? probe.status}: ${String(body.error_description ?? '').replace(clientId, '<client>').slice(0, 200)}`;
-  // Seen on our tenant: audience and details are refused before the user is
-  // looked up. So unknown_user_id means both were accepted.
-  const accepted = body.error === 'unknown_user_id';
-  if (!accepted) ok = false;
-  console.log(`${accepted ? '✓' : '✗'} CIBA with audience + authorization_details (probe user does not exist) -> ${said}`);
-  if (!accepted) console.log('  Fix the tenant (web/INTEGRATION.md, "Auth0 dashboard steps") or unset AUTH0_CIBA_RAR.');
+  const description = String(body.error_description ?? '');
+  const said = `${body.error ?? probe.status}: ${description.replace(clientId, '<client>').slice(0, 200)}`;
+  // Seen on our tenant: a refused audience says the client "is not authorized
+  // to access resource server"; refused details name authorization_details.
+  // Any other 4xx (here unknown_user_id, since the probe user does not exist)
+  // means Auth0 accepted them.
+  const is4xx = probe.status >= 400 && probe.status < 500;
+  const audienceOk = is4xx && !/not authorized to access resource server/i.test(description);
+  const detailsOk = audienceOk && !/authorization_details/i.test(description);
+  if (!detailsOk) ok = false;
+  console.log(`${audienceOk ? '✓' : '✗'} CIBA audience accepted (code ${body.error ?? probe.status})`);
+  console.log(`${detailsOk ? '✓' : '✗'} CIBA authorization_details accepted -> ${said}`);
+  if (!detailsOk) console.log('  Fix the tenant (web/INTEGRATION.md, "Auth0 dashboard steps") or unset AUTH0_CIBA_RAR.');
 }
 
 process.exit(ok ? 0 : 1);

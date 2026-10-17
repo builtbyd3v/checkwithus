@@ -17,8 +17,9 @@ export const POST = handle(async (request, { params }: { params: Promise<{ id: s
   const user = await requireFamilyUser(request);
   const id = uuidParam((await params).id);
   const { decision } = await readBody(request, decisionBody);
-  // Auth0 RBAC, when the token carries it; decidePayment also checks the circle role.
-  requireTokenPermission(user.permissions, 'approve:payments');
+  // Auth0 RBAC on approvals (when the token carries it, or AUTH0_RBAC=true);
+  // decidePayment also checks the circle role. Deny only stops money: role alone.
+  if (decision === 'approve') requireTokenPermission(user.permissions, 'approve:payments');
 
   // With CIBA, an approval only counts if Auth0 reports it from the member's
   // Guardian push, which takes their enrolled phone and Face ID. A sign-in

@@ -22,11 +22,20 @@
  * sends neither, which is the setup verified to reach user lookup. Docs:
  * https://auth0.com/docs/get-started/apis/configure-rich-authorization-requests
  */
-import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from 'jose';
+import { createRemoteJWKSet, decodeJwt, jwtVerify, type JWTVerifyGetKey } from 'jose';
 import { formatCents, type Cents } from '@/lib/money';
 
 const TIMEOUT_MS = 10_000;
 const MAX_BINDING_MESSAGE = 64;
+
+/** Reduced to the characters Auth0 accepts in a binding message, accents dropped. */
+const clean = (text: string) =>
+  text
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^A-Za-z0-9\s+\-_.,:#]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 
 /**
  * The line shown on the family member's phone, e.g.
@@ -38,13 +47,6 @@ export function bindingMessage(input: {
   amountCents: Cents;
   payeeName: string;
 }): string {
-  const clean = (text: string) =>
-    text
-      .normalize('NFKD')
-      .replace(/[̀-ͯ]/g, '')
-      .replace(/[^A-Za-z0-9\s+\-_.,:#]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
   // Capped so the amount always fits: 20 + ": 1,000,000.00 USD to " (the
   // largest amount the API accepts) leaves room for the payee within 64.
   const who = (clean(input.protectedName.split(/\s+/)[0] ?? '') || 'Payment').slice(0, 20).trimEnd();
@@ -80,8 +82,9 @@ export function paymentAuthorizationDetails(payment: PaymentDetails) {
     instruction: 'Approve or deny this held payment.',
     properties: {
       amount: shown(1, 'Amount (USD)', formatCents(payment.amountCents)),
-      payee: shown(2, 'Payee', payment.payee),
-      reason: shown(3, 'Why it paused', payment.reasons.join('; ').slice(0, 255)),
+      // Same charset as the binding message, and capped: these come from the phone.
+      payee: shown(2, 'Payee', clean(payment.payee).slice(0, MAX_BINDING_MESSAGE).trimEnd() || 'unknown payee'),
+      reason: shown(3, 'Why it paused', clean(payment.reasons.join(', ')).slice(0, 200).trimEnd()),
       ...((payment.approvalsRequired ?? 1) > 1
         ? { approvals: shown(4, 'Approvals needed', `${payment.approvalsRequired} family approvers`) }
         : {}),
@@ -131,6 +134,8 @@ export type CibaClientOptions = {
    * user-delegated access to the API and the details type registered there.
    */
   richAuthorizationDetails?: boolean;
+  /** AUTH0_RBAC: an API access token without a `permissions` claim grants nothing. */
+  requirePermissionsClaim?: boolean;
   fetch?: FetchLike;
   /** Key set for verifying ID tokens. Defaults to the tenant's published keys. */
   keys?: JWTVerifyGetKey;
@@ -177,7 +182,10 @@ export function createCibaClient(options: CibaClientOptions) {
       // A 400 sends no push. If the tenant refused the audience or details
       // (app not granted, type not registered), the binding message alone
       // still works. ponytail: retries on any 400; Auth0 does not document these texts.
-      if (rich && result.status === 400) result = await send(false);
+      if (rich && result.status === 400) {
+        console.warn(`[ciba] bc-authorize refused audience/details (${String(result.body.error ?? 'no code')}); retrying without`);
+        result = await send(false);
+      }
     } catch {
       throw new CibaError('Could not reach Auth0', null);
     }
@@ -254,20 +262,29 @@ export function createCibaClient(options: CibaClientOptions) {
   }
 
   /**
-   * The `permissions` claim of a verified access token for our API, or
-   * undefined when there is none to read (no audience, opaque token, RBAC
-   * off). Undefined means "not checked here"; the circle role still applies.
+   * The `permissions` claim of the access token for our API. Undefined only
+   * when no such token came back (no audience sent, or the plain retry): then
+   * the circle role decides. A token for our API fails closed: one that does
+   * not verify or names someone else yields no permissions.
    */
   async function accessTokenPermissions(token: unknown, sub: string): Promise<string[] | undefined> {
     if (!options.audience || typeof token !== 'string') return undefined;
+    let aud: unknown;
+    try {
+      aud = decodeJwt(token).aud;
+    } catch {
+      return undefined; // opaque: Auth0 issued no API token
+    }
+    if (aud !== options.audience && !(Array.isArray(aud) && aud.includes(options.audience))) return undefined;
     try {
       const { payload } = await jwtVerify(token, keys, { issuer, audience: options.audience, algorithms: ['RS256'] });
       const claim = payload.permissions;
-      if (payload.sub !== sub || claim === undefined) return undefined;
+      if (payload.sub !== sub) return [];
+      if (claim === undefined) return options.requirePermissionsClaim ? [] : undefined;
       // A malformed claim must not read as "no claim": it yields no permissions.
       return Array.isArray(claim) ? claim.filter((p): p is string => typeof p === 'string') : [];
     } catch {
-      return undefined;
+      return [];
     }
   }
 
