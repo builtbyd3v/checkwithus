@@ -302,6 +302,8 @@ export type NessieRecord = {
   date: string;
   amountCents: Cents;
   description: string;
+  /** Purchase description or bill nickname, including a seed or payment tag. */
+  reference: string;
   paymentId: string | null;
   merchantId: string | null;
 };
@@ -313,6 +315,7 @@ export function fromPurchase(p: z.infer<typeof purchaseSchema>): NessieRecord {
     date: p.purchase_date,
     amountCents: fromNessieDollars(p.amount),
     description: p.description ?? '',
+    reference: p.description ?? '',
     paymentId: paymentIdFromDescription(p.description),
     merchantId: p.merchant_id,
   };
@@ -328,6 +331,7 @@ export function fromMovement(
     date: m.transaction_date,
     amountCents: fromNessieDollars(m.amount),
     description: m.description ?? '',
+    reference: m.description ?? '',
     paymentId: paymentIdFromDescription(m.description),
     merchantId: null,
   };
@@ -340,6 +344,7 @@ export function fromBill(b: z.infer<typeof billSchema>): NessieRecord {
     date: b.payment_date,
     amountCents: fromNessieDollars(b.payment_amount),
     description: b.payee,
+    reference: b.nickname ?? '',
     paymentId: paymentIdFromDescription(b.nickname),
     merchantId: null,
   };
