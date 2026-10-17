@@ -17,3 +17,88 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
+
+/* Landing page: "quiet bank-grade trust" tokens and motion. Prefixed m- so they collide with nothing. */
+@theme {
+  --color-m-night: #171721;
+  --color-m-night-raised: #1e1e2a;
+  --color-m-night-high: #272734;
+  --color-m-ink: #28253b;
+  --color-m-ink-2: #4f4972;
+  --color-m-on-dark: #ededf3;
+  --color-m-fog: #c3c3cc;
+  --color-m-canvas: #fbfcfd;
+  --color-m-surface: #ffffff;
+  --color-m-lavender: #edecfb;
+  --color-m-mist: #f3f3f9;
+  --color-m-lavender-deep: #e2e0f7;
+  --color-m-indigo: #5266eb;
+  --color-m-indigo-press: #4356d6;
+  --color-m-periwinkle: #9cb4e8;
+  --color-m-hold: #8a5a00;
+  --color-m-hold-bg: #fdf3dc;
+  --color-m-safe: #1d6b45;
+  --color-m-safe-bg: #e3f4ea;
+  --color-m-stop: #a3253a;
+  --color-m-stop-bg: #fbe8eb;
+  --ease-m: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@theme inline {
+  --font-m: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+@keyframes m-in {
+  from { opacity: 0; transform: translate3d(0, 22px, 0) scale(0.985); }
+}
+@keyframes m-out {
+  from { opacity: 1; visibility: visible; }
+  to { opacity: 0; visibility: hidden; }
+}
+@keyframes m-swap {
+  from { opacity: 0; visibility: hidden; transform: translate3d(0, 10px, 0); }
+}
+@keyframes m-tap {
+  0%, 100% { transform: scale(1); }
+  45% { transform: scale(0.93); }
+}
+@keyframes m-drift {
+  from { transform: translate3d(-4%, 0, 0) scale(1); }
+  to { transform: translate3d(4%, 3%, 0) scale(1.08); }
+}
+
+/* Hero states play once, as a real interface would. Without motion the final state shows. */
+@utility m-in { animation: m-in 900ms var(--ease-m) both; }
+@utility m-out { opacity: 0; visibility: hidden; animation: m-out 360ms var(--ease-m) both; }
+@utility m-swap { animation: m-swap 600ms var(--ease-m) both; }
+@utility m-tap { animation: m-tap 320ms var(--ease-m) both; }
+@utility m-drift { animation: m-drift 16s ease-in-out infinite alternate; }
+
+/* Scroll entrances: hidden only once the observer is running (data-m-reveal on <html>), so no script means no hidden content. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-m-reveal] [data-reveal] {
+    transition: opacity 700ms var(--ease-m), transform 900ms var(--ease-m);
+    transition-delay: var(--d, 0ms);
+  }
+  [data-m-reveal] [data-reveal]:not(.is-in) { opacity: 0; transform: translate3d(0, 24px, 0); }
+  [data-m-reveal] [data-reveal='scale']:not(.is-in) { transform: translate3d(0, 16px, 0) scale(0.96); }
+  [data-m-reveal] [data-reveal='side']:not(.is-in) { transform: translate3d(-20px, 0, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .m-in, .m-out, .m-swap, .m-tap, .m-drift { animation: none; }
+}
+
+/* The landing page opens and closes in night, so overscroll matches. */
+body:has(.m-landing) { background: var(--color-m-night); }
+
+/* The hero's product cards drift up a little as the page scrolls, where the browser supports scroll timelines. */
+@keyframes m-lift {
+  from { transform: translate3d(0, 40px, 0); }
+  to { transform: translate3d(0, -40px, 0); }
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .m-lift { animation: m-lift linear both; animation-timeline: view(); }
+  }
+}
