@@ -7,13 +7,14 @@
  * `{ objectCreated: { _id } }`, amounts are stored as sent, and lists answer
  * 200 []. `failNext` simulates the failures payments must survive.
  */
-type Stored = { kind: 'purchases' | 'withdrawals' | 'deposits' | 'bills'; accountId: string; body: Record<string, unknown> & { _id: string } };
+type Stored = { kind: 'purchases' | 'withdrawals' | 'deposits' | 'bills' | 'transfers'; accountId: string; body: Record<string, unknown> & { _id: string } };
 
 export type FakeNessie = ReturnType<typeof createFakeNessie>;
 
 export function createFakeNessie() {
   let nextId = 1;
   const merchants: Array<Record<string, unknown> & { _id: string }> = [];
+  const accounts: Array<Record<string, unknown> & { _id: string; customer_id: string }> = [];
   const records: Stored[] = [];
   const calls: Array<{ method: string; path: string; body: unknown }> = [];
   /**
@@ -50,7 +51,20 @@ export function createFakeNessie() {
       return json(201, { code: 201, message: 'Merchant created', objectCreated: merchant });
     }
 
-    const accountRoute = pathname.match(/^\/accounts\/([^/]+)\/(purchases|withdrawals|deposits|bills)$/);
+    const customerAccounts = pathname.match(/^\/customers\/([^/]+)\/accounts$/);
+    if (customerAccounts) {
+      const customerId = customerAccounts[1]!;
+      if (method === 'POST') {
+        // Account ids are unique columns in our database, so never reuse one across fakes.
+        const account = { ...body, _id: `fake-account-${crypto.randomUUID()}`, customer_id: customerId };
+        if (failure?.mode !== 'lostThen500') accounts.push(account);
+        if (failure) return json(500, { message: 'Internal server error' });
+        return json(201, { code: 201, message: 'Account created', objectCreated: account });
+      }
+      return json(200, accounts.filter((a) => a.customer_id === customerId));
+    }
+
+    const accountRoute = pathname.match(/^\/accounts\/([^/]+)\/(purchases|withdrawals|deposits|bills|transfers)$/);
     if (accountRoute) {
       const [, accountId, kind] = accountRoute as [string, string, Stored['kind']];
       if (method === 'GET' && listHook) {
@@ -78,6 +92,7 @@ export function createFakeNessie() {
     fetch,
     calls,
     records,
+    accounts,
     /** Writes that reached the fake (not merchant creation). */
     paymentWrites: () =>
       calls.filter((c) => c.method === 'POST' && c.path !== '/merchants'),

@@ -32,6 +32,9 @@ All paths below are relative to the base URL.
 | `GET /family/payments?status=held` | Family | Pending payments, independently of recent completed payments |
 | `GET /family/payments/:id` | Family | Payment detail, Guardian polling and interrupted-send recovery |
 | `POST /family/payments/:id/decision` | Family | `{decision: "approve" \| "deny"}`; CIBA mode accepts denial only |
+| `POST /family/circles/:id/freeze` | Family (approver) | `{}` -> `{frozen: true, movedCents}`: spending balance to the vault |
+| `POST /family/circles/:id/unfreeze` | Family (approver, fresh login) | `{amountCents}` -> `{frozen: false, movedCents}`: that amount back |
+| `GET /family/circles/:id/balance` | Family | Ledger balance (vault excluded) and `frozen` |
 
 Health endpoint: `GET https://checkwith.us/api/health`.
 
@@ -70,7 +73,7 @@ In CIBA mode an API approval returns `403 approve_in_guardian`. The member must 
 
 ## Demo setup and boundaries
 
-Run `npm run db:migrate` and `npm run seed:demo` from `web/` with local environment variables configured. The seed creates synthetic Rosa data, known payees, historical spending, and an invite. Sign in, join with that invite, then generate a pairing code in the dashboard for the iPhone.
+Run `npm run db:migrate` and `npm run seed:demo` from `web/` with local environment variables configured. The seed creates synthetic Rosa data, known payees, historical spending, the Freeze vault account, and an invite. Sign in, join with that invite, then generate a pairing code in the dashboard for the iPhone.
 
 `npm run check:nessie` reads the synthetic account on both supported Nessie hosts. Add `-- --write` to verify one $1 utility payment per host through the normal rules and ledger. Fixed idempotency keys make repeat checks read the same payments rather than resend. The check prints statuses and synthetic balance amounts, never API keys. Both hosts were verified on October 17, 2026. Nessie's reported account balance did not change after those payments, so it is not currently an authoritative spendable balance; payment accounting remains in Tiger Data.
 
@@ -135,22 +138,41 @@ The details contain amount, payee and hold reasons, never message/bill contents.
 Tenant RAR configuration and real Guardian display/approval have not been verified;
 the family test account is not enrolled yet. Automated tests use a fake Auth0.
 
-### Nessie transfer blocker (#13, #18)
+### Freeze (#18) and Nessie transfers
 
-Live probes on October 17 found `GET /accounts/:id/transfers` returns 404 on both
-supported hosts for our existing synthetic account. Empty POSTs reach a
-`TransferCreate` validator requiring transaction_date/status/amount/description.
-A validation-only request with an intentionally invalid amount confirmed both
-`medium` and `payee_id` are rejected as extra fields. No transfer was created.
-The [published spec](https://prod.nessieisreal.com/nessie-openapi-spec.yaml) also
-does not describe a destination-bearing account transfer creation contract.
-Reported account balances remain unchanged after real purchases/bills.
+Freeze is implemented. One tap sets the circle frozen, then moves the spendable
+ledger balance (whole dollars, less approved or sending payments) to a vault
+account with one Nessie transfer. The vault is a Savings account created on the
+first freeze. Every new payment is then held with "Your family froze spending",
+and approving an already held payment answers `409 frozen` ("Spending is frozen.
+Unfreeze first."); denying still works. A retry of a tap moves nothing and returns
+the first answer. Unfreeze needs an approver with a fresh login (`403
+step_up_required` otherwise), returns `409 not_enough_in_vault` over the vault total,
+`409 freeze_in_progress` while a freeze sent in the last 30 seconds is unconfirmed,
+and `422 whole_dollars_only` for cents. Viewers get `403`. The vault total is our
+Tiger Data ledger (`vault_transfers`), like spending.
 
-Freeze, unfreeze, family top-up, person transfers and benefit/vault refills need
-an agreed accounting contract: a Tiger Data account ledger with Nessie transfer
-records, or a sponsor-supported destination transfer endpoint. They are not
-implemented or claimed complete.
-Latest shared main (`2471aaa`) was fetched and merged; it contains no transfer fix.
+Nessie transfer quirks, verified live on October 17 (a synthetic probe customer froze
+$1,000 from an account Nessie stores at $50 into a vault opened at $0, then unfroze $400):
+
+- `POST /accounts/:id/transfers` accepts exactly `transaction_date`, `status`,
+  `amount`, `description`. `medium` and `payee_id` are rejected, so a transfer
+  cannot name its destination. Our description names it, with a `[cw:<id>]` tag.
+- Amounts with cents are truncated to whole dollars, like purchases.
+- Nessie does not check or change stored balances: the $1,000 transfer from a $50
+  account was accepted, and both stored balances stayed the same.
+- `GET /accounts/:id/transfers` answers `404 "No transfers found"` when empty,
+  not `200 []`, and lists rows with `id` instead of `_id`.
+- A transfer whose outcome is unknown (timeout or 5xx) is not retried or looked up;
+  it stays `sending` and counts as moved.
+
+### Scam sequence (#17)
+
+A gift card bought within two hours of ATM cash (boundary included) is held with
+"Cash at an ATM, then a gift card. Scammers often ask for this." Nessie
+withdrawals carry no time and no ATM, so ATM cash enters the ledger with
+`spending.atm_id`. For demo step 4 run `npm run demo:atm` right before showing it:
+it records one $200 withdrawal at a Nessie ATM now.
 
 Bill requests accept optional `billDueDate` (`YYYY-MM-DD`, billers only). Migration
 012 stores it and retries must preserve it. The payment is made now, including

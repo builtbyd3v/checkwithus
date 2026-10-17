@@ -13,6 +13,7 @@
     "test": "vitest run",
     "db:migrate": "node --env-file=.env.local scripts/migrate.mjs",
     "seed:demo": "node --env-file=.env.local --conditions=react-server --import tsx scripts/seed-demo.ts",
+    "demo:atm": "node --env-file=.env.local --conditions=react-server --import tsx scripts/demo-atm.ts",
     "test:db": "vitest run --config vitest.int.config.mts",
     "check:auth0": "node --env-file=.env.local scripts/check-auth0.mjs",
     "bench:perf": "node --import tsx scripts/perf-bench.ts"

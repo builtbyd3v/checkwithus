@@ -1,6 +1,7 @@
 /** Synthetic Rosa demo. Run once with `npm run seed:demo`; safe to rerun. */
 import pg from 'pg';
 import { dbEnv, nessieEnv } from '@/lib/env';
+import { ensureVaultAccount } from '@/lib/vault';
 import { issueInviteCode } from '@/lib/invites';
 import { toCents } from '@/lib/money';
 import { normalizeName } from '@/lib/names';
@@ -64,6 +65,8 @@ async function main() {
       [customerId, accountId, OPENING_CENTS],
     );
     const circleId = circles[0]!.id;
+    // The Freeze vault (#18). Found by nickname at Nessie, so a rerun reuses it.
+    const vaultId = await ensureVaultAccount(pool, nessie, circleId);
     for (const payee of [
       { name: 'City Power & Light', kind: 'biller', category: 'utilities' },
       ...MERCHANTS.slice(0, 2).map(({ name, category }) => ({ name, kind: 'merchant', category })),
@@ -180,6 +183,7 @@ async function main() {
     const invite = !inviteIsValid || rotate ? await issueInviteCode(pool, circleId) : null;
     console.log(`Demo circle ${circleId}; Nessie customer ${customerId}; account ${accountId}`);
     console.log(`Nessie records created: ${created}; Tiger Data ledger rows added: ${ledgerAdded}`);
+    console.log(`Freeze vault account ${vaultId}. Run npm run demo:atm right before demo step 4.`);
     if (invite) console.log(`Family invite code: ${invite.code} (expires ${invite.expiresAt})`);
     else console.log('Existing family invite remains valid; use --rotate-invite to show a fresh one.');
   } finally {

@@ -253,7 +253,8 @@ export function createCibaApprovals(deps: CibaApprovalsDeps) {
       await deps.payments().decidePayment({ paymentId, member: { memberId }, decision, via: 'ciba' });
     } catch (error) {
       // Someone else answered first, or the deadline passed: their outcome stands.
-      if (error instanceof PaymentError && (error.code === 'already_decided' || error.code === 'expired')) {
+      // A Guardian approval while frozen is refused; the hold runs out and blocks.
+      if (error instanceof PaymentError && (error.code === 'already_decided' || error.code === 'expired' || error.code === 'frozen')) {
         return;
       }
       throw error;

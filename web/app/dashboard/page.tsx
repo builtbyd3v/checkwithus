@@ -6,13 +6,14 @@ import { auth0 } from '@/lib/auth0/web';
 import { CATEGORY_LABELS, type Category } from '@/lib/categories';
 import { db } from '@/lib/db';
 import { familyPayments, memberships } from '@/lib/family';
+import { VAULT_CENTS_SQL } from '@/lib/vault';
 import { formatCents, toCents } from '@/lib/money';
 import { weeklySpending } from '@/lib/spending';
 import { cibaApprovals, payments } from '@/lib/services';
-import { Countdown, JoinForm, SettingsForms } from './controls';
+import { Countdown, FreezeControl, JoinForm, SettingsForms } from './controls';
 
 type SpendRow = { day: Date; category: Category; total_cents: string };
-type CircleRow = { hold_over_cents: string; protected_name: string };
+type CircleRow = { hold_over_cents: string; protected_name: string; frozen: boolean; vault_cents: number };
 type MemberRow = { id: string; display_name: string };
 type PayeeRow = { id: string; name: string; kind: string; category: Category };
 const money = (cents: bigint | number | string) => formatCents(toCents(Number(cents)));
@@ -49,7 +50,8 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
         order by day`, [active.circleId],
     ),
     weeklySpending(db(), active.circleId),
-    db().query<CircleRow>('select protected_name, hold_over_cents::text from circles where id = $1', [active.circleId]),
+    db().query<CircleRow>(`select protected_name, hold_over_cents::text, frozen, ${VAULT_CENTS_SQL} as vault_cents
+      from circles c where c.id = $1`, [active.circleId]),
     db().query<MemberRow>('select id, display_name from circle_members where circle_id = $1 order by created_at', [active.circleId]),
     db().query<PayeeRow>('select id, name, kind, category from payees where circle_id = $1 order by name', [active.circleId]),
   ]);
@@ -85,6 +87,8 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
             className={`rounded-full border px-4 py-2 text-sm font-medium ${item.circleId === active.circleId ? 'border-teal-800 bg-teal-800 text-white' : 'border-stone-300 bg-white text-stone-700'}`}>{item.protectedName}</Link>)}</div>}
       </section>
 
+      {active.role === 'approver' && <FreezeControl circleId={active.circleId} frozen={circle.frozen} firstName={circle.protected_name.split(' ')[0]!}
+        vaultLabel={money(circle.vault_cents)} vaultDollars={String(Math.floor(circle.vault_cents / 100))} />}
       <section aria-labelledby="attention-title" className="rounded-2xl border border-teal-900/15 bg-[#e6f0eb] p-5 sm:p-7">
         <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-bold uppercase tracking-widest text-teal-800">Needs attention</p>
           <h2 id="attention-title" className="mt-1 text-2xl font-semibold">{held.length ? `${held.length} payment${held.length === 1 ? '' : 's'} waiting` : 'All clear right now'}</h2></div>
