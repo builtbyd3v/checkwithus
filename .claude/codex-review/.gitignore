@@ -1,0 +1,4 @@
+# Local review state - per-machine, not shared
+.last-review
+DISABLED
+logs/
