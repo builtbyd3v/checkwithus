@@ -36,7 +36,7 @@ checkwith.us is one iPhone app with two roles, plus a web dashboard.
 - **Family circle:** approvers and viewers. Over $1,000 (default), two approvers must say yes; one no stops it.
 - **Freeze:** one tap moves the whole spending balance to a vault account.
 - **Top up:** an approver adds money from their own account (API built; no phone screen yet).
-- **Alerts and context:** "Ask my family" and bank alerts in a list, and "About 8x Rosa's usual at this store" next to a held payment.
+- **Alerts and context:** "Ask my family" and bank alerts in a list, and "About Nx Rosa's usual" (from her history at that payee) next to a held payment.
 - **Allowances:** a scoped, expiring "yes in advance", for example utilities up to $400 until Nov 30. It lifts only the amount limits for a known payee, never a scam hold.
 
 **Three hard rules:** AI suggests, code decides money. Money is integer cents everywhere. The older adult's texts and bills never go to a cloud AI model.

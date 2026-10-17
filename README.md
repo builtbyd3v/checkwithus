@@ -215,7 +215,7 @@ license. Required by Devpost rule 10 and [`docs/RULES.md`](docs/RULES.md).
 | [Auth0](https://auth0.com/) | Family login, API tokens, roles, optional RBAC; CIBA Guardian push implemented, off by default | Auth0 free plan, developer terms |
 | [Tiger Data / Tiger Cloud](https://www.tigerdata.com/) | Spending hypertable, compression, continuous aggregates | Tiger Cloud trial; TimescaleDB |
 | [Vercel](https://vercel.com/) | Hosting for `web/` | Vercel Hobby terms |
-| [GoDaddy Registry](https://registry.godaddy/) | `checkwith.us` domain | Registered with the MLH hackathon offer |
+| [GoDaddy Registry](https://registry.godaddy/) | `checkwith.us` domain (.us registry) | TODO(Dev): confirm the MLH code was used (whois registrar: Porkbun) |
 
 ### `web/` dependencies
 

@@ -76,7 +76,7 @@ export function decideHold(input: {
 }
 ```
 
-(This is the version from [PR #32](https://github.com/builtbyd3v/checkwithus/pull/32), which adds Freeze and the "cash then gift card" sequence. TODO(Dev): if #32 is not merged when you publish, use the version on `main` instead.)
+(This version includes Freeze and the "cash then gift card" sequence from PR #32. TODO(Dev): check it still matches `web/lib/rules.ts` on `main` when you publish.)
 
 A fooled, broken or tampered model can make the system more careful, never less. Every reason has a plain-words label the family reads on their phone, like "Paid while on a phone call". "The AI said so" is not a reason a family member can check.
 
@@ -120,7 +120,7 @@ Compression took the table from 163.3 MB to 50.3 MB (3.2x smaller). To be fair t
 
 ## What surprised us
 
-- **Nessie is a sandbox, with sandbox quirks.** The reported account balance does not change after payments, so Tiger Data keeps our ledger. All of Nessie's bank and ATM locations are near Washington, DC, so our "at a bank during a phone call" alert needed a debug "make this spot a test bank" button for a demo in Gainesville.
+- **Nessie is a sandbox, with sandbox quirks.** The reported account balance does not change after payments, so Tiger Data keeps our ledger. All of Nessie's bank and ATM locations are near Washington, DC, so for a demo in Gainesville our server adds demo bank locations from an environment variable, and debug builds have a "make this spot a test bank" button.
 - **iOS has opinions.** Once a sender's text went to Spam, iOS stopped calling our filter for that sender, even for a legit text.
 - **Review agents earn their keep.** We built with Claude Code and ran Codex as a read-only reviewer at the end of each turn. It found the data leaks above and real bugs in the payment flow, such as a retry that sent a new request instead of the same one, and a race in the exactly-once path. Every finding was checked against the code before a fix.
 
