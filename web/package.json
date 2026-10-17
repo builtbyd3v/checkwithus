@@ -14,7 +14,8 @@
     "db:migrate": "node --env-file=.env.local scripts/migrate.mjs",
     "seed:demo": "node --env-file=.env.local --conditions=react-server --import tsx scripts/seed-demo.ts",
     "test:db": "vitest run --config vitest.int.config.mts",
-    "check:auth0": "node --env-file=.env.local scripts/check-auth0.mjs"
+    "check:auth0": "node --env-file=.env.local scripts/check-auth0.mjs",
+    "bench:perf": "node --import tsx scripts/perf-bench.ts"
   },
   "dependencies": {
     "@auth0/nextjs-auth0": "^4.32.1",

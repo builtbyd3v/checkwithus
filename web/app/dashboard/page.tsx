@@ -7,6 +7,7 @@ import { CATEGORY_LABELS, type Category } from '@/lib/categories';
 import { db } from '@/lib/db';
 import { familyPayments, memberships } from '@/lib/family';
 import { formatCents, toCents } from '@/lib/money';
+import { weeklySpending } from '@/lib/spending';
 import { cibaApprovals, payments } from '@/lib/services';
 import { Countdown, JoinForm, SettingsForms } from './controls';
 
@@ -38,7 +39,7 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
   const requested = (await searchParams).circle;
   const active = circles.find((circle) => circle.circleId === requested) ?? circles[0]!;
   await cibaApprovals()?.pollCircles([active.circleId]);
-  const [recent, held, spendResult, circleResult, memberResult, payeeResult] = await Promise.all([
+  const [recent, held, spendResult, weekResult, circleResult, memberResult, payeeResult] = await Promise.all([
     familyPayments(db(), payments(), session.user.sub, { heldOnly: false, circleId: active.circleId }),
     // Query holds independently: newer completed payments must not hide them.
     familyPayments(db(), payments(), session.user.sub, { heldOnly: true, circleId: active.circleId }),
@@ -47,6 +48,7 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
          from spending_daily where circle_id = $1 and day >= now() - interval '90 days'
         order by day`, [active.circleId],
     ),
+    weeklySpending(db(), active.circleId),
     db().query<CircleRow>('select protected_name, hold_over_cents::text from circles where id = $1', [active.circleId]),
     db().query<MemberRow>('select id, display_name from circle_members where circle_id = $1 order by created_at', [active.circleId]),
     db().query<PayeeRow>('select id, name, kind, category from payees where circle_id = $1 order by name', [active.circleId]),
@@ -55,10 +57,10 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
   const categories = new Map<Category, bigint>();
   const weeks = Array<bigint>(13).fill(0n);
   for (const row of spendResult.rows) {
-    const cents = BigInt(row.total_cents);
-    categories.set(row.category, (categories.get(row.category) ?? 0n) + cents);
-    const age = Math.floor((Date.now() - row.day.getTime()) / (7 * 86_400_000));
-    if (age >= 0 && age < weeks.length) weeks[12 - age] += cents;
+    categories.set(row.category, (categories.get(row.category) ?? 0n) + BigInt(row.total_cents));
+  }
+  for (const row of weekResult) {
+    if (row.weeks_ago >= 0 && row.weeks_ago < weeks.length) weeks[12 - row.weeks_ago] = BigInt(row.total_cents);
   }
   const total = [...categories.values()].reduce((sum, cents) => sum + cents, 0n);
   const categoryRows = [...categories].sort((a, b) => a[1] > b[1] ? -1 : a[1] < b[1] ? 1 : 0);

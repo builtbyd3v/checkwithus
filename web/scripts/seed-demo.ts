@@ -165,6 +165,15 @@ async function main() {
       `call refresh_continuous_aggregate('spending_daily',
          now() - interval '91 days', now() - interval '1 hour')`,
     );
+    // spending_weekly rolls up spending_daily, so it refreshes after it.
+    await pool.query(
+      `call refresh_continuous_aggregate('spending_weekly',
+         now() - interval '98 days', now() - interval '1 hour')`,
+    );
+    await pool.query(
+      `call refresh_continuous_aggregate('spending_payee_daily',
+         now() - interval '91 days', now() - interval '1 hour')`,
+    );
 
     const inviteIsValid = circles[0]!.invite_expires_at && circles[0]!.invite_expires_at > new Date();
     const rotate = process.argv.includes('--rotate-invite');
