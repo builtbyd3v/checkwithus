@@ -11,7 +11,11 @@ import SwiftUI
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { model.keepPollingInBackground() }
-            if phase == .active { Task { await model.watch() } }
+            if phase == .active {
+                // resume() picks up a held payment that an offline launch could not load.
+                Task { await model.resume(); await model.watch() }
+                Task { await model.installScamNumbers() }
+            }
         }
     }
 }

@@ -34,3 +34,6 @@ DerivedData/
 .DS_Store
 .vercel
 ios/CheckWithUs/MessageFilter/GuardInt8.mlpackage/
+
+# Demo scammer phone number (a real number, so never committed)
+ios/CheckWithUs/CheckWithUs/scam-numbers.local.json

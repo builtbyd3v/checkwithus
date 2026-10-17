@@ -26,9 +26,9 @@ struct API {
         let family: [Member]
     }
 
-    struct PaymentRequest: Encodable {
-        struct Payee: Encodable { let name: String; let kind: String }
-        struct GuardScore: Encodable { let score: Float; let modelVersion: String }
+    struct PaymentRequest: Codable {
+        struct Payee: Codable { let name: String; let kind: String }
+        struct GuardScore: Codable { let score: Float; let modelVersion: String }
         let idempotencyKey: String
         let amountCents: Int
         let payee: Payee

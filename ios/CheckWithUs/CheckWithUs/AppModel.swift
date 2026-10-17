@@ -3,6 +3,7 @@ import CallKit
 import GuardKit
 import SwiftUI
 import UIKit
+import os
 
 /// Someone the older adult can pay. Names match the demo seed's known payees (web/scripts/seed-demo.ts).
 struct Payee: Hashable, Identifiable {
@@ -35,14 +36,20 @@ enum Screen: Equatable {
 
     private let calls = CXCallObserver()
     /// One request per payment attempt, resent unchanged when retrying it, so the idempotency key always
-    /// matches the same body (web/INTEGRATION.md).
-    private var attempt: API.PaymentRequest?
+    /// matches the same body (web/INTEGRATION.md). Saved until the server answers, so a restart after a lost
+    /// response resends the same key instead of paying twice.
+    @ObservationIgnored private var attempt = UserDefaults.standard.data(forKey: AppModel.attemptKey)
+        .flatMap { try? JSONDecoder().decode(API.PaymentRequest.self, from: $0) } {
+        didSet { UserDefaults.standard.set(attempt.flatMap { try? JSONEncoder().encode($0) }, forKey: Self.attemptKey) }
+    }
+    private static let attemptKey = "paymentAttempt"
     /// The held payment survives an app restart, so polling and the lock-screen card pick up again.
     private static let watchedKey = "watchedPaymentID"
     private var activity: Activity<PaymentActivity>?
     private var watching = false
     private var backgroundTask = UIBackgroundTaskIdentifier.invalid
     private static let guardModel = try? Guard(scorer: NGramScorer())
+    private static let log = Logger(subsystem: "us.checkwith.app", category: "App")
 
     var isOnCall: Bool { calls.calls.contains { !$0.hasEnded } }
 
@@ -64,7 +71,10 @@ enum Screen: Equatable {
 
     func go(_ next: Screen) {
         error = nil
-        if case .confirm = next { attempt = nil }
+        // Confirming the same payee and amount again is a retry of the unanswered attempt, not a new payment.
+        if case let .confirm(payee, cents) = next, attempt?.payee.name != payee.name || attempt?.amountCents != cents {
+            attempt = nil
+        }
         screen = next
     }
 
@@ -75,6 +85,31 @@ enum Screen: Equatable {
             self.token = token
             await self.loadConfig()
         }
+    }
+
+    /// The Call Directory extension is off until someone turns it on in Settings.
+    var callLabelsOff = false
+
+    /// Writes the scam-number list for the Call Directory extension and asks iOS to reload it.
+    /// ponytail: scam-numbers.json holds fictional 555-01xx numbers; the demo phone's number goes in the
+    /// gitignored scam-numbers.local.json. A real feed (for example FTC complaint data) would replace both.
+    func installScamNumbers() async {
+        let lists = ["scam-numbers", "scam-numbers.local"].compactMap { Bundle.main.url(forResource: $0, withExtension: "json") }
+        let numbers = lists.flatMap { (try? JSONDecoder().decode([String].self, from: Data(contentsOf: $0))) ?? [] }
+        let directory = CXCallDirectoryManager.sharedInstance
+        do {
+            try ScamNumbers.write(numbers)
+            callLabelsOff = try await directory.enabledStatusForExtension(withIdentifier: ScamNumbers.extensionID) != .enabled
+            if !callLabelsOff { try await directory.reloadExtension(withIdentifier: ScamNumbers.extensionID) }
+        } catch {
+            // Disabled, not yet registered, or unsupported: offer the Settings link rather than hide the problem.
+            callLabelsOff = true
+            Self.log.error("Call Directory: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    func openCallSettings() {
+        CXCallDirectoryManager.sharedInstance.openSettings { _ in }
     }
 
     func loadConfig() async {
@@ -92,6 +127,11 @@ enum Screen: Equatable {
 
     func pay(_ payee: Payee, cents: Int) async {
         guard let token else { return }
+        // One held payment at a time: only the watched payment is polled, and polling is what hears the family.
+        if let held = payment, !held.isSettled { go(.status); return }
+        // A call that started since the first try must reach the server. A duplicate this causes is held for the
+        // family, while a stale "not on a call" could skip them.
+        if attempt?.onCall == false, isOnCall { attempt = nil }
         // ponytail: the Guard scores the payment's own words (payee + category). There is no text here to read;
         // the server treats the score as advisory and its fixed rules decide.
         let verdict = try? Self.guardModel?.check("\(payee.name) \(payee.category.replacingOccurrences(of: "_", with: " "))")
@@ -102,6 +142,7 @@ enum Screen: Equatable {
         attempt = request
         await run {
             let payment = try await API.pay(request, token: token)
+            self.attempt = nil
             self.payment = payment
             self.go(.status)
             if !payment.isSettled {
