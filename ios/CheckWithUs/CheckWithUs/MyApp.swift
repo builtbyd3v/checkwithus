@@ -6,7 +6,7 @@ import SwiftUI
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
                 .environment(model)
         }
         .onChange(of: scenePhase) { _, phase in
