@@ -6,6 +6,31 @@ in this repo; `CLAUDE.md` just points here.
 Built for SwampHacks. Speed over polish — prefer a working implementation over a
 clean abstraction unless someone asks for the abstraction.
 
+## What we build
+
+checkwith.us protects older adults from scams with zero effort from them. Family
+members approve risky payments with Face ID. All scam detection runs on the phone.
+
+- **Older adult iPhone app:** Message Filter extension (on-device scam model screens
+  texts), Call Directory extension ("Possible scam" labels), payment holds,
+  bank-while-on-a-call alert, Screen Time app lock, one big "Ask my family" button,
+  lock-screen card.
+- **Family iPhone app:** Auth0 CIBA push, approve or deny with Face ID, family circle
+  (up to 3 people, first answer decides, no answer in 5 minutes = blocked).
+- **Backend:** Next.js on Vercel. Capital One Nessie (accounts, payments), Auth0
+  (approvals), Tiger Data (spending history, dashboard).
+- **On-device AI:** Guard = rules + fine-tuned DistilBERT (Core ML). checkwith-1 =
+  fine-tuned Qwen3.5-2B (MLX Swift). Family decisions retrain the Guard.
+
+## Hard rules (never break these)
+
+1. **AI suggests, code decides money.** No model output moves money directly. Every
+   payment passes fixed rules and, when held, family approval.
+2. **Money is integer cents everywhere.** Nessie only accepts whole numbers. Convert
+   dollars at the edge with one helper. Never use floats for money.
+3. **Never send the older adult's texts or bills to a cloud AI model.** Scam
+   detection runs on the phone.
+
 ## Before you start: read the live state
 
 This file goes stale. The repo does not. Always begin by checking what has actually
@@ -53,16 +78,42 @@ up on Haadi's branch only — adopt it on yours if you want the same safety net.
 
 ## Stack
 
-> **TODO — not decided yet.** Fill this in as soon as the first real code lands.
-> Include: language and framework, how to install deps, how to run the app
-> locally, how to run tests, and any required env vars (names only — never commit
-> secrets).
+```
+ios/        Xcode project: older adult app, family app, extensions
+web/        Next.js backend + family dashboard (deployed to Vercel)
+ml/         datasets, training, eval scripts, exported models
+docs/       Devpost write-up, demo script, research
+```
+
+- **Web:** Next.js App Router, TypeScript strict, Tailwind only, npm (never npx; use
+  `npm exec --`). Server Components by default. Validate input at route handlers and
+  server actions. No `any`. Node.js runtime on Vercel, never `runtime = 'edge'`.
+- **iOS:** Swift, SwiftUI. Builds are signed with Dev's Apple Developer account, so
+  iOS changes go through a PR and Dev builds them to devices.
+- **ML:** Python 3.12 in `ml/`, pinned versions in `ml/requirements.txt`. Every
+  trained model gets a row in the eval table in `README.md`.
+- **Older adult screens:** large text (Dynamic Type), big tap targets, plain words,
+  one action per screen.
+- **Env vars (names only):** `NESSIE_API_KEY`, `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`,
+  `AUTH0_CLIENT_SECRET`, Tiger Data connection string (name TBD). Keep them in
+  `.env.local`; list names in `.env.example`.
+
+Done-checks before calling a task done:
+
+```bash
+cd web && npm run typecheck && npm run build   # web
+cd ml && python eval.py                          # ml: prints scores (script name TBD)
+# ios: the app builds and the feature works on a real iPhone
+```
 
 ## Ownership
 
-> **TODO — fill in once work is split.** One line per person: name, branch, and
-> the directories or features they own, so agents know whose area they are
-> touching and whose PR to read first.
+| Person | Branch | Owns |
+| --- | --- | --- |
+| Dev (builtbyd3v) | `dev` | Lead. All ML (`ml/`: training, fine-tuning, learning loop, eval table). All iOS (`ios/`: older adult app, Message Filter, Call Directory, Screen Time lock, bank alert, lock-screen card, building and signing the family app). Integration. |
+| Haadi (haad1r) | `haadi` | `web/`: Next.js on Vercel, Nessie, Auth0 CIBA, family circle logic, Tiger Data, family dashboard |
+| rgons (rgons15) | `rgons` | Both apps' screens (Figma), SwiftUI views for the family app (PR to Dev), `docs/` research write-up |
+| [data + demo teammate, not on the repo yet] | `[their name]` | `ml/data/`: collect and label training data for Dev (about 200 hand-written elder scams, real bills, cleaned public sets). `docs/`: Devpost, demo script, backup video |
 
 ## Ground rules
 
@@ -72,3 +123,6 @@ up on Haadi's branch only — adopt it on yours if you want the same safety net.
   real diff and causes conflicts for everyone else.
 - If you hit something ambiguous and the answer changes what you build, ask in the
   team chat rather than guessing and building the wrong thing twice.
+- Hackathon rules: all code is written during the event (after Friday 8:30 PM), and
+  AI tool use must be disclosed on Devpost. Note the AI tools you used in each PR.
+- Devpost is due Sunday 8:00 AM ET. The expo is Sunday 10 AM to noon.
