@@ -10,14 +10,40 @@ public struct Verdict {
     public let reasons: [String]
 }
 
-/// Rules + DistilBERT. The model only scores; this code makes the call using the threshold stored in the model.
+/// Anything that turns a text into P(scam) and knows its own threshold.
+public protocol ScamScorer {
+    var threshold: Float { get }
+    func score(_ text: String) throws -> Float
+}
+
+/// Rules + a scorer. The model only scores; this code makes the call.
+/// Message Filter: `Guard(scorer: try NGramScorer())`. Main app: `Guard(scorer: try CoreMLScorer(...))`.
 public final class Guard {
-    public let threshold: Float
     public let rules = ScamRules()
+    public let scorer: ScamScorer
+    public var threshold: Float { scorer.threshold }
+
+    public init(scorer: ScamScorer) {
+        self.scorer = scorer
+    }
+
+    public func check(_ text: String) throws -> Verdict {
+        let p = try scorer.score(text)
+        var reasons = rules.hits(text).map(\.reason)
+        if p >= threshold {
+            reasons.insert("Reads like a scam text (score \(Int((p * 100).rounded()))%)", at: 0)
+        }
+        return Verdict(isScam: !reasons.isEmpty, probability: p, reasons: reasons)
+    }
+}
+
+/// DistilBERT through Core ML. Too big for the Message Filter (~67 MB); use it in the main app.
+public final class CoreMLScorer: ScamScorer {
+    public let threshold: Float
     private let model: MLModel
     private let tokenizer: WordPieceTokenizer
 
-    /// `compiledModelURL`: the .mlmodelc Xcode builds from GuardInt8.mlpackage (Bundle.main.url(forResource: "GuardInt8", withExtension: "mlmodelc")).
+    /// `compiledModelURL`: the .mlmodelc Xcode builds from GuardInt8.mlpackage.
     public init(compiledModelURL: URL, configuration: MLModelConfiguration = MLModelConfiguration()) throws {
         model = try MLModel(contentsOf: compiledModelURL, configuration: configuration)
         let meta = model.modelDescription.metadata[.creatorDefinedKey] as? [String: String] ?? [:]
@@ -40,14 +66,5 @@ public final class Guard {
             throw CocoaError(.coderValueNotFound)
         }
         return out[0].floatValue
-    }
-
-    public func check(_ text: String) throws -> Verdict {
-        let p = try score(text)
-        var reasons = rules.hits(text).map(\.reason)
-        if p >= threshold {
-            reasons.insert("Reads like a scam text (score \(Int((p * 100).rounded()))%)", at: 0)
-        }
-        return Verdict(isScam: !reasons.isEmpty, probability: p, reasons: reasons)
     }
 }
