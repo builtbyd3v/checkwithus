@@ -98,6 +98,7 @@ import SwiftUI
         // Busy before Face ID, so a second tap cannot start a second decision.
         guard !busy else { return }
         busy = true
+        error = nil
         if approve, !(await ownerConfirms("Approve \(dollars(payment.amountCents)) to \(payment.payee.name)")) { busy = false; return }
         await run {
             #if DEBUG
@@ -229,8 +230,11 @@ import SwiftUI
     private func ownerConfirms(_ reason: String) async -> Bool {
         guard !mock else { return true }
         let context = LAContext()
-        // ponytail: a phone with no passcode has nothing to check; the Auth0 sign-in is the only gate then.
-        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: nil) else { return true }
+        // No passcode means anyone holding the phone could approve, so approving is refused. Deny still works.
+        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: nil) else {
+            error = "Set a passcode on this iPhone to approve payments."
+            return false
+        }
         return (try? await context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason)) ?? false
     }
 
