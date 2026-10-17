@@ -176,7 +176,11 @@ const DEMO_MERCHANT_LOCATION = {
   geocode: { lat: 29.6516, lng: -82.3248 },
 };
 
-/** A 'paying' payment untouched this long had its request cut off mid-flight. */
+/**
+ * A 'paying' payment untouched this long had its request cut off mid-flight.
+ * Must stay well above the Nessie client's 10s request timeout, so that by
+ * the time anyone may conclude a send failed, the send itself has resolved.
+ */
 const STUCK_PAYING_SECONDS = 30;
 
 export type PaymentServiceDeps = {
@@ -334,9 +338,9 @@ export function createPaymentService(deps: PaymentServiceDeps) {
       existing.amountCents === input.amountCents &&
       existing.payeeKind === input.payeeKind &&
       existing.category === input.category &&
-      normalizeName(existing.payeeName) === normalizeName(input.payeeName) &&
+      existing.payeeName === input.payeeName &&
       existing.onCall === input.onCall &&
-      sameGuardScore(existing.guardScore, input.guard?.score ?? null) &&
+      existing.guardScore === (input.guard?.score ?? null) &&
       existing.guardModelVersion === (input.guard?.modelVersion ?? null) &&
       existing.explanation === input.explanation;
     if (!same) {
@@ -500,6 +504,14 @@ export function createPaymentService(deps: PaymentServiceDeps) {
       // Nothing reached Nessie yet (a merchant create is not a payment).
       return markFailed(payment.id, `Could not prepare the payment: ${messageOf(error)}`);
     }
+
+    // Restart the reconcile clock at the send itself, not at the claim: the
+    // merchant lookup above can take a while, and a concurrent read must not
+    // conclude "failed" while this send is still about to happen.
+    await pool.query(
+      `update payments set updated_at = now() where id = $1 and status = 'paying'`,
+      [payment.id],
+    );
 
     // Only the send is guarded here. Once Nessie has said yes, nothing that
     // goes wrong afterwards may mark this payment failed: the money moved.
@@ -666,16 +678,6 @@ export function createPaymentService(deps: PaymentServiceDeps) {
 }
 
 export type PaymentService = ReturnType<typeof createPaymentService>;
-
-/**
- * `guard_score` is a 32-bit `real` column, so a score comes back at float4
- * precision (0.123456789 returns as 0.12345679). Compare at that precision,
- * or a genuine retry would look like a different payment.
- */
-function sameGuardScore(stored: number | null, sent: number | null): boolean {
-  if (stored === null || sent === null) return stored === sent;
-  return Math.fround(stored) === Math.fround(sent);
-}
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);

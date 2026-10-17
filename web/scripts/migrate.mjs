@@ -45,7 +45,9 @@ try {
 
   let ran = 0;
   for (const name of files) {
-    const sql = await readFile(join(dir, name), 'utf8');
+    // Hash with LF line endings: git on Windows checks files out with CRLF,
+    // and a checkout must not look like an edit to an applied migration.
+    const sql = (await readFile(join(dir, name), 'utf8')).replace(/\r\n/g, '\n');
     const sha256 = createHash('sha256').update(sql).digest('hex');
 
     if (applied.has(name)) {
