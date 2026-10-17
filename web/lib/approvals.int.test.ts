@@ -115,6 +115,40 @@ describe('answers from Guardian', () => {
     expect((await requestsFor(payment.id)).find((s) => s.sub === LEO)?.state).toBe('superseded');
   });
 
+  it('an approval is never lost when applying it fails once', async () => {
+    const payment = await hold();
+    auth0.answer(MARIA, 'approve');
+    await makeDue(payment.id);
+
+    // The first attempt to apply the decision hits a transient error.
+    let failOnce = true;
+    const flaky = createCibaApprovals({
+      pool,
+      ciba: createCibaClient({ ...FAKE_AUTH0, fetch: auth0.fetch, keys: auth0.keys }),
+      payments: () => ({
+        ...service,
+        decidePayment: async (input) => {
+          if (failOnce) {
+            failOnce = false;
+            throw new Error('connection terminated unexpectedly');
+          }
+          return service.decidePayment(input);
+        },
+      }),
+    });
+
+    await expect(flaky.pollPayment(payment.id, circleId)).rejects.toThrow('connection terminated');
+    expect((await service.getPayment(payment.id))!.status).toBe('held');
+    const pollsSoFar = auth0.tokenPolls().length;
+
+    // The next poll applies the recorded answer, without asking Auth0 again.
+    await flaky.pollPayment(payment.id, circleId);
+
+    expect((await service.getPayment(payment.id))!.status).toBe('paid');
+    expect(nessieFake.paymentWrites()).toHaveLength(1);
+    expect(auth0.tokenPolls().length).toBe(pollsSoFar);
+  });
+
   it('a deny in Guardian blocks it, recorded as the family\'s answer', async () => {
     const payment = await hold();
     auth0.answer(LEO, 'deny');

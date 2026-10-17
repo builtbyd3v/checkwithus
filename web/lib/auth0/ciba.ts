@@ -35,7 +35,9 @@ export function bindingMessage(input: {
       .replace(/[^A-Za-z0-9\s+\-_.,:#]/g, '')
       .replace(/\s+/g, ' ')
       .trim();
-  const who = clean(input.protectedName.split(/\s+/)[0] ?? '') || 'Payment';
+  // Capped so the amount always fits: 20 + ": 1,000,000.00 USD to " (the
+  // largest amount the API accepts) leaves room for the payee within 64.
+  const who = (clean(input.protectedName.split(/\s+/)[0] ?? '') || 'Payment').slice(0, 20).trimEnd();
   const amount = formatCents(input.amountCents).replace('$', '');
   const head = `${who}: ${amount} USD to `;
   const payee = clean(input.payeeName) || 'unknown payee';
