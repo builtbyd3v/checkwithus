@@ -111,9 +111,9 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
   return <main className="min-h-screen bg-family-canvas text-family-ink">
     <div className="mx-auto max-w-7xl px-5 pb-20 pt-7 sm:px-8">
       <header className="flex flex-wrap items-center justify-between gap-4 border-b border-family-line pb-6">
-        <Link href="/" className="text-xl font-bold tracking-tight text-family-ink">checkwith<span className="text-family-blue">.us</span></Link>
-        <nav aria-label="Dashboard" className="flex items-center gap-5 text-sm font-semibold text-family-muted">
-          <a href="#activity" className="hover:text-family-blue-deep">Activity</a><a href="#setup" className="hover:text-family-blue-deep">Setup</a>
+        <Link href="/" className="text-xl font-bold tracking-tight text-family-ink min-[1100px]:hidden">checkwith<span className="text-family-blue">.us</span></Link>
+        <nav aria-label="Dashboard" className="ml-auto flex items-center gap-5 text-sm font-semibold text-family-muted">
+          <a href="#activity" className="hover:text-family-blue-deep min-[1100px]:hidden">Activity</a><a href="#setup" className="hover:text-family-blue-deep min-[1100px]:hidden">Setup</a>
           <a href="/auth/logout" className="hover:text-family-blue-deep">Sign out</a>
         </nav>
       </header>

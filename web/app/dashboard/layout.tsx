@@ -22,7 +22,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       <Link href="/" className="px-4 text-2xl font-bold tracking-[-.06em]">checkwith<span className="text-family-blue">.us</span></Link>
       <p className="mb-4 mt-12 px-4 text-xs font-semibold uppercase tracking-[.16em] text-family-muted">Your family</p>
       <nav aria-label="Family workspace navigation" className="space-y-2">
-        <Link className={`${navLink} bg-family-blue-soft`} href="/dashboard"><span aria-hidden="true">◈</span> Overview</Link>
+        <Link aria-current="page" className={`${navLink} bg-family-blue-soft`} href="/dashboard"><span aria-hidden="true">◈</span> Overview</Link>
         <Link className={navLink} href="/dashboard#activity"><span aria-hidden="true">▤</span> Activity</Link>
         <Link className={navLink} href="/dashboard#setup"><span aria-hidden="true">◎</span> Family circle</Link>
       </nav>

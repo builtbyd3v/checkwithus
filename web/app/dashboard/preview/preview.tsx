@@ -32,7 +32,7 @@ export function DashboardPreview() {
     return { message: denied ? 'Denied. The payment will not go through.' : 'Approved. The payment is on its way.', decided: true };
   }
   return <main className="mx-auto w-full max-w-5xl px-5 py-8 text-family-ink">
-    <header><p className="text-xl font-bold text-family-ink">checkwith.us</p>
+    <header><p className="text-xl font-bold text-family-ink min-[1100px]:hidden">checkwith.us</p>
       <p className="mt-8 text-xs font-semibold uppercase tracking-[.16em] text-family-blue-deep">Family overview · synthetic preview</p>
       <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">Looking out for Rosa</h1>
       <p className="mt-2 text-family-body">Local gallery preview. Synthetic family; decisions here never send money.</p></header>
