@@ -8,27 +8,46 @@ on the phone, so the older adult's texts and bills never leave the device.
 
 Live at [checkwith.us](https://checkwith.us). Built at SwampHacks XII (Oct 16 to 18, 2026).
 
-TODO(Dev): before submission, cut or clearly mark every feature here that is not merged on `main`. Items marked "in review" below are open PRs (#30 to #34).
+> **TODO(Dev): before submission.** This README describes `main` after the PRs below are merged and deployed. For each line that is not merged by submission, cut the claims it lists.
+> - [ ] #30 family iPhone app: role picker, Auth0 login on the phone, Approvals (approve asks for Face ID), Alerts, Money (Freeze), Allowances screens
+> - [ ] #31 `spending_weekly` and `spending_payee_daily` aggregates, the 1M-row benchmark and the Tiger Data performance table
+> - [ ] #32 Freeze, the vault account, Nessie transfers, the "cash then gift card" hold, `npm run demo:atm`
+> - [ ] Landing page with the "Try a payment" widget: the one Dev picks of #33, #36, #37, #39, #42
+> - [ ] #34 bank-while-on-a-call alert
+> - [ ] #35 these docs
+> - [ ] #38 design principles, research and the iPhone gallery shots (`docs/design-principles.md`, `docs/research.md`)
+> - [ ] #40 Guardian push audience fix, opt-in payment details (`AUTH0_CIBA_RAR`), opt-in `approve:payments` RBAC (`AUTH0_RBAC`)
+> - [ ] #41 demo bank locations (`DEMO_BANK_LOCATIONS`), ledger balance fix, family top-up, pension deposits, migration 017
+> - [ ] #43 dashboard alerts list, "Nx usual" line, live Tiger Data speed card, dashboard gallery shots
+> - [ ] #44 iPhone accessibility pass
+> - [ ] The no-passcode fix (a phone with no passcode cannot approve). Until it merges, keep the caveat under "The family does the work".
+> - [ ] #45 test-only fix (flaky bill test); no claims depend on it
+> - [ ] #46 bill-pay agent (needs #40 first): the "Bill-pay agent" section, `npm run agent:bills`, migration 020. Until it merges, delete that section and the agent lines in Auth0 below.
+> - [ ] Merged `main` deployed to checkwith.us, migrations 014 to 017 (and 020 with #46) applied to the live database.
 
 ## How it works
 
-One iPhone app serves both roles (the family role is in review, PR #30). On first
-launch it asks "I'm the one being protected" or "I'm family". The web at
-checkwith.us is the landing page and the family dashboard.
+One iPhone app serves both roles. On first launch it asks "I'm the one being
+protected" or "I'm family". The web at checkwith.us is the landing page and the
+family dashboard.
 
 **The older adult does nothing new.**
 - **Texts.** An iOS Message Filter extension runs our own on-device scam model (Guard tiny, 1 MB). Scam texts go to the Spam folder before they are read.
 - **Calls.** A Call Directory extension labels known scam numbers "Possible scam" on the incoming call screen.
-- **Payments.** The app has one big "Pay a bill" flow. Every payment goes to our server, which runs fixed code rules. A risky payment pauses, and the phone says the family will call. A lock-screen Live Activity updates when the family decides.
+- **Payments.** The app has one big "Pay a bill" flow. Every payment goes to our server, which runs fixed code rules. A risky payment pauses, and the phone says the family will call. A lock-screen Live Activity shows the state; it updates while the app polls the server (in the foreground, or for a short time in the background), not by push.
 - **Help.** One big "Ask my family" button sends an alert to the family.
-- **Bank while on a call** (in review, PR #34). The phone watches the nearest bank and ATM locations from Nessie. If the phone is inside one during a phone call, the family gets an alert. Scammers often keep a victim on the line and send them to the bank.
+- **Bank while on a call.** The phone watches the nearest bank and ATM locations from Nessie, plus any demo locations the server adds (`DEMO_BANK_LOCATIONS`). If the phone is inside one during a phone call, the family gets an alert with the bank's name, never the phone's location. Scammers often keep a victim on the line and send them to the bank.
+- **Accessibility.** Tested at the largest accessibility text size: pinned buttons on an opaque bar, no mid-word breaks, VoiceOver announces the real outcome, darker colors for contrast, 56 pt tap targets, and Reduce Motion stops the waiting pulse.
 
 **The family does the work.**
-- **Approve or deny** a held payment on the dashboard, or on the family iPhone app (in review, PR #30; approve needs Face ID). The family sees the amount, the payee and each hold reason in plain words.
+- **Approve or deny** a held payment on the family iPhone app or the dashboard. The family sees the amount, the payee and each hold reason in plain words. On the phone, Approve first asks for Face ID or the passcode; that check runs on the phone. The server checks the approver's Auth0 token and circle role (and the `approve:payments` permission when `AUTH0_RBAC=true`). Deny needs no Face ID, because denying only stops money. TODO(Dev): today a phone with no passcode skips the check; keep this caveat until the no-passcode fix merges.
 - **Family circle.** Approvers decide; viewers only watch. Over a threshold (default $1,000), two approvers must say yes; one no stops it.
-- **Freeze** (in review, PR #32). One tap moves the whole spending balance to a vault account with a Nessie transfer. New payments hold while frozen.
-- **Allowances.** Approvers grant a scoped, expiring permission, for example "utilities up to $400 until Nov 30". Inside it, a known payee can be paid over the usual limit with no approval. It never lifts gift card, crypto, wire, new payee, phone call or scam-check holds. (API merged; the family app screen is in PR #30.)
-- **Explanation.** Apple's on-device model (Foundation Models) rewrites the true facts about a held payment into a short, calm note for the family. Code picks the facts; the model only rewords them.
+- **Freeze.** One tap moves the whole spending balance to a vault account with one Nessie transfer, exactly once. New payments hold while frozen.
+- **Top up.** An approver adds money from their own Nessie account with one transfer ($1 to $10,000, whole dollars, fresh login, not while frozen). The API is built; the iPhone app has no top-up screen yet.
+- **Allowances.** Approvers grant a scoped, expiring permission, for example "utilities up to $400 until Nov 30". Inside it, a known payee can be paid over the usual limit with no approval. It never lifts gift card, crypto, wire, new payee, phone call or scam-check holds. The allowance is stored in our database (Tiger Data), granted after a fresh Auth0 login.
+- **Alerts.** "Ask my family" and "at a bank during a call" alerts show in the family app and on the dashboard, newest first. The family app polls every 10 seconds; there are no push notifications yet.
+- **Explanation.** Apple's on-device model (Foundation Models) rewrites the true facts about a held payment into a short, calm note for the family. Code picks the facts; the note is dropped if it loses one.
+- **Dashboard.** Waiting payments with "About Nx Rosa's usual at this payee", a weekly spending chart, the alerts list, and a "How fast this page is" card that times the real weekly query on the aggregate and on raw rows.
 
 **Hard rules.**
 1. AI suggests, code decides money. The Guard score can add a hold reason and can never remove one ([`web/lib/rules.ts`](web/lib/rules.ts)).
@@ -41,47 +60,37 @@ checkwith.us is the landing page and the family dashboard.
 
 | Hold reason (as the family reads it) | Data behind it |
 | --- | --- |
+| Your family froze spending | The Freeze switch |
 | Gift card purchase, Crypto purchase, Wire transfer | Payment category |
-| Cash at an ATM, then a gift card. Scammers often ask for this. (PR #32) | Tiger Data time-window query: ATM cash in the last 2 hours |
+| Cash at an ATM, then a gift card. Scammers often ask for this. | Tiger Data time-window query: ATM cash in the last 2 hours |
 | Someone they have not paid before | The family's known payee list |
 | Over the limit you set | Circle limit (default: over $300) |
-| Much more than they usually spend on this | Tiger Data continuous aggregate: more than 3x the typical day in that category |
+| Much more than they usually spend on this | Tiger Data continuous aggregate `spending_daily`: more than 3x the typical day in that category |
 | Paid while on a phone call | The phone's call state (CallKit) |
 | Our scam check flagged it | On-device Guard score of 0.5 or more |
-| Your family froze spending (PR #32) | The Freeze switch |
 
-The landing page (in review, PR #33) has a "Try a payment" widget that runs this same `decideHold` function in the browser.
+The landing page has a "Try a payment" widget that runs this same `decideHold` function in the browser.
+
+### Bill-pay agent
+
+Rosa's bill-pay agent has its own Auth0 identity: a Machine-to-Machine app that signs in with the client credentials grant. Its token holds one scope, `pay:bills`.
+- **It can only ask.** `npm run agent:bills` calls `POST /api/v1/agent/bills/run`. For each known biller it proposes the next bill (due one month after the last one, for the last amount). That is a fixed rule with no AI model, and bill data never leaves our server except to Nessie.
+- **The same rules decide.** Every proposal goes through `createPayment`, the same path as the phone. Inside a live family allowance it pays with no push. Outside it, the payment is held and the family is asked once (family app, or a Guardian push with `APPROVAL_MODE=ciba`). It never pays a cycle twice and never asks again after a no.
+- **Least privilege.** It acts only in circles with a live allowance. The route checks RS256, our issuer and audience, `gty = client-credentials`, the agent's own `sub`, and `pay:bills`. Every family route rejects machine tokens (`403 agent_not_allowed`), so the agent can never approve, deny, freeze, unfreeze, grant allowances or change policy. Revoking the allowance stops it.
+- **Visible.** Each agent payment stores `initiated_by = 'agent'`; the dashboard shows "Paid by the bill agent under your Utilities allowance" or "Asked by the bill agent".
+
+TODO(Dev): the real M2M grant is not verified on the live Auth0 tenant yet. Create the M2M app with only `pay:bills`, set `AUTH0_AGENT_CLIENT_ID`, run `npm run agent:bills -- --within 14` once, then delete this line. Until then, say "tested against a fake Auth0".
 
 ### Sponsor tech doing real work
 
-- **Capital One Nessie.** Customers and accounts (a spending account, plus a vault account in PR #32), merchants (payee categories), purchases and bills (every allowed payment is sent to Nessie), and withdrawals with the ATM list (the "cash then gift card" sequence, PR #32). Transfers move money for Freeze and Unfreeze (PR #32). The ATM and branch lists feed the bank-while-on-a-call alert (endpoint merged; phone side in PR #34). Deposits are read only when matching a payment to its Nessie record, and never count as a payment. Client: [`web/lib/nessie/client.ts`](web/lib/nessie/client.ts).
-- **Auth0.** Login for the dashboard. Native PKCE login in the family iPhone app (PR #30). Signed API access tokens on every family route. Approver and viewer roles enforced on the server. A fresh login (no older than 5 minutes) before granting an allowance or changing roles. Client-Initiated Backchannel Authentication (CIBA, part of Auth0 for AI Agents) is implemented: it can send a Guardian push with the payment details as `authorization_details`. It is off by default (`APPROVAL_MODE=app`), tested only against a fake Auth0, and a live Guardian push is not verified. Code: [`web/lib/auth0/ciba.ts`](web/lib/auth0/ciba.ts), [`web/lib/auth/family.ts`](web/lib/auth/family.ts).
-- **Tiger Data.** `spending` is a hypertable with columnstore compression (segment by circle). The real-time continuous aggregate `spending_daily` feeds the unusual-spending rule and the dashboard. `spending_weekly`, built on top of it, feeds the dashboard's weekly chart (PR #31). `spending_payee_daily` is built but not read by the app yet (PR #31). A time-window query on the hypertable catches "ATM cash, then a gift card within 2 hours" (PR #32). Measured numbers are below.
+- **Capital One Nessie.** Each endpoint has a job. Customers and accounts: a spending account and a vault account. Merchants: payee categories. Purchases and bills: every allowed payment is sent to Nessie. Withdrawals and ATMs: the "cash then gift card" sequence. Transfers: Freeze, Unfreeze and the family top-up. Deposits: the seed writes Rosa's monthly pension as Nessie deposits, which add to her ledger balance. ATMs and branches: the bank-while-on-a-call alert. Nessie never updates its stored balance, so the available balance is our ledger minus reserved payments; Nessie's reported balance is shown for information. Client: [`web/lib/nessie/client.ts`](web/lib/nessie/client.ts).
+- **Auth0.** Login for the dashboard and native PKCE login in the family iPhone app. Signed API access tokens on every family route. Approver and viewer roles enforced on the server, plus an opt-in `approve:payments` RBAC permission (`AUTH0_RBAC=true`). A fresh login (no older than 5 minutes) before granting an allowance, changing roles, unfreezing or topping up. The bill-pay agent is its own Machine-to-Machine client with only `pay:bills`, and family routes reject machine tokens. Client-Initiated Backchannel Authentication (CIBA, part of Auth0 for AI Agents) is implemented: with `APPROVAL_MODE=ciba`, a held payment sends a Guardian push. With `AUTH0_CIBA_RAR=true` as well, the push carries the amount, payee and hold reasons as rich `authorization_details`. Both are off by default, tested only against a fake Auth0, and a live push is not verified. We fixed a bug where the push always sent `audience`, which the real tenant rejects. Code: [`web/lib/auth0/ciba.ts`](web/lib/auth0/ciba.ts), [`web/lib/auth/family.ts`](web/lib/auth/family.ts).
+- **Tiger Data.** `spending` is a hypertable with columnstore compression (segment by circle). Real-time continuous aggregates do the reading: `spending_daily` feeds the unusual-spending rule; `spending_weekly`, built on top of it, feeds the dashboard's weekly chart; `spending_payee_daily` feeds the dashboard's "About Nx usual" line (display only; it does not decide holds). A time-window query on the hypertable catches "ATM cash, then a gift card within 2 hours". The dashboard speed card times the weekly query live; the 1M-row numbers are below.
 - **GoDaddy Registry.** checkwith.us is our product name and our live domain.
 
-## Status
+Design notes for the older adult screens: [`docs/design-principles.md`](docs/design-principles.md), with sources in [`docs/research.md`](docs/research.md) and screenshots in [`docs/gallery/`](docs/gallery/).
 
-What is merged on `main`, and what is still in review. Do not claim a feature as live until it is merged and deployed. The demo runs one build of the local `dev-integration` branch (main plus PRs #30 to #34).
-
-| Feature | Status |
-| --- | --- |
-| Message Filter with on-device Guard tiny | Merged; tested on a real iPhone |
-| Call Directory "Possible scam" labels | Merged |
-| Older adult app: pairing, Home, Pay a bill, held status, Live Activity, Ask my family | Merged |
-| On-device explanation for the family (Foundation Models) | Merged |
-| Web backend: payments, rules, Nessie, Auth0, Tiger Data, family API, dashboard | Merged |
-| Roles, two-approval threshold, allowances (API) | Merged |
-| CIBA Guardian push | Implemented and tested against a fake Auth0. Off by default (`APPROVAL_MODE=app`). Live push not verified. |
-| Family iPhone app: role picker, Face ID approvals, alerts, Freeze, allowances | In review, PR #30 |
-| Weekly and per-payee continuous aggregates, 1M-row benchmark | In review, PR #31 |
-| Freeze (Nessie vault transfer) and "cash then gift card" hold | In review, PR #32 |
-| Landing page with "Try a payment" widget | In review, PR #33 |
-| Bank-while-on-a-call alert | In review, PR #34 |
-| ESP32 "Ask my family" hardware button | Not built (PR #28 closed) |
-
-TODO(Dev): update this table after each merge.
-
-Known limits: alerts are not sent as Apple push notifications; the family app polls and the dashboard reads them on reload. Nessie's reported account balance does not change after payments, so Tiger Data keeps the payment ledger.
+Known limits: no push notifications (alerts and the lock-screen card update by polling). The allowance lives in our database, not in Auth0. No usability test with older adults yet.
 
 ## Model evaluation
 
@@ -131,7 +140,7 @@ Measured on Oct 17, 2026 on Tiger Cloud (TimescaleDB 2.30.2, PostgreSQL 18.6) wi
 
 Compression (columnstore, segment by circle): 163.3 MB to 50.3 MB, **3.2x smaller** (158 of 158 chunks).
 
-Aggregate times are a best case: everything was materialized, while in production the current week is computed live from raw rows. The queries are simplified versions of the dashboard and rules queries. Full method: [`docs/perf.md`](docs/perf.md) (PR #31). Reproduce with `npm run bench:perf` in `web/`, against a throwaway `wt_*` schema only.
+Aggregate times are a best case: everything was materialized, while in production the current week is computed live from raw rows. The queries are simplified versions of the dashboard and rules queries. Full method: [`docs/perf.md`](docs/perf.md). Reproduce with `npm run bench:perf` in `web/`, against a throwaway `wt_*` schema only.
 
 ## Setup
 
@@ -148,6 +157,8 @@ npm run db:migrate             # applies web/db/migrations to Tiger Data
 npm run seed:demo              # synthetic "Rosa" circle, payees, history, invite
 npm run dev                    # http://localhost:3000
 ```
+
+Optional flags in `.env.example`: `APPROVAL_MODE` (`app` or `ciba`), `AUTH0_CIBA_RAR`, `AUTH0_RBAC`, `DEMO_BANK_LOCATIONS`. Demo helpers: `npm run demo:reset` (throwaway `wt_*` schema only, or `-- --live` for the real demo circle), `npm run demo:atm`, `npm run smoke:demo`, `npm run agent:bills` (needs `AUTH0_AGENT_CLIENT_ID` and `AUTH0_AGENT_CLIENT_SECRET`).
 
 Checks: `npm run typecheck && npm run build && npm test`. Database tests: `npm run test:db`. More detail: [`web/INTEGRATION.md`](web/INTEGRATION.md).
 
@@ -208,10 +219,10 @@ license. Required by Devpost rule 10 and [`docs/RULES.md`](docs/RULES.md).
 | Service | Used for | Terms |
 | --- | --- | --- |
 | [Capital One Nessie](http://api.nessieisreal.com/) | Mock customers, accounts, merchants, purchases, bills, withdrawals, deposits, transfers, ATMs, branches | Capital One hackathon sandbox; mock data only |
-| [Auth0](https://auth0.com/) | Family login, API tokens, roles; CIBA Guardian push implemented, off by default | Auth0 free plan, developer terms |
+| [Auth0](https://auth0.com/) | Family login, API tokens, roles, optional RBAC; CIBA Guardian push implemented, off by default | Auth0 free plan, developer terms |
 | [Tiger Data / Tiger Cloud](https://www.tigerdata.com/) | Spending hypertable, compression, continuous aggregates | Tiger Cloud trial; TimescaleDB |
 | [Vercel](https://vercel.com/) | Hosting for `web/` | Vercel Hobby terms |
-| [GoDaddy Registry](https://registry.godaddy/) | `checkwith.us` domain | Registered with the MLH hackathon offer |
+| [GoDaddy Registry](https://registry.godaddy/) | `checkwith.us` domain (.us registry) | TODO(Dev): confirm the MLH code was used (whois registrar: Porkbun) |
 
 ### `web/` dependencies
 

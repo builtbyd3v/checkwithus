@@ -12,14 +12,14 @@
 1. **Texts:** the Message Filter runs our on-device Guard model; scam texts never reach the inbox. (Built.)
 2. **Calls:** known scam numbers ring as "Possible scam" (Call Directory). #12
 3. **Payments:** a protected Nessie account. Code rules hold gift cards, crypto, new payees, large amounts, anything unusual for this user, payments started during a call, and the "ATM cash then gift cards" sequence. #11, #17
-4. **Screen:** "You're safe" or "Paused, your family will call", one big "Ask my family" button, a lock-screen card that updates live. #11
+4. **Screen:** "You're safe" or "Paused, your family will call", one big "Ask my family" button, a lock-screen card that updates while the app polls (no push). #11
 
 ### Family (family iPhone app; web dashboard as backup)
-1. **Approve or deny** a held payment from the family iPhone app (approve needs Face ID) or the dashboard, with amount, payee and reason shown. The Auth0 Guardian push (CIBA) is built but off by default. #14, #16
+1. **Approve or deny** a held payment from the family iPhone app (approve asks for Face ID on the phone; the server checks the approver's Auth0 token) or the dashboard, with amount, payee and reason shown. The Auth0 Guardian push (CIBA) is built but off by default and not verified live. #14, #16
 2. **Family circle:** approvers vs viewers; over $1,000, two approvers must say yes, and one no stops it. #14
 3. **Freeze:** one tap sweeps the spending balance to the vault (Nessie transfer). #18
-4. **Allowances:** the family grants the AI agent limited, expiring permission (for example utility bills under $200 until Nov 30); inside it, no push. #19
-5. **Dashboard:** holds, spending over time, "6x her usual", Tiger Data performance numbers. #6, #16
+4. **Allowances:** the family grants limited, expiring permission (for example utility bills up to $400 until Nov 30); inside it, a known payee over the usual limit pays with no approval and no push. A bill-pay agent with its own Auth0 identity is in progress and would work only inside an allowance. #19
+5. **Dashboard:** holds, spending over time, "About Nx her usual", alerts, a live Tiger Data speed card. #6, #16
 
 ## How each sponsor is won
 | Sponsor | What wins it | Issues |
@@ -36,11 +36,14 @@
 Setup: one iPhone as the older adult, one iPhone with the family app as the family (MacBook dashboard as backup), Google Voice as the scammer.
 1. A scam text never reaches the inbox.
 2. A scam call rings as "Possible scam".
-3. A gift-card payment during the call pauses; the family denies it from the Guardian push; the phone updates live.
-4. Cash at an ATM, then a gift card: held as a scam sequence.
-5. The family taps Freeze; the balance moves to the vault.
-6. A known utility bill under the allowance pays with no push.
-7. Close on the Tiger Data numbers and the model scores.
+3. A gift-card payment during the call pauses; the family denies it in the family app; the phone updates.
+4. The family gets an alert: she is at a bank during the call.
+5. Cash at an ATM, then a gift card: held as a scam sequence.
+6. A $350 utility bill pays with no push, because the family allowance covers utilities up to $400.
+7. The family taps Freeze; the balance moves to the vault.
+8. Close on the Tiger Data numbers and the model scores.
+
+Full script: [demo.md](demo.md).
 
 ## Out of scope (cut on Oct 17 to focus on sponsors)
 - Qwen fine-tune ("checkwith-1") and model retraining
