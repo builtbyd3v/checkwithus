@@ -100,6 +100,42 @@ export const appEnv = memo(() =>
   ),
 );
 
+/**
+ * Extra bank branches for the on-call bank alert, as JSON `[{name, lat, lng}]`.
+ * Nessie has no banks in Gainesville, so the expo needs one. Empty by default.
+ */
+export const demoEnv = memo(() =>
+  parse(
+    'demo',
+    z.object({
+      DEMO_BANK_LOCATIONS: optional(
+        z
+          .string()
+          .transform((text, ctx) => {
+            try {
+              return JSON.parse(text) as unknown;
+            } catch {
+              ctx.addIssue({ code: 'custom', message: 'must be JSON like [{"name":"...","lat":29.6,"lng":-82.3}]' });
+              return z.NEVER;
+            }
+          })
+          .pipe(
+            z
+              .array(
+                z.strictObject({
+                  name: z.string().min(1).max(100),
+                  lat: z.number().min(-90).max(90),
+                  lng: z.number().min(-180).max(180),
+                }),
+              )
+              .max(20),
+          )
+          .default([]),
+      ),
+    }),
+  ),
+);
+
 function isTimeZone(zone: string): boolean {
   try {
     new Intl.DateTimeFormat('en-US', { timeZone: zone });

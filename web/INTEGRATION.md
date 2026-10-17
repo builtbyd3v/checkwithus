@@ -35,10 +35,19 @@ All paths below are relative to the base URL.
 | `POST /family/circles/:id/freeze` | Family (approver) | `{}` -> `{frozen: true, movedCents}`: spending balance to the vault |
 | `POST /family/circles/:id/unfreeze` | Family (approver, fresh login) | `{amountCents}` -> `{frozen: false, movedCents}`: that amount back |
 | `GET /family/circles/:id/balance` | Family | Ledger balance (vault excluded) and `frozen` |
+| `POST /family/circles/:id/top-up` | Family (approver, fresh login) | `{amountCents, idempotencyKey}` -> `{id, movedCents, status}`: money from the member's own Nessie account into spending |
 
 Health endpoint: `GET https://checkwith.us/api/health`.
 
 Bank directory entries contain `id`, `kind` (`atm` or `branch`), `name`, `coordinates` (`latitude`, `longitude`, or null), and `address` (or null). Use only entries with coordinates for geofences; do not treat a missing coordinate as zero. Match the phone's location locally, then post `bank_during_call` when the iOS call/location rules trigger. No phone location is required by the directory endpoint. The directory is cached with Next's `hours` profile.
+
+Nessie has no ATMs or branches in Gainesville, so the expo needs a demo bank. Set `DEMO_BANK_LOCATIONS` on the server (Vercel env var) to JSON `[{name, lat, lng}]`; each entry is added after Nessie's banks as `{id: "demo-<n>", kind: "branch", name, coordinates, address: null}`. It is empty by default, works in a Release build, and needs no app change. Bad JSON or out-of-range coordinates are ignored with one server warning that names the variable; Nessie's banks still return. Example for the SwampHacks expo (UF Reitz Union; confirm the expo room's coordinates on site):
+
+```
+DEMO_BANK_LOCATIONS=[{"name":"SwampHacks Demo Bank","lat":29.6463,"lng":-82.3478}]
+```
+
+The phone loads the directory once per app launch, so relaunch the app after changing it. Only Nessie's part is cached; redeploy after changing the variable.
 
 ## Payment flow
 
@@ -99,7 +108,7 @@ token. Circle access is checked server-side.
 
 | Route | Input / result |
 | --- | --- |
-| `GET /family/circles/:id/balance` | Live Nessie reported balance, ledger balance, reservations, conservative available amount, timestamp |
+| `GET /family/circles/:id/balance` | Ledger balance, reservations, available amount, Nessie's stored balance (informational, null if Nessie is down), timestamp; see Balance below |
 | `POST /family/circles/:id/policy` | `{action:"threshold",twoApprovalsOverCents:100000}` or `{action:"role",memberId,role:"approver"\|"viewer"}`; fresh approver login required |
 | `GET /family/circles/:id/allowances` | `{allowances:[...]}` with active scope, cap, expiry and grantor |
 | `POST /family/circles/:id/allowances` | `{payeeId:null,category:"utilities",maxAmountCents:20000,expiresAt:"2026-11-30T23:59:00Z"}`; exactly one of payeeId/category, fresh approver login required |
@@ -165,6 +174,44 @@ $1,000 from an account Nessie stores at $50 into a vault opened at $0, then unfr
   not `200 []`, and lists rows with `id` instead of `_id`.
 - A transfer whose outcome is unknown (timeout or 5xx) is not retried or looked up;
   it stays `sending` and counts as moved.
+
+### Balance: the ledger decides (#13)
+
+`GET /family/circles/:id/balance` answers integer cents:
+`{ledgerBalanceCents, reservedCents, availableCents, nessieReportedBalanceCents, checkedAt, balanceSource: "ledger", frozen}`.
+`availableCents` is `max(0, ledger - reserved)`. The ledger is the opening balance, less
+spending and the Freeze vault, plus top-ups and deposits, in Tiger Data.
+
+Decision, from a live probe on October 17 (synthetic customer, Checking account opened at $100):
+a $25 deposit, a $10 transfer in from another account, and a $5 withdrawal were all
+accepted (201), and `GET /accounts/:id` still answered `balance: 100` after each. The
+source account of the transfer, opened at $0, also stayed at $0. So Nessie's stored
+balance is the opening balance forever. It used to cap `availableCents`
+(`ledger_with_nessie_ceiling`); that cap is gone, because money added to the ledger
+would hide behind a figure Nessie never updates. We still read `GET /accounts/:id`
+and return its figure as `nessieReportedBalanceCents`, but a Nessie error returns
+`null` there instead of failing the whole balance. The ledger fields were also fixed to
+be JSON numbers: Postgres `sum()` is `numeric`, which arrived as a string.
+
+### Family top-up and pension deposits (#13)
+
+`POST /family/circles/:id/top-up` with `{amountCents, idempotencyKey}` moves whole
+dollars ($1 to $10,000) from the approver's own Nessie account into the older adult's
+spending with one Nessie transfer. On first use the member gets a synthetic Nessie
+customer and a Checking account opened at $0, found again by a `[cw:<memberId>]` tag.
+Reusing a key answers with the first top-up and sends nothing (`status` `sent`, or
+`sending` while an unknown outcome is unsettled); a different amount under the same key
+is `409 idempotency_conflict`. Errors: viewers `403 permission_required`, stale login
+`403 step_up_required`, cents `422 whole_dollars_only`, frozen circle `409 frozen`
+(unfreeze first; the vault is the way back), definite bank refusal `502 bank_error`
+(retry with the same key), and a key already used by a deposit `409 idempotency_conflict`. A top-up is a ledger credit (`ledger_credits`, migration 017),
+so once Nessie confirms it (`sent`) it raises `ledgerBalanceCents` and a later Freeze moves it to the vault too. A top-up whose outcome is unknown (`sending`) counts nowhere and is never resent. The family account is opened only after the frozen and key checks pass.
+Verified live on October 17 on a synthetic circle: one transfer listed on the member's
+account for three calls with the same key. `demo:reset` deletes last demo's top-ups.
+
+The seed records Rosa's monthly pension ($1,500 on August 2, September 1 and October 1)
+as Nessie deposits (`POST /accounts/:id/deposits`) and as deposit credits in the same
+ledger, so the balance includes them. A rerun finds each deposit by its seed marker.
 
 ### Scam sequence (#17)
 

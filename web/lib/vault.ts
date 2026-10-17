@@ -11,6 +11,14 @@ import { vaultAccountBody } from '@/lib/nessie/format';
 export const VAULT_CENTS_SQL = `coalesce((select sum(case t.direction when 'freeze' then t.amount_cents
   else -t.amount_cents end) from vault_transfers t where t.circle_id = c.id and t.status <> 'failed'), 0)::bigint`;
 
+/**
+ * Cents added to circle `c`'s spending by top-ups and deposits (017_ledger_credits.sql).
+ * Only confirmed credits count: the opposite of the vault, because the safe side
+ * for money coming in is to wait until it surely arrived.
+ */
+export const CREDIT_CENTS_SQL = `coalesce((select sum(k.amount_cents) from ledger_credits k
+  where k.circle_id = c.id and k.status = 'sent'), 0)::bigint`;
+
 /** The circle's vault account at Nessie, created on first use. Safe to call again. */
 export async function ensureVaultAccount(pool: pg.Pool, nessie: NessieClient, circleId: string): Promise<string> {
   const { rows } = await pool.query<{ vault_account_id: string | null; nessie_customer_id: string }>(

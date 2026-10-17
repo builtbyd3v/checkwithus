@@ -23,7 +23,7 @@ import { toCents, type Cents } from '@/lib/money';
 import { NessieError, type NessieClient } from '@/lib/nessie/client';
 import { taggedDescription, transferBody } from '@/lib/nessie/format';
 import { requireFreshLogin, requirePermission } from '@/lib/permissions';
-import { ensureVaultAccount, VAULT_CENTS_SQL } from '@/lib/vault';
+import { CREDIT_CENTS_SQL, ensureVaultAccount, VAULT_CENTS_SQL } from '@/lib/vault';
 
 export type FreezeResult = { frozen: boolean; movedCents: Cents };
 
@@ -48,7 +48,7 @@ export function createFreezeService(deps: { pool: pg.Pool; nessie: NessieClient 
            - coalesce((select sum(amount_cents) from spending where circle_id = c.id), 0)
            - coalesce((select sum(amount_cents) from payments
                         where circle_id = c.id and status in ('approved', 'paying')), 0)
-           - ${VAULT_CENTS_SQL})::bigint as spendable,
+           - ${VAULT_CENTS_SQL} + ${CREDIT_CENTS_SQL})::bigint as spendable,
          ${VAULT_CENTS_SQL} as vault
        from circles c where c.id = $1 for update`,
       [circleId],

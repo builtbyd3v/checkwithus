@@ -10,6 +10,7 @@ import { createNessieClient, type NessieClient } from '@/lib/nessie/client';
 import {
   checkingAccountBody,
   customerBody,
+  depositBody,
   merchantBody,
   paidBillBody,
   purchaseBody,
@@ -165,6 +166,25 @@ export async function seedDemo({ pool, nessie, customerLastName = CUSTOMER.lastN
           amountCents, at, timeZone: TIME_ZONE,
         })),
       });
+    }
+
+    // Rosa's monthly pension, as Nessie deposits. Credits add to the ledger balance (017_ledger_credits.sql).
+    for (const days of [76, 46, 16]) {
+      const key = `deposit:${days}`;
+      const at = atDaysAgo(days);
+      const amountCents = toCents(150_000);
+      const existing = existingRecords.find((record) => record.kind === 'deposit' && record.reference.includes(`${MARKER}${key}]`));
+      if (existing && existing.amountCents !== amountCents) throw new Error(`Demo record ${key} has an unexpected amount`);
+      const nessieId = existing?.nessieId ?? await nessie.createDeposit(accountId, depositBody({
+        amountCents, at, timeZone: TIME_ZONE, description: `Monthly pension ${MARKER}${key}]`,
+      }));
+      if (!existing) created++;
+      const added = await pool.query(
+        `insert into ledger_credits (circle_id, kind, amount_cents, status, idempotency_key, nessie_id, occurred_at)
+         values ($1, 'deposit', $2, 'sent', $3, $4, $5) on conflict (circle_id, idempotency_key) do nothing`,
+        [circleId, amountCents, `seed:${key}`, nessieId, at],
+      );
+      ledgerAdded += added.rowCount ?? 0;
     }
 
     // These backdated rows can sit behind the continuous aggregate watermark.

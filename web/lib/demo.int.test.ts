@@ -107,8 +107,19 @@ beforeAll(async () => {
     `insert into circle_members (circle_id, auth0_sub, display_name, role) values ($1, $2, 'Maria', 'approver')`,
     [circleId, MARIA],
   );
+  // A top-up left over from the last demo; the reset clears it.
+  await db().query(
+    `insert into ledger_credits (circle_id, kind, amount_cents, status, idempotency_key) values ($1, 'top_up', 10000, 'sent', 'smoke-old-topup')`,
+    [circleId],
+  );
   // Second run: idempotent, and now grants the allowance through Maria.
   expect((await reset()).circleId).toBe(circleId);
+  // The seeded monthly pension: three Nessie deposits and three ledger credits, not doubled by the rerun.
+  expect(fakeNessie.records.filter((r) => r.kind === 'deposits')).toHaveLength(3);
+  const credits = await db().query<{ kind: string; n: number }>(
+    'select kind, count(*)::int as n from ledger_credits where circle_id = $1 group by kind', [circleId],
+  );
+  expect(credits.rows).toEqual([{ kind: 'deposit', n: 3 }]);
   const code = await read(await routes.pairingCode.POST(req(`/family/circles/${circleId}/pairing-code`, { sub: MARIA, body: {} }), params(circleId)));
   deviceToken = (await read(await routes.pair.POST(req('/device/pair', { body: { code: code.body.code } }), noParams))).body.deviceToken;
 }, 60_000);
