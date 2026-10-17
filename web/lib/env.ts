@@ -84,6 +84,15 @@ export const auth0Env = memo(() =>
   ),
 );
 
+/**
+ * The bill-pay agent's Auth0 Machine-to-Machine client id, or null when the
+ * agent is off. Not memoized, so tests can switch it. The secret is read only
+ * by the agent itself (scripts/agent-bills.ts), never by the API.
+ */
+export function agentClientId(): string | null {
+  return process.env.AUTH0_AGENT_CLIENT_ID || null;
+}
+
 export const appEnv = memo(() =>
   parse(
     'app',

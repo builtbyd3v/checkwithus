@@ -122,7 +122,8 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
         </div>
         <div className="mt-5 rounded-xl border border-stone-200 bg-white p-5"><h3 className="font-semibold">Recent payments</h3>
           {recent.length ? <ul role="list" className="mt-3 divide-y divide-stone-100">{recent.slice(0, 8).map((payment) => <li key={payment.id} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm">
-            <span><strong className="font-semibold">{payment.payee.name}</strong><span className="ml-2 text-stone-500">{payment.category.label}</span></span>
+            <span><strong className="font-semibold">{payment.payee.name}</strong><span className="ml-2 text-stone-500">{payment.category.label}</span>
+              {payment.initiatedBy === 'agent' && <span className="block text-stone-500">{payment.allowanceId ? `Paid by the bill agent under your ${payment.category.label} allowance` : 'Asked by the bill agent'}</span>}</span>
             <span className="flex items-center gap-4"><span className="capitalize text-stone-600">{payment.status}</span><strong className="tabular-nums">{money(payment.amountCents)}</strong></span>
           </li>)}</ul> : <p className="mt-3 text-sm text-stone-600">Payments from the phone will appear here.</p>}
         </div>
