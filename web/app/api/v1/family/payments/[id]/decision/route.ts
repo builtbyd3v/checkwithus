@@ -9,6 +9,7 @@ import { db } from '@/lib/db';
 import { memberNames, requireMembership } from '@/lib/family';
 import { errorResponse, handle, HttpError, json, readBody, uuidParam } from '@/lib/http';
 import { PaymentError, type Payment } from '@/lib/payments';
+import { requireTokenPermission } from '@/lib/permissions';
 import { approvalsUseCiba, payments } from '@/lib/services';
 import { familyPaymentView } from '@/lib/views';
 
@@ -16,6 +17,9 @@ export const POST = handle(async (request, { params }: { params: Promise<{ id: s
   const user = await requireFamilyUser(request);
   const id = uuidParam((await params).id);
   const { decision } = await readBody(request, decisionBody);
+  // Auth0 RBAC on approvals (when the token carries it, or AUTH0_RBAC=true);
+  // decidePayment also checks the circle role. Deny only stops money: role alone.
+  if (decision === 'approve') requireTokenPermission(user.permissions, 'approve:payments');
 
   // With CIBA, an approval only counts if Auth0 reports it from the member's
   // Guardian push, which takes their enrolled phone and Face ID. A sign-in

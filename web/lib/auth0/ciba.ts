@@ -11,12 +11,31 @@
  * Verified against our tenant on 2026-10-17: bc-authorize reaches user
  * lookup (CIBA enabled); binding_message allows letters, digits, whitespace
  * and +-_.,:# only, at most 64 characters ($ and ? are rejected).
+ *
+ * Payment details ride along as a Rich Authorization Request
+ * (`authorization_details`, with the API `audience` Auth0 requires for it)
+ * only when `richAuthorizationDetails` is on. Probed on our tenant on
+ * 2026-10-17 with a user that does not exist (so no push): with `audience`,
+ * Auth0 answers "Client ... is not authorized to access resource server"
+ * until the app has user-delegated access to the API; details without
+ * `audience` answer "Audience must be explicitly specified". So the default
+ * sends neither, which is the setup verified to reach user lookup. Docs:
+ * https://auth0.com/docs/get-started/apis/configure-rich-authorization-requests
  */
-import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from 'jose';
+import { createRemoteJWKSet, decodeJwt, jwtVerify, type JWTVerifyGetKey } from 'jose';
 import { formatCents, type Cents } from '@/lib/money';
 
 const TIMEOUT_MS = 10_000;
 const MAX_BINDING_MESSAGE = 64;
+
+/** Reduced to the characters Auth0 accepts in a binding message, accents dropped. */
+const clean = (text: string) =>
+  text
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^A-Za-z0-9\s+\-_.,:#]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 
 /**
  * The line shown on the family member's phone, e.g.
@@ -28,13 +47,6 @@ export function bindingMessage(input: {
   amountCents: Cents;
   payeeName: string;
 }): string {
-  const clean = (text: string) =>
-    text
-      .normalize('NFKD')
-      .replace(/[̀-ͯ]/g, '')
-      .replace(/[^A-Za-z0-9\s+\-_.,:#]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
   // Capped so the amount always fits: 20 + ": 1,000,000.00 USD to " (the
   // largest amount the API accepts) leaves room for the payee within 64.
   const who = (clean(input.protectedName.split(/\s+/)[0] ?? '') || 'Payment').slice(0, 20).trimEnd();
@@ -42,6 +54,43 @@ export function bindingMessage(input: {
   const head = `${who}: ${amount} USD to `;
   const payee = clean(input.payeeName) || 'unknown payee';
   return (head + payee).slice(0, MAX_BINDING_MESSAGE).trimEnd();
+}
+
+/** Register this on the Auth0 API before turning on AUTH0_CIBA_RAR. */
+export const PAYMENT_DETAILS_TYPE = 'urn:auth0:schemas:authorization-details:v1:payment';
+
+export type PaymentDetails = {
+  amountCents: Cents;
+  payee: string;
+  /** Plain-words hold reasons, as the family sees them. */
+  reasons: string[];
+  /** 2 when the amount is over the circle's two-approval threshold. */
+  approvalsRequired?: number;
+};
+
+/**
+ * Guardian shows exactly one object in Auth0's documented display schema
+ * (`urn:auth0:schemas:authorization-details:v1:<name>`, with `instruction` and
+ * `properties`). Money is shown, never sent as a float: the hidden
+ * `amount_cents` keeps the integer for anything that reads it back.
+ */
+export function paymentAuthorizationDetails(payment: PaymentDetails) {
+  const shown = (order: number, name: string, value: string | number) =>
+    ({ display: true, name, display_order: order, value });
+  return [{
+    type: PAYMENT_DETAILS_TYPE,
+    instruction: 'Approve or deny this held payment.',
+    properties: {
+      amount: shown(1, 'Amount (USD)', formatCents(payment.amountCents)),
+      // Same charset as the binding message, and capped: these come from the phone.
+      payee: shown(2, 'Payee', clean(payment.payee).slice(0, MAX_BINDING_MESSAGE).trimEnd() || 'unknown payee'),
+      reason: shown(3, 'Why it paused', clean(payment.reasons.join(', ')).slice(0, 200).trimEnd()),
+      ...((payment.approvalsRequired ?? 1) > 1
+        ? { approvals: shown(4, 'Approvals needed', `${payment.approvalsRequired} family approvers`) }
+        : {}),
+      amount_cents: { display: false, value: payment.amountCents },
+    },
+  }];
 }
 
 export class CibaError extends Error {
@@ -56,8 +105,11 @@ export class CibaError extends Error {
 }
 
 export type CibaPoll =
-  /** Approved in Guardian; `sub` is from the verified ID token. */
-  | { kind: 'approved'; sub: string }
+  /**
+   * Approved in Guardian; `sub` is from the verified ID token. `permissions`
+   * is the RBAC claim of the verified API access token, when Auth0 sent one.
+   */
+  | { kind: 'approved'; sub: string; permissions?: string[] }
   | { kind: 'pending' }
   /** Auth0 asks us to poll less often. */
   | { kind: 'slow_down'; intervalSeconds: number }
@@ -77,6 +129,13 @@ export type CibaClientOptions = {
   clientId: string;
   clientSecret: string;
   audience?: string;
+  /**
+   * Send `audience` and `authorization_details`. Needs the app granted
+   * user-delegated access to the API and the details type registered there.
+   */
+  richAuthorizationDetails?: boolean;
+  /** AUTH0_RBAC: an API access token without a `permissions` claim grants nothing. */
+  requirePermissionsClaim?: boolean;
   fetch?: FetchLike;
   /** Key set for verifying ID tokens. Defaults to the tenant's published keys. */
   keys?: JWTVerifyGetKey;
@@ -104,27 +163,29 @@ export function createCibaClient(options: CibaClientOptions) {
   }
 
   /** Sends the push. Throws CibaError if Auth0 will not (e.g. member not enrolled). */
-  async function start(input: { sub: string; bindingMessage: string; expirySeconds: number;
-    payment?: { amountCents: Cents; payee: string; reasons: string[] } }) {
+  async function start(input: { sub: string; bindingMessage: string; expirySeconds: number; payment?: PaymentDetails }) {
+    const send = (rich: boolean) => post('bc-authorize', {
+      scope: 'openid',
+      ...(rich && options.audience ? { audience: options.audience } : {}),
+      ...(rich && input.payment
+        ? { authorization_details: JSON.stringify(paymentAuthorizationDetails(input.payment)) }
+        : {}),
+      binding_message: input.bindingMessage,
+      // 300 or less is what makes Auth0 use mobile push rather than email.
+      requested_expiry: String(Math.max(1, Math.min(300, Math.floor(input.expirySeconds)))),
+      login_hint: JSON.stringify({ format: 'iss_sub', iss: issuer, sub: input.sub }),
+    });
+    const rich = Boolean(options.richAuthorizationDetails && options.audience);
     let result;
     try {
-      result = await post('bc-authorize', {
-        scope: 'openid',
-        ...(options.audience ? { audience: options.audience } : {}),
-        ...(input.payment ? { authorization_details: JSON.stringify([{
-          type: 'urn:auth0:schemas:authorization-details:v1:payment',
-          instruction: 'Approve or deny this held payment.',
-          properties: {
-            amount: { display: true, name: 'Amount (USD)', display_order: 1, value: formatCents(input.payment.amountCents) },
-            payee: { display: true, name: 'Payee', display_order: 2, value: input.payment.payee },
-            reason: { display: true, name: 'Why it paused', display_order: 3, value: input.payment.reasons.join(', ').slice(0, 255) },
-          },
-        }]) } : {}),
-        binding_message: input.bindingMessage,
-        // 300 or less is what makes Auth0 use mobile push rather than email.
-        requested_expiry: String(Math.max(1, Math.min(300, Math.floor(input.expirySeconds)))),
-        login_hint: JSON.stringify({ format: 'iss_sub', iss: issuer, sub: input.sub }),
-      });
+      result = await send(rich);
+      // A 400 sends no push. If the tenant refused the audience or details
+      // (app not granted, type not registered), the binding message alone
+      // still works. ponytail: retries on any 400; Auth0 does not document these texts.
+      if (rich && result.status === 400) {
+        console.warn(`[ciba] bc-authorize refused audience/details (${String(result.body.error ?? 'no code')}); retrying without`);
+        result = await send(false);
+      }
     } catch {
       throw new CibaError('Could not reach Auth0', null);
     }
@@ -166,7 +227,8 @@ export function createCibaClient(options: CibaClientOptions) {
           algorithms: ['RS256'],
         });
         if (!payload.sub) return { kind: 'invalid', message: 'ID token has no subject' };
-        return { kind: 'approved', sub: payload.sub };
+        const permissions = await accessTokenPermissions(body.access_token, payload.sub);
+        return { kind: 'approved', sub: payload.sub, ...(permissions ? { permissions } : {}) };
       } catch {
         return { kind: 'invalid', message: 'ID token did not verify' };
       }
@@ -196,6 +258,33 @@ export function createCibaClient(options: CibaClientOptions) {
           kind: 'invalid',
           message: String(body.error_description ?? body.error ?? `Auth0 answered ${status}`).slice(0, 300),
         };
+    }
+  }
+
+  /**
+   * The `permissions` claim of the access token for our API. Undefined only
+   * when no such token came back (no audience sent, or the plain retry): then
+   * the circle role decides. A token for our API fails closed: one that does
+   * not verify or names someone else yields no permissions.
+   */
+  async function accessTokenPermissions(token: unknown, sub: string): Promise<string[] | undefined> {
+    if (!options.audience || typeof token !== 'string') return undefined;
+    let aud: unknown;
+    try {
+      aud = decodeJwt(token).aud;
+    } catch {
+      return undefined; // opaque: Auth0 issued no API token
+    }
+    if (aud !== options.audience && !(Array.isArray(aud) && aud.includes(options.audience))) return undefined;
+    try {
+      const { payload } = await jwtVerify(token, keys, { issuer, audience: options.audience, algorithms: ['RS256'] });
+      const claim = payload.permissions;
+      if (payload.sub !== sub) return [];
+      if (claim === undefined) return options.requirePermissionsClaim ? [] : undefined;
+      // A malformed claim must not read as "no claim": it yields no permissions.
+      return Array.isArray(claim) ? claim.filter((p): p is string => typeof p === 'string') : [];
+    } catch {
+      return [];
     }
   }
 

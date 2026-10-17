@@ -54,12 +54,13 @@ enum Screen: Equatable {
     var isOnCall: Bool { calls.calls.contains { !$0.hasEnded } }
 
     #if DEBUG
-    /// Screenshots without a server: launch with `-preview home|payees|confirm|waiting|denied`.
+    /// Screenshots without a server: launch with `-preview home|payees|confirm|waiting|denied|asked|settings`.
     init() {
         let payee = Payee.all[3]
         let held = { (outcome: String) in API.Payment(id: "preview", outcome: outcome, amountCents: 50000, payee: .init(name: payee.name), decidedByName: nil) }
         switch UserDefaults.standard.string(forKey: "preview") {
-        case "home": token = "preview"; config = .init(protectedName: "Rosa", family: [])
+        case "home", "settings": token = "preview"; config = .init(protectedName: "Rosa", family: [])
+        case "asked": token = "preview"; screen = .asked
         case "payees": token = "preview"; screen = .choosePayee
         case "confirm": token = "preview"; screen = .confirm(payee, cents: 50000)
         case "waiting": token = "preview"; payment = held("waiting"); screen = .status
