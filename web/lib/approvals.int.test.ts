@@ -118,6 +118,8 @@ describe('answers from Guardian', () => {
     await makeDue(payment.id);
 
     await approvals.pollPayment(payment.id, circleId);
+    await makeDueFor(payment.id, LEO);
+    await approvals.pollPayment(payment.id, circleId);
 
     const final = await service.getPayment(payment.id);
     expect(final).toMatchObject({ status: 'paid', decidedVia: 'ciba' });
@@ -129,7 +131,7 @@ describe('answers from Guardian', () => {
   it('an approval is never lost when applying it fails once', async () => {
     const payment = await hold();
     auth0.answer(MARIA, 'approve');
-    await makeDue(payment.id);
+    await makeDueFor(payment.id, MARIA);
 
     // The first attempt to apply the decision hits a transient error.
     let failOnce = true;
@@ -148,6 +150,8 @@ describe('answers from Guardian', () => {
       }),
     });
 
+    await flaky.pollPayment(payment.id, circleId);
+    await makeDueFor(payment.id, LEO);
     await expect(flaky.pollPayment(payment.id, circleId)).rejects.toThrow('connection terminated');
     expect((await service.getPayment(payment.id))!.status).toBe('held');
     const pollsSoFar = auth0.tokenPolls().length;
@@ -181,6 +185,88 @@ describe('answers from Guardian', () => {
 
     expect(await service.getPayment(payment.id)).toMatchObject({ status: 'denied', decidedVia: 'ciba' });
     expect(nessieFake.paymentWrites()).toHaveLength(0);
+  });
+
+  it('does not count a pending check made before another member approves', async () => {
+    const payment = await hold();
+    auth0.answer(MARIA, 'approve');
+    await makeDue(payment.id);
+    const ciba = createCibaClient({ ...FAKE_AUTH0, fetch: auth0.fetch, keys: auth0.keys });
+    const mariaRequest = [...auth0.pushes.entries()].find(([, push]) => push.sub === MARIA)![0];
+    const timed = createCibaApprovals({
+      pool,
+      ciba: {
+        ...ciba,
+        poll: async (id) => {
+          // Leo was pending when checked. He denies before Maria's approval
+          // reaches this server, so that earlier check cannot clear her approval.
+          if (id === mariaRequest) auth0.answer(LEO, 'deny');
+          return ciba.poll(id);
+        },
+      },
+      payments: () => service,
+    });
+
+    await timed.pollPayment(payment.id, circleId);
+    expect((await service.getPayment(payment.id))!.status).toBe('held');
+    expect(nessieFake.paymentWrites()).toHaveLength(0);
+
+    await makeDueFor(payment.id, LEO);
+    await timed.pollPayment(payment.id, circleId);
+    expect((await service.getPayment(payment.id))!.status).toBe('denied');
+  });
+
+  it('requires the other pending check to be strictly after the approval', async () => {
+    const payment = await hold();
+    await pool.query(
+      `update ciba_requests r
+          set state = case when m.auth0_sub = $2 then 'approved' else r.state end,
+              answered_at = case when m.auth0_sub = $2 then now() else r.answered_at end,
+              last_polled_at = now(), poll_after = now() + interval '1 hour'
+         from circle_members m
+        where r.payment_id = $1 and m.id = r.member_id and m.auth0_sub in ($2, $3)`,
+      [payment.id, MARIA, LEO],
+    );
+
+    await approvals.pollPayment(payment.id, circleId);
+    expect((await service.getPayment(payment.id))!.status).toBe('held');
+    expect(nessieFake.paymentWrites()).toHaveLength(0);
+  });
+
+  it('keeps an earlier Auth0 answer when recording a later poll fails', async () => {
+    const payment = await hold();
+    auth0.answer(LEO, 'approve');
+    await makeDue(payment.id);
+    const mariaId = (
+      await pool.query<{ id: string }>(
+        `select r.id from ciba_requests r join circle_members m on m.id = r.member_id
+          where r.payment_id = $1 and m.auth0_sub = $2`,
+        [payment.id, MARIA],
+      )
+    ).rows[0]!.id;
+    const brokenPool = new Proxy(pool, {
+      get(target, property) {
+        if (property === 'query') return (sql: string, values?: unknown[]) => {
+          if (sql.includes('update ciba_requests set last_polled_at') && values?.[0] === mariaId) {
+            throw new Error('record write failed');
+          }
+          return target.query(sql, values);
+        };
+        return Reflect.get(target, property);
+      },
+    });
+    const interrupted = createCibaApprovals({
+      pool: brokenPool,
+      ciba: createCibaClient({ ...FAKE_AUTH0, fetch: auth0.fetch, keys: auth0.keys }),
+      payments: () => service,
+    });
+
+    await expect(interrupted.pollPayment(payment.id, circleId)).rejects.toThrow('record write failed');
+    expect((await requestsFor(payment.id)).find((r) => r.sub === LEO)?.state).toBe('approved');
+
+    await makeDueFor(payment.id, MARIA);
+    await approvals.pollPayment(payment.id, circleId);
+    expect((await service.getPayment(payment.id))!.status).toBe('paid');
   });
 
   it('an approval waits for the other open push to be checked, and an earlier Deny wins', async () => {

@@ -1,0 +1,5 @@
+import 'server-only';
+import { Auth0Client } from '@auth0/nextjs-auth0/server';
+
+/** Cookie-backed Auth0 login for the family dashboard. */
+export const auth0 = new Auth0Client();

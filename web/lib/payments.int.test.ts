@@ -295,14 +295,14 @@ describe('money moves exactly once', () => {
     // A minute after the send: still "sending". Saying "failed" now would
     // invite a second payment while the first might still land.
     await pool.query(
-      `update payments set updated_at = now() - interval '31 seconds', sent_at = now() - interval '1 minute' where id = $1`,
+      `update payments set updated_at = now() - interval '31 seconds', sent_at = now() - interval '1 minute', next_lookup_at = now() where id = $1`,
       [payment.id],
     );
     expect((await service.paymentForCircle(circleId, payment.id)).status).toBe('paying');
 
     // Ten minutes after the send, still nothing at Nessie: now it is failed.
     await pool.query(
-      `update payments set updated_at = now() - interval '31 seconds', sent_at = now() - interval '11 minutes' where id = $1`,
+      `update payments set updated_at = now() - interval '31 seconds', sent_at = now() - interval '11 minutes', next_lookup_at = now() where id = $1`,
       [payment.id],
     );
     const settled = await service.paymentForCircle(circleId, payment.id);
@@ -318,7 +318,7 @@ describe('money moves exactly once', () => {
     const payment = await service.createPayment(circleId, { ...electricBill, idempotencyKey: key() });
     // Old enough on both clocks that only the race guard can stop a "failed".
     await pool.query(
-      `update payments set updated_at = now() - interval '31 seconds', sent_at = now() - interval '11 minutes' where id = $1`,
+      `update payments set updated_at = now() - interval '31 seconds', sent_at = now() - interval '11 minutes', next_lookup_at = now() where id = $1`,
       [payment.id],
     );
 
@@ -351,22 +351,50 @@ describe('money moves exactly once', () => {
         payment_amount: 84.12,
       },
     });
-    await pool.query(`update payments set updated_at = now() - interval '31 seconds' where id = $1`, [payment.id]);
+    await pool.query(`update payments set updated_at = now() - interval '31 seconds', next_lookup_at = now() where id = $1`, [payment.id]);
 
     const settled = await service.paymentForCircle(circleId, payment.id);
     expect(settled).toMatchObject({ status: 'paid', nessieId: 'fake-late-arrival' });
     expect(fake.paymentWrites()).toHaveLength(1);
   });
+
+  it('finds a newly landed payment within 30 seconds, with one claimed lookup per interval', async () => {
+    fake.failNext('/bills', 'lostThen500');
+    const payment = await service.createPayment(circleId, { ...electricBill, idempotencyKey: key() });
+    expect(payment.status).toBe('paying');
+    const initialGets = fake.calls.filter((call) => call.method === 'GET').length;
+
+    await Promise.all(Array.from({ length: 5 }, () => service.paymentForCircle(circleId, payment.id)));
+    expect(fake.calls.filter((call) => call.method === 'GET')).toHaveLength(initialGets);
+
+    fake.records.push({
+      kind: 'bills', accountId: ACCOUNT,
+      body: { _id: 'fake-quick-arrival', payee: 'City Power & Light',
+        nickname: `Utilities [cw:${payment.id}]`, payment_date: '2026-10-17', payment_amount: 84.12 },
+    });
+    await pool.query(`update payments set next_lookup_at = now() where id = $1`, [payment.id]);
+    const reads = await Promise.all(Array.from({ length: 5 }, () => service.paymentForCircle(circleId, payment.id)));
+    expect(reads.some((read) => read.status === 'paid')).toBe(true);
+    expect((await service.getPayment(payment.id))!.status).toBe('paid');
+    expect(fake.calls.filter((call) => call.method === 'GET')).toHaveLength(initialGets + 4);
+    expect(fake.paymentWrites()).toHaveLength(1);
+  });
 });
 
-describe('unusual spending, from the real-time continuous aggregate', () => {
-  it('holds a grocery run far above her usual, from history the aggregate has not materialized', async () => {
+describe('unusual spending, from the continuous aggregate', () => {
+  it('holds a grocery run far above her usual history', async () => {
     // Ten days of ~$40 grocery runs, straight into the hypertable.
     await pool.query(
       `insert into spending (occurred_at, circle_id, amount_cents, category, payee_name)
        select now() - make_interval(days => d), $1, 4000, 'groceries', 'Sunrise Grocery'
          from generate_series(1, 10) as d`,
       [circleId],
+    );
+    // Once historical buckets are materialized, a backdated insert needs a
+    // refresh before the continuous aggregate includes it.
+    await pool.query(
+      `call refresh_continuous_aggregate('spending_daily',
+         now() - interval '11 days', now() - interval '1 hour')`,
     );
 
     const usual = await service.createPayment(circleId, {

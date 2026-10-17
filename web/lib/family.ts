@@ -10,6 +10,8 @@ import { PAIRING_CODE_MINUTES } from '@/lib/auth/device';
 import { hashShortCode, newShortCode, normalizeShortCode } from '@/lib/auth/tokens';
 import { codeHashKey } from '@/lib/env';
 import { HttpError } from '@/lib/http';
+import { issueInviteCode } from '@/lib/invites';
+export { issueInviteCode } from '@/lib/invites';
 import type { PaymentService } from '@/lib/payments';
 import { familyPaymentView } from '@/lib/views';
 
@@ -134,28 +136,10 @@ export async function createPairingCode(pool: pg.Pool, sub: string, circleId: st
   return { code, expiresAt: rows[0]!.expires_at.toISOString() };
 }
 
-/** Invite codes work this long. */
-export const INVITE_CODE_DAYS = 7;
-
 /** A fresh invite code for the circle; the old one stops working. */
 export async function rotateInviteCode(pool: pg.Pool, sub: string, circleId: string) {
   await requireMembership(pool, sub, circleId);
   return issueInviteCode(pool, circleId);
-}
-
-/** Sets a new invite code on a circle. Also used by the seed, before anyone has joined. */
-export async function issueInviteCode(pool: pg.Pool, circleId: string) {
-  const code = newShortCode();
-  const { rows } = await pool.query<{ invite_expires_at: Date }>(
-    `update circles
-        set invite_code_hash = $2,
-            invite_expires_at = now() + make_interval(days => $3)
-      where id = $1
-     returning invite_expires_at`,
-    [circleId, hashShortCode(code, codeHashKey()), INVITE_CODE_DAYS],
-  );
-  if (!rows[0]) throw new HttpError(404, 'not_found', 'Not found');
-  return { code, expiresAt: rows[0].invite_expires_at.toISOString() };
 }
 
 export async function familyAlerts(pool: pg.Pool, sub: string) {

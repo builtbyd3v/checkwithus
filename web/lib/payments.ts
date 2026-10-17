@@ -182,11 +182,12 @@ const DEMO_MERCHANT_LOCATION = {
  * the time anyone may conclude a send failed, the send itself has resolved.
  */
 const STUCK_PAYING_SECONDS = 30;
+const LOOKUP_INTERVAL_SECONDS = 7;
 
 /**
  * A payment whose bank outcome is unknown is only declared failed this long
- * after it was actually sent. Until then it is looked for at Nessie on every
- * read and shown as "sending". Nessie has no idempotency keys, so "failed"
+ * after it was actually sent. Until then it is looked for at Nessie at most
+ * once per lookup interval and shown as "sending". Nessie has no idempotency keys, so "failed"
  * followed by a retry (a new payment) while the first one commits late would
  * pay twice; ten minutes is far beyond any plausible late commit.
  */
@@ -520,8 +521,10 @@ export function createPaymentService(deps: PaymentServiceDeps) {
     // If that touches no row, a concurrent read already concluded this payment
     // (preparation ran past the reconcile window), so it must not be sent.
     const stillPaying = await pool.query(
-      `update payments set updated_at = now(), sent_at = now() where id = $1 and status = 'paying'`,
-      [payment.id],
+      `update payments set updated_at = now(), sent_at = now(),
+              next_lookup_at = now() + make_interval(secs => $2)
+        where id = $1 and status = 'paying'`,
+      [payment.id, LOOKUP_INTERVAL_SECONDS],
     );
     if (stillPaying.rowCount === 0) {
       const current = await getPayment(id);
@@ -566,10 +569,10 @@ export function createPaymentService(deps: PaymentServiceDeps) {
     }
   }
 
-  /** Leaves a payment `paying`, with a note for the dashboard. Restarts the reconcile clock. */
+  /** Leaves a payment `paying`, with a note for the dashboard. */
   async function notePaying(id: string, note: string): Promise<void> {
     await pool.query(
-      `update payments set failure = $2, updated_at = now() where id = $1 and status = 'paying'`,
+      `update payments set failure = $2 where id = $1 and status = 'paying'`,
       [id, note],
     );
   }
@@ -616,19 +619,20 @@ export function createPaymentService(deps: PaymentServiceDeps) {
 
   /**
    * Settles a payment left `paying`: a send cut off mid-flight, or one waiting
-   * on reconciliation. Waits until the last attempt is STUCK_PAYING_SECONDS
-   * old, so a write still in flight at Nessie is not declared failed.
+   * on reconciliation. Claims one Nessie lookup per interval across all readers.
+   * An absent record cannot mean failure until the last send is old enough.
    */
   async function reconcileIfStuck(payment: Payment): Promise<Payment> {
     if (payment.status !== 'paying') return payment;
     const { rows } = await pool.query<{ observed: string; long_enough: boolean }>(
-      `select updated_at::text as observed,
+      `update payments set next_lookup_at = now() + make_interval(secs => $2)
+        where id = $1 and status = 'paying' and next_lookup_at <= now()
+          and (sent_at is not null or updated_at < now() - make_interval(secs => $3))
+       returning updated_at::text as observed,
               -- Never sent (died before the send): nothing can land, safe to fail.
-              (sent_at is null or sent_at < now() - make_interval(mins => $3)) as long_enough
-         from payments
-        where id = $1 and status = 'paying'
-          and updated_at < now() - make_interval(secs => $2)`,
-      [payment.id, STUCK_PAYING_SECONDS, UNKNOWN_OUTCOME_MINUTES],
+              (sent_at is null or sent_at < now() - make_interval(mins => $4))
+                and updated_at < now() - make_interval(secs => $3) as long_enough`,
+      [payment.id, LOOKUP_INTERVAL_SECONDS, STUCK_PAYING_SECONDS, UNKNOWN_OUTCOME_MINUTES],
     );
     if (!rows[0]) return payment;
     const circle = await circleSettings(payment.circleId);

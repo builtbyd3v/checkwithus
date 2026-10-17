@@ -36,6 +36,7 @@ Required by SwampHacks and MLH rules, and disclosed on Devpost.
 | --- | --- |
 | Claude Code (Opus 5) | `web/` backend and dashboard: scaffolding, Nessie and Auth0 integration, family-circle logic, Tiger Data schema. Each PR notes the tools used. |
 | Codex CLI | Independent second-opinion review of changed files via a `Stop` hook. Read-only; it reviews, a human and the authoring agent decide. |
+| Codex (GPT-6) | Continued the `web/` backend: approval and reconciliation fixes, synthetic demo seed, and family dashboard. |
 
 All code in this repository was written during the event window. The on-device
 models are fine-tuned by us; the project is not a reskin of an existing AI tool.
@@ -70,6 +71,8 @@ license. Required by Devpost rule 10 and `docs/RULES.md`.
 | [jose](https://github.com/panva/jose) | 6.2.12 | MIT |
 | [server-only](https://www.npmjs.com/package/server-only) | 0.0.1 | MIT |
 | [vitest](https://github.com/vitest-dev/vitest) | 5.0.5 | MIT |
+| [@auth0/nextjs-auth0](https://github.com/auth0/nextjs-auth0) | 4.32.1 | MIT |
+| [tsx](https://github.com/privatenumber/tsx) | 4.23.15 | MIT |
 
 Type definitions (`@types/*`) come from
 [DefinitelyTyped](https://github.com/DefinitelyTyped/DefinitelyTyped) (MIT).

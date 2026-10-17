@@ -19,7 +19,6 @@
  */
 import 'server-only';
 import type pg from 'pg';
-import { transaction } from '@/lib/db';
 import { bindingMessage, CibaError, type CibaClient, type CibaPoll } from '@/lib/auth0/ciba';
 import { PaymentError, type Payment, type PaymentService } from '@/lib/payments';
 
@@ -127,17 +126,14 @@ export function createCibaApprovals(deps: CibaApprovalsDeps) {
         await supersede(paymentId);
         return;
       }
-      // Ask about every due request first, then record all the answers in one
-      // transaction. Inside it now() is a single instant, after every answer
-      // came back, so "checked after that approval arrived" is judged on one
-      // clock rather than on the order this loop happened to run in.
-      const answers: Array<{ request: (typeof claimed)[number]; result: CibaPoll }> = [];
-      for (const request of claimed) {
-        answers.push({ request, result: await ciba.poll(request.auth_req_id) });
+      // Commit each result before asking Auth0 about the next request. Auth0
+      // may hand out an answer only once, and a later failed write must not
+      // roll back an earlier answer. Separate clock readings also preserve
+      // the order in which the pending checks and answers reached us.
+      for (const request of claimed.sort((a, b) => a.sub.localeCompare(b.sub))) {
+        const result = await ciba.poll(request.auth_req_id);
+        await record(request, result);
       }
-      await transaction(pool, async (client) => {
-        for (const { request, result } of answers) await record(client, request, result);
-      });
     }
 
     // Also retries answers whose decision did not land last time (Auth0 hands
@@ -182,7 +178,7 @@ export function createCibaApprovals(deps: CibaApprovalsDeps) {
             select 1 from ciba_requests other
              where other.payment_id = r.payment_id and other.id <> r.id
                and other.state = 'pending'
-               and (other.last_polled_at is null or other.last_polled_at < r.answered_at))
+               and (other.last_polled_at is null or other.last_polled_at <= r.answered_at))
         order by r.answered_at, r.id
         limit 1`,
       [paymentId, circleId],
@@ -196,17 +192,16 @@ export function createCibaApprovals(deps: CibaApprovalsDeps) {
    * failure while applying it cannot lose it.
    */
   async function record(
-    client: pg.PoolClient,
     request: { id: string; sub: string },
     result: CibaPoll,
   ): Promise<void> {
     const update = (sql: string, values: unknown[] = []) =>
-      client.query(`update ciba_requests set ${sql} where id = $1`, [request.id, ...values]);
+      pool.query(`update ciba_requests set ${sql} where id = $1`, [request.id, ...values]);
 
     switch (result.kind) {
       case 'pending':
         // Auth0 confirmed "no answer yet" as of now.
-        await update('last_polled_at = now(), last_error = null');
+        await update('last_polled_at = clock_timestamp(), last_error = null');
         return;
       case 'unavailable':
         // We learned nothing, so last_polled_at stays as it was.
@@ -223,7 +218,7 @@ export function createCibaApprovals(deps: CibaApprovalsDeps) {
         await update(`state = 'failed', last_error = $2`, [result.message.slice(0, 500)]);
         return;
       case 'expired':
-        await update(`state = 'expired', last_polled_at = now()`);
+        await update(`state = 'expired', last_polled_at = clock_timestamp()`);
         return;
       case 'approved':
         // The verified token must be the member this push went to.
@@ -231,16 +226,16 @@ export function createCibaApprovals(deps: CibaApprovalsDeps) {
           await update(`state = 'failed', last_error = $2`, ['Auth0 returned a token for a different user']);
           return;
         }
-        await update(`state = 'approved', answered_at = now(), last_polled_at = now(), last_error = null`);
+        await update(`state = 'approved', answered_at = clock_timestamp(), last_polled_at = clock_timestamp(), last_error = null`);
         return;
       case 'denied_or_expired':
-        // Judged as of when the answer arrived (this transaction started after
-        // it did): well before expiry, Auth0 evaluated it earlier still, so it
+        // Judged as of when the answer arrived: well before expiry,
+        // Auth0 evaluated it earlier still, so it
         // was a real "Deny"; at the edge it may have been the timeout.
         await update(
-          `state = case when expires_at - now() > make_interval(secs => $2) then 'denied' else 'expired' end,
-           answered_at = case when expires_at - now() > make_interval(secs => $2) then now() end,
-           last_polled_at = now(), last_error = null`,
+          `state = case when expires_at - clock_timestamp() > make_interval(secs => $2) then 'denied' else 'expired' end,
+           answered_at = case when expires_at - clock_timestamp() > make_interval(secs => $2) then clock_timestamp() end,
+           last_polled_at = clock_timestamp(), last_error = null`,
           [EXPIRY_MARGIN_SECONDS],
         );
         return;
