@@ -72,6 +72,12 @@ export function createFakeNessie() {
       return json(200, accounts.filter((a) => a.customer_id === customerId));
     }
 
+    const oneAccount = pathname.match(/^\/accounts\/([^/]+)$/);
+    if (method === 'GET' && oneAccount) {
+      const account = accounts.find((a) => a._id === oneAccount[1]);
+      return account ? json(200, account) : json(404, { message: 'Account not found' });
+    }
+
     const accountRoute = pathname.match(/^\/accounts\/([^/]+)\/(purchases|withdrawals|deposits|bills|transfers)$/);
     if (accountRoute) {
       const [, accountId, kind] = accountRoute as [string, string, Stored['kind']];

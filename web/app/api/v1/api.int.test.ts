@@ -34,6 +34,12 @@ vi.mock('@/lib/auth/family', async () => {
 });
 
 const fake = createFakeNessie();
+// Routes that read Nessie directly (balance) must hit the fake, never the real sandbox.
+vi.mock('@/lib/nessie/client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/nessie/client')>();
+  const client = actual.createNessieClient({ key: 'test-key', fetch: fake.fetch, sleep: async () => {} });
+  return { ...actual, nessie: () => client };
+});
 /** Flipped by the CIBA-mode test. CIBA itself is covered in lib/approvals.int.test.ts. */
 const approvalMode = { ciba: false };
 const pollPayment = vi.fn(async () => {});
@@ -73,6 +79,7 @@ const routes = {
   me: await import('./family/me/route'),
   freeze: await import('./family/circles/[id]/freeze/route'),
   unfreeze: await import('./family/circles/[id]/unfreeze/route'),
+  balance: await import('./family/circles/[id]/balance/route'),
 };
 
 const BASE = 'https://checkwith.us/api/v1';
@@ -474,5 +481,20 @@ describe('Freeze over HTTP (the family app contract)', () => {
     fresh.headers.set('x-test-auth-time', String(Math.floor(Date.now() / 1000)));
     expect(await read(await routes.unfreeze.POST(fresh, params(circleId))))
       .toEqual({ status: 200, body: { frozen: false, movedCents: 10_000 } });
+  });
+
+  it('the balance is integer cents from the ledger; Nessie\'s stored balance is informational', async () => {
+    const balance = async () => read(await routes.balance.GET(req(`/family/circles/${circleId}/balance`, { sub: MARIA }), params(circleId)));
+    // The circle's Nessie account is not in the fake: Nessie unreachable must not hide the balance.
+    const offline = await balance();
+    expect(offline).toMatchObject({ status: 200, body: { nessieReportedBalanceCents: null, balanceSource: 'ledger', frozen: false } });
+    for (const key of ['ledgerBalanceCents', 'reservedCents', 'availableCents']) expect(Number.isInteger(offline.body[key])).toBe(true);
+    expect(offline.body.availableCents).toBe(Math.max(0, offline.body.ledgerBalanceCents - offline.body.reservedCents));
+
+    // A stored balance below the ledger is not a ceiling: Nessie never updates it.
+    const { rows } = await db().query<{ nessie_account_id: string }>('select nessie_account_id from circles where id = $1', [circleId]);
+    fake.accounts.push({ _id: rows[0]!.nessie_account_id, customer_id: 'test-customer', type: 'Checking', nickname: 'x', balance: 1 });
+    const live = await balance();
+    expect(live.body).toMatchObject({ nessieReportedBalanceCents: 100, availableCents: offline.body.availableCents });
   });
 });

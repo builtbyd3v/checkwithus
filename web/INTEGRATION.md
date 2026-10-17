@@ -107,7 +107,7 @@ token. Circle access is checked server-side.
 
 | Route | Input / result |
 | --- | --- |
-| `GET /family/circles/:id/balance` | Live Nessie reported balance, ledger balance, reservations, conservative available amount, timestamp |
+| `GET /family/circles/:id/balance` | Ledger balance, reservations, available amount, Nessie's stored balance (informational, null if Nessie is down), timestamp; see Balance below |
 | `POST /family/circles/:id/policy` | `{action:"threshold",twoApprovalsOverCents:100000}` or `{action:"role",memberId,role:"approver"\|"viewer"}`; fresh approver login required |
 | `GET /family/circles/:id/allowances` | `{allowances:[...]}` with active scope, cap, expiry and grantor |
 | `POST /family/circles/:id/allowances` | `{payeeId:null,category:"utilities",maxAmountCents:20000,expiresAt:"2026-11-30T23:59:00Z"}`; exactly one of payeeId/category, fresh approver login required |
@@ -173,6 +173,24 @@ $1,000 from an account Nessie stores at $50 into a vault opened at $0, then unfr
   not `200 []`, and lists rows with `id` instead of `_id`.
 - A transfer whose outcome is unknown (timeout or 5xx) is not retried or looked up;
   it stays `sending` and counts as moved.
+
+### Balance: the ledger decides (#13)
+
+`GET /family/circles/:id/balance` answers integer cents:
+`{ledgerBalanceCents, reservedCents, availableCents, nessieReportedBalanceCents, checkedAt, balanceSource: "ledger", frozen}`.
+`availableCents` is `max(0, ledger - reserved)`. The ledger is the opening balance, less
+spending and the Freeze vault, in Tiger Data.
+
+Decision, from a live probe on October 17 (synthetic customer, Checking account opened at $100):
+a $25 deposit, a $10 transfer in from another account, and a $5 withdrawal were all
+accepted (201), and `GET /accounts/:id` still answered `balance: 100` after each. The
+source account of the transfer, opened at $0, also stayed at $0. So Nessie's stored
+balance is the opening balance forever. It used to cap `availableCents`
+(`ledger_with_nessie_ceiling`); that cap is gone, because money added to the ledger
+would hide behind a figure Nessie never updates. We still read `GET /accounts/:id`
+and return its figure as `nessieReportedBalanceCents`, but a Nessie error returns
+`null` there instead of failing the whole balance. The ledger fields were also fixed to
+be JSON numbers: Postgres `sum()` is `numeric`, which arrived as a string.
 
 ### Scam sequence (#17)
 
