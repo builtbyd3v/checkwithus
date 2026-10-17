@@ -318,12 +318,7 @@ export function createPaymentService(deps: PaymentServiceDeps) {
       `select two_approvals_over_cents, hold_over_cents, frozen, ${AVAILABLE_CENTS_SQL} as available
          from circles c where c.id = $1 for update`, [circle.id],
     );
-    // The ledger, not the rules, knows the money is there. A retry of a payment already saved is exempt
-    // (its own amount is reserved now); it is answered from the saved row below.
     const duplicate = await q.query('select 1 from payments where circle_id = $1 and idempotency_key = $2', [circle.id, input.idempotencyKey]);
-    if (!duplicate.rowCount && input.amountCents > Number(policy.rows[0]!.available)) {
-      throw new PaymentError('insufficient_funds', 'There is not enough money available for this payment.');
-    }
     const allowance = await q.query<{ id: string }>(
       `select a.id from allowances a join circle_members m on m.id = a.granted_by
        left join payees p on p.id = a.payee_id
@@ -358,6 +353,12 @@ export function createPaymentService(deps: PaymentServiceDeps) {
       decision = { action: 'hold', reasons: reasons.includes('over_limit') ? reasons : [...reasons, 'over_limit'] };
     }
     const held = decision.action === 'hold';
+    // The ledger, not the rules, knows the money is there. Only a payment that would go out now is refused for
+    // lack of funds; a held one waits for family and is checked again when approved. A retry of a payment
+    // already saved is exempt (its own amount is reserved now); it is answered from the saved row below.
+    if (!held && !duplicate.rowCount && input.amountCents > Number(policy.rows[0]!.available)) {
+      throw new PaymentError('insufficient_funds', 'There is not enough money available for this payment.');
+    }
 
     return q.query<PaymentRow>(
       `insert into payments (

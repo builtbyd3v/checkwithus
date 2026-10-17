@@ -153,7 +153,13 @@ export function createFreezeService(deps: { pool: pg.Pool; nessie: NessieClient 
       if (last?.direction === 'unfreeze' && last.status !== 'failed') {
         // Another tap is moving the money back right now: never send a second transfer.
         if (last.in_flight) throw new HttpError(409, 'unfreeze_in_progress', 'The unfreeze is still moving the money. Try again in a moment.');
-        // A tap that sent (or may have sent) and stopped before lifting the freeze: finish it, send nothing.
+        // Stuck 'sending': its outcome is unknown and it may still fail, so stay frozen rather than let
+        // payments pass while the money may be in the vault. Never resent.
+        // ponytail: no lookup at Nessie to settle it, so this stays frozen until someone checks the bank.
+        if (last.status === 'sending') {
+          throw new HttpError(409, 'unfreeze_unconfirmed', 'The bank has not confirmed the earlier unfreeze, so spending stays frozen.');
+        }
+        // It sent but stopped before lifting the freeze: finish it, send nothing.
         await q.query('update circles set frozen = false where id = $1', [circleId]);
         return { transfer: null, moved: last.amount_cents, circle };
       }
@@ -171,15 +177,18 @@ export function createFreezeService(deps: { pool: pg.Pool; nessie: NessieClient 
       // Nothing moved and the flag was never lifted: still frozen, and tapping again retries.
       throw new HttpError(502, 'bank_error', 'The bank did not move the money back, so spending is still frozen. Try again.');
     }
+    let frozen = false;
     if (transfer) {
-      // The money is back (or may be: an unknown outcome counts). Lift the freeze unless a newer freeze took over.
-      await pool.query(
+      // The money is back (or may be: an unknown outcome counts). Lift the freeze unless a newer freeze took
+      // over; answer with what was saved, not what was hoped.
+      const lifted = await pool.query(
         `update circles set frozen = false where id = $1
            and (select direction from vault_transfers where circle_id = $1 order by id desc limit 1) = 'unfreeze'`,
         [circleId],
       );
+      frozen = !lifted.rowCount;
     }
-    return { frozen: false, movedCents: toCents(tap.moved) };
+    return { frozen, movedCents: toCents(tap.moved) };
   }
 
   return { freeze, unfreeze };
