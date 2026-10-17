@@ -23,6 +23,9 @@ final class RulesTests: XCTestCase {
             ("USPS: package on hold, update address at usps-redeliver.info/r1", "lookalike_domain"),
             ("Account locked. Verify at https://secure.paypalsecurity.net/login", "lookalike_domain"),
             ("Photos from Sunday are ready! https://apple.com.example.com/view", "lookalike_domain"),
+            ("Your withdrawal of $88000 is on hold for a tax review. Pay $500 to release the funds.", "withdraw_fee"),
+            ("Before withdrawal a security deposit of $49 is required.", "withdraw_fee"),
+            ("Your crypto account shows $42000 profit. To withdraw you must first pay a $980 tax fee.", "withdraw_fee"),
         ]
         for (text, rule) in cases {
             XCTAssertTrue(fired(text).contains(rule), "\(rule) did not fire on: \(text)")
@@ -51,6 +54,20 @@ final class RulesTests: XCTestCase {
             "Chase fraud alert: Never install AnyDesk or share your screen with a caller.",
             "Your toll statement is ready at https://www.sunpass.com",
             "Thanks for calling. Our toll-free support line is listed at https://example.com/help",
+            "Fidelity: We will never ask you to send crypto or pay a fee to withdraw your money.",
+            "ATM withdrawal fee of $3.00 was charged to your account ending 4421.",
+            "To withdraw early from your 401(k), a 10% tax penalty may apply. Talk to your advisor.",
+            "Fidelity: Your withdrawal of $500 was sent to your checking account.",
+            "Get 15% daily cashback at Publix this week!",
+            "Weekly returns are due Friday, bring the library books",
+            "Robinhood: Your order to buy 2 shares of AAPL was filled.",
+            "Sorry, wrong number! I was trying to reach my sister.",
+            // Not copied from blind_probe.csv, so these tests never tune rules on the blind set.
+            "Dad, if someone online promises guaranteed crypto returns, it is a scam. Please don't send them money.",
+            "CVS Pharmacy: Your prescription is ready. Please pay at the counter to release your order.",
+            "Library: pay your $3 late fee to unlock your account and borrow again.",
+            "I need to pay the parking fine to release the car from the impound lot",
+            "HSA reminder: to withdraw for non-medical expenses you must pay a 20% tax penalty.",
         ]
         for text in legit {
             XCTAssertEqual(fired(text), [], "false hold on: \(text)")
