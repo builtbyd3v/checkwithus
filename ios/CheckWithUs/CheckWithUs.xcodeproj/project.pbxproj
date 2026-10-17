@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		D707C7FE3083297900A792A4 /* MessageFilter.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D707C7F73083297900A792A4 /* MessageFilter.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		D707C9000000000000000001 /* GuardKit in Frameworks */ = {isa = PBXBuildFile; productRef = D707C9000000000000000002 /* GuardKit */; };
+		D707CB000000000000000002 /* GuardKit in Frameworks */ = {isa = PBXBuildFile; productRef = D707CB000000000000000003 /* GuardKit */; };
+		D707CA00000000000000000D /* SafeCard.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D707CA000000000000000002 /* SafeCard.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -19,6 +21,13 @@
 			remoteGlobalIDString = D707C7F63083297900A792A4;
 			remoteInfo = MessageFilter;
 		};
+		D707CA00000000000000000B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D707CA000000000000000001;
+			remoteInfo = SafeCard;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -28,6 +37,7 @@
 			dstSubfolder = PlugIns;
 			files = (
 				D707C7FE3083297900A792A4 /* MessageFilter.appex in Embed Foundation Extensions */,
+				D707CA00000000000000000D /* SafeCard.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 		};
@@ -36,6 +46,7 @@
 /* Begin PBXFileReference section */
 		000000000000000000000120 /* CheckWithUs.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CheckWithUs.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D707C7F73083297900A792A4 /* MessageFilter.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MessageFilter.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		D707CA000000000000000002 /* SafeCard.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SafeCard.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -45,6 +56,13 @@
 				Info.plist,
 			);
 			target = D707C7F63083297900A792A4 /* MessageFilter */;
+		};
+		D707CA000000000000000004 /* Exceptions for "SafeCard" folder in "SafeCard" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = D707CA000000000000000001 /* SafeCard */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -62,18 +80,37 @@
 			path = MessageFilter;
 			sourceTree = "<group>";
 		};
+		D707CB000000000000000001 /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		D707CA000000000000000003 /* SafeCard */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D707CA000000000000000004 /* Exceptions for "SafeCard" folder in "SafeCard" target */,
+			);
+			path = SafeCard;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		000000000000000130000000 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
+				D707CB000000000000000002 /* GuardKit in Frameworks */,
 			);
 		};
 		D707C7F43083297900A792A4 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
 				D707C9000000000000000001 /* GuardKit in Frameworks */,
+			);
+		};
+		D707CA000000000000000006 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
 			);
 		};
 /* End PBXFrameworksBuildPhase section */
@@ -84,7 +121,9 @@
 			children = (
 				000000000000000000000010 /* CheckWithUs */,
 				D707C7F83083297900A792A4 /* MessageFilter */,
+				D707CB000000000000000001 /* Shared */,
 				000000000000000000000020 /* Products */,
+				D707CA000000000000000003 /* SafeCard */,
 			);
 			sourceTree = "<group>";
 		};
@@ -93,6 +132,7 @@
 			children = (
 				000000000000000000000120 /* CheckWithUs.app */,
 				D707C7F73083297900A792A4 /* MessageFilter.appex */,
+				D707CA000000000000000002 /* SafeCard.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -113,9 +153,14 @@
 			);
 			dependencies = (
 				D707C7FD3083297900A792A4 /* PBXTargetDependency */,
+				D707CA00000000000000000C /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				000000000000000000000010 /* CheckWithUs */,
+				D707CB000000000000000001 /* Shared */,
+			);
+			packageProductDependencies = (
+				D707CB000000000000000003 /* GuardKit */,
 			);
 			name = CheckWithUs;
 			productName = MyApp;
@@ -143,6 +188,25 @@
 			productReference = D707C7F73083297900A792A4 /* MessageFilter.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		D707CA000000000000000001 /* SafeCard */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D707CA000000000000000008 /* Build configuration list for PBXNativeTarget "SafeCard" */;
+			buildPhases = (
+				D707CA000000000000000005 /* Sources */,
+				D707CA000000000000000006 /* Frameworks */,
+				D707CA000000000000000007 /* Resources */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				D707CA000000000000000003 /* SafeCard */,
+				D707CB000000000000000001 /* Shared */,
+			);
+			name = SafeCard;
+			productName = SafeCard;
+			productReference = D707CA000000000000000002 /* SafeCard.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -153,6 +217,9 @@
 				LastSwiftUpdateCheck = 2710;
 				LastUpgradeCheck = 2700;
 				TargetAttributes = {
+					D707CA000000000000000001 = {
+						CreatedOnToolsVersion = 27.1;
+					};
 					000000000000000100000000 = {
 						CreatedOnToolsVersion = 26.3;
 					};
@@ -180,6 +247,7 @@
 			targets = (
 				000000000000000100000000 /* CheckWithUs */,
 				D707C7F63083297900A792A4 /* MessageFilter */,
+				D707CA000000000000000001 /* SafeCard */,
 			);
 		};
 /* End PBXProject section */
@@ -191,6 +259,11 @@
 			);
 		};
 		D707C7F53083297900A792A4 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		D707CA000000000000000007 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
 			);
@@ -208,6 +281,11 @@
 			files = (
 			);
 		};
+		D707CA000000000000000005 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -215,6 +293,11 @@
 			isa = PBXTargetDependency;
 			target = D707C7F63083297900A792A4 /* MessageFilter */;
 			targetProxy = D707C7FC3083297900A792A4 /* PBXContainerItemProxy */;
+		};
+		D707CA00000000000000000C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D707CA000000000000000001 /* SafeCard */;
+			targetProxy = D707CA00000000000000000B /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -362,6 +445,7 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Check With Us";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -401,6 +485,7 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Check With Us";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -490,6 +575,67 @@
 			};
 			name = Release;
 		};
+		D707CA000000000000000009 /* Debug configuration for PBXNativeTarget "SafeCard" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6NXLW84FWQ;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = SafeCard/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = SafeCard;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.devgiribharatgirigoswami.CheckWithUs.SafeCard;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		D707CA00000000000000000A /* Release configuration for PBXNativeTarget "SafeCard" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6NXLW84FWQ;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = SafeCard/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = SafeCard;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.devgiribharatgirigoswami.CheckWithUs.SafeCard;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -517,6 +663,14 @@
 			);
 			defaultConfigurationName = Release;
 		};
+		D707CA000000000000000008 /* Build configuration list for PBXNativeTarget "SafeCard" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D707CA000000000000000009 /* Debug configuration for PBXNativeTarget "SafeCard" */,
+				D707CA00000000000000000A /* Release configuration for PBXNativeTarget "SafeCard" */,
+			);
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -528,6 +682,11 @@
 
 /* Begin XCSwiftPackageProductDependency section */
 		D707C9000000000000000002 /* GuardKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D707C804308329AB00A792A4 /* XCLocalSwiftPackageReference "../GuardKit" */;
+			productName = GuardKit;
+		};
+		D707CB000000000000000003 /* GuardKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = D707C804308329AB00A792A4 /* XCLocalSwiftPackageReference "../GuardKit" */;
 			productName = GuardKit;
