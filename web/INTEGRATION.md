@@ -19,6 +19,7 @@ All paths below are relative to the base URL.
 | --- | --- | --- |
 | `POST /device/pair` | One-time pairing code in body | Exchange `{code, label}` for a device token |
 | `GET /device/config` | Device | Family names, hold threshold, timeout, locked app groups |
+| `GET /device/bank-locations` | Device | Cached public Nessie ATM/branch directory for on-device bank-location checks |
 | `POST /device/alerts` | Device | Record `ask_family` or `bank_during_call` with optional detail |
 | `GET /device/labels?cursor=<nextCursor>` | Device | Family decisions as labels for local training; optional legacy `after` starting filter |
 | `POST /payments` | Device | Request a payment with an idempotency key |
@@ -33,6 +34,8 @@ All paths below are relative to the base URL.
 | `POST /family/payments/:id/decision` | Family | `{decision: "approve" \| "deny"}`; CIBA mode accepts denial only |
 
 Health endpoint: `GET https://checkwith.us/api/health`.
+
+Bank directory entries contain `id`, `kind` (`atm` or `branch`), `name`, `coordinates` (`latitude`, `longitude`, or null), and `address` (or null). Use only entries with coordinates for geofences; do not treat a missing coordinate as zero. Match the phone's location locally, then post `bank_during_call` when the iOS call/location rules trigger. No phone location is required by the directory endpoint. The directory is cached with Next's `hours` profile.
 
 ## Payment flow
 
@@ -68,6 +71,8 @@ In CIBA mode an API approval returns `403 approve_in_guardian`. The member must 
 ## Demo setup and boundaries
 
 Run `npm run db:migrate` and `npm run seed:demo` from `web/` with local environment variables configured. The seed creates synthetic Rosa data, known payees, historical spending, and an invite. Sign in, join with that invite, then generate a pairing code in the dashboard for the iPhone.
+
+`npm run check:nessie` reads the synthetic account on both supported Nessie hosts. Add `-- --write` to verify one $1 utility payment per host through the normal rules and ledger. Fixed idempotency keys make repeat checks read the same payments rather than resend. The check prints statuses and synthetic balance amounts, never API keys. Both hosts were verified on October 17, 2026. Nessie's reported account balance did not change after those payments, so it is not currently an authoritative spendable balance; payment accounting remains in Tiger Data.
 
 The current demo provisions circles and Nessie accounts through the seed. It does not include general customer/account onboarding, bank linking, or a public circle-creation endpoint. Known payees, hold limits, invites, and pairing codes can be managed through the dashboard; full mobile settings CRUD is not implemented.
 

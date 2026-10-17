@@ -16,10 +16,13 @@ import type { z } from 'zod';
 import { nessieEnv } from '@/lib/env';
 import {
   accountListSchema,
+  accountSchema,
+  bankLocationListSchema,
   billListSchema,
   createdSchema,
   customerListSchema,
   fromAccount,
+  fromBankLocation,
   fromBill,
   fromMovement,
   fromPurchase,
@@ -30,7 +33,7 @@ import {
   type NessieRecord,
 } from './format';
 
-const BASE_URL = 'https://api.nessieisreal.com';
+export const NESSIE_BASE_URLS = ['https://api.nessieisreal.com', 'https://prod-api.nessieisreal.com'] as const;
 const TIMEOUT_MS = 10_000;
 const GET_RETRIES = 2;
 
@@ -59,6 +62,7 @@ type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
 
 export type NessieClientOptions = {
   key: string;
+  baseUrl?: typeof NESSIE_BASE_URLS[number];
   fetch?: FetchLike;
   /** Injected by tests so retries do not actually sleep. */
   sleep?: (ms: number) => Promise<void>;
@@ -66,11 +70,13 @@ export type NessieClientOptions = {
 
 export function createNessieClient(options: NessieClientOptions) {
   if (!options.key) throw new Error('Nessie API key is empty');
+  const baseUrl = options.baseUrl ?? NESSIE_BASE_URLS[0];
+  if (!NESSIE_BASE_URLS.includes(baseUrl)) throw new Error('Unsupported Nessie host');
   const doFetch: FetchLike = options.fetch ?? ((input, init) => fetch(input, init));
   const sleep = options.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
 
   async function request(method: Method, path: string, body?: unknown) {
-    const url = `${BASE_URL}${path}?key=${encodeURIComponent(options.key)}`;
+    const url = `${baseUrl}${path}?key=${encodeURIComponent(options.key)}`;
     const attempts = method === 'GET' ? 1 + GET_RETRIES : 1;
 
     for (let attempt = 1; ; attempt++) {
@@ -82,6 +88,7 @@ export function createNessieClient(options: NessieClientOptions) {
           body: body === undefined ? undefined : JSON.stringify(body),
           signal: AbortSignal.timeout(TIMEOUT_MS),
           cache: 'no-store',
+          redirect: 'error',
         });
       } catch {
         // The original error can contain the URL, and with it the key: drop it.
@@ -171,6 +178,16 @@ export function createNessieClient(options: NessieClientOptions) {
   }
 
   return {
+    listAtms: async () => (await list('/atms', bankLocationListSchema)).map((location) => fromBankLocation(location, 'atm')),
+    listBranches: async () => (await list('/branches', bankLocationListSchema)).map((location) => fromBankLocation(location, 'branch')),
+    getAccount: async (id: string): Promise<NessieAccount> => {
+      const path = account(id);
+      const { status, json } = await request('GET', path);
+      if (status !== 200) throw new NessieError('GET', path, status, detailOf(json));
+      const parsed = accountSchema.safeParse(json);
+      if (!parsed.success) throw new NessieError('GET', path, status, 'response did not match the expected shape');
+      return fromAccount(parsed.data);
+    },
     listCustomers: () => list('/customers', customerListSchema),
     createCustomer: (body: unknown) => create('/customers', body),
 

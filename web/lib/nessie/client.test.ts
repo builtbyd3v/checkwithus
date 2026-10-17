@@ -21,6 +21,35 @@ const json = (status: number, body: unknown) =>
 
 const noSleep = async () => {};
 
+describe('hosts and bank data', () => {
+  it.each(['https://api.nessieisreal.com', 'https://prod-api.nessieisreal.com'] as const)('reads an account from %s and converts dollars to cents', async (baseUrl) => {
+    const { fetch, calls } = scripted([json(200, { _id: 'acct', customer_id: 'customer', type: 'Checking', nickname: 'Synthetic', balance: 123.45, rewards: 0 })]);
+    const client = createNessieClient({ key: KEY, baseUrl, fetch });
+    expect(await client.getAccount('acct')).toMatchObject({ nessieId: 'acct', openingBalanceCents: 12345 });
+    expect(new URL(calls[0]!.url).origin).toBe(baseUrl);
+  });
+
+  it('rejects an unexpected host before sending the key', () => {
+    // @ts-expect-error Verify runtime safety for untyped callers too.
+    expect(() => createNessieClient({ key: KEY, baseUrl: 'https://untrusted.invalid' })).toThrow('Unsupported Nessie host');
+  });
+
+  it('keeps missing branch coordinates null rather than inventing a geofence', async () => {
+    const { fetch } = scripted([
+      json(200, [{ _id: 'atm', name: 'Synthetic ATM', geocode: { lat: 29.65, lng: -82.32 } }]),
+      json(200, [{ _id: 'branch', name: 'Synthetic Branch', address: { street_number: '1', street_name: 'Demo St', city: 'Gainesville', state: 'FL', zip: '32601' } }]),
+    ]);
+    const client = createNessieClient({ key: KEY, fetch });
+    expect(await client.listAtms()).toEqual([{ id: 'atm', kind: 'atm', name: 'Synthetic ATM', coordinates: { latitude: 29.65, longitude: -82.32 }, address: null }]);
+    expect((await client.listBranches())[0]).toMatchObject({ kind: 'branch', coordinates: null, address: { city: 'Gainesville' } });
+  });
+
+  it('rejects invalid coordinates', async () => {
+    const { fetch } = scripted([json(200, [{ _id: 'atm', name: 'Bad coordinates', geocode: { lat: 999, lng: 0 } }])]);
+    await expect(createNessieClient({ key: KEY, fetch }).listAtms()).rejects.toThrow('response did not match');
+  });
+});
+
 describe('writes', () => {
   it('never retries a POST, because it may already have paid', async () => {
     const { fetch, calls } = scripted([json(500, { message: 'boom' }), json(201, {})]);
