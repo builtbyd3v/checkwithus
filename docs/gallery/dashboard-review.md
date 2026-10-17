@@ -28,7 +28,9 @@ npm exec -- playwright test --config playwright.dashboard.config.ts
 The browser suite starts a local server using explicitly fake Auth0 configuration,
 tests keyboard approval/denial and persistent result focus, partial approvals,
 Guardian/viewer controls, button text contrast (at least 4.5:1), 200% text size,
-and long payee names. It recreates all ten screenshots. DevTools indicators are
+and long payee names. It also advances the browser clock past a hold deadline,
+checks both decision buttons disable, verifies exactly one route refresh, and
+checks a replacement deadline restores the controls. It recreates all ten screenshots. DevTools indicators are
 hidden in captures; payment UI is unchanged.
 
 Server-action unit tests separately verify authenticated delegation to the payment

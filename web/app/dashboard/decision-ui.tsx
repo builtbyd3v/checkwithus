@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from 'react';
 import type { FormState } from './actions';
+import { useRemainingSeconds } from './deadline';
 
 const DECIDED_EVENT = 'checkwith:decided';
 
@@ -28,9 +29,14 @@ export function DecisionStatus() {
 }
 
 /** Approve or deny one held payment. Under CIBA, approving happens in the Guardian push only. */
-export function DecisionForm({ paymentId, canApproveHere, decideAction }: { paymentId: string; canApproveHere: boolean; decideAction: (state: FormState, form: FormData) => Promise<FormState> }) {
+export function DecisionForm({ paymentId, canApproveHere, decideAction, expiresAt }: { paymentId: string; canApproveHere: boolean; decideAction: (state: FormState, form: FormData) => Promise<FormState>; expiresAt?: string | null }) {
+  const seconds = useRemainingSeconds(expiresAt);
+  const deadlinePassed = seconds === 0;
   const initial: FormState = { message: '' };
   const [state, decide, pending] = useActionState(async (previous: FormState, form: FormData) => {
+    if (expiresAt && Date.parse(expiresAt) <= Date.now()) {
+      return { message: 'Time is up. Refresh to see the latest payment status.' };
+    }
     const result = await decideAction(previous, form);
     if (result.decided) window.dispatchEvent(new CustomEvent(DECIDED_EVENT, { detail: result.message }));
     return result;
@@ -39,12 +45,13 @@ export function DecisionForm({ paymentId, canApproveHere, decideAction }: { paym
   return <form action={decide} className="mt-5 border-t border-stone-100 pt-4">
     <input type="hidden" name="paymentId" value={paymentId} />
     <div className="flex flex-wrap gap-3">
-      {canApproveHere && <button name="decision" value="approve" disabled={pending}
+      {canApproveHere && <button name="decision" value="approve" disabled={pending || deadlinePassed}
         className={`${base} bg-teal-800 hover:bg-teal-900 focus-visible:outline-teal-800`}>Approve</button>}
-      <button name="decision" value="deny" disabled={pending}
+      <button name="decision" value="deny" disabled={pending || deadlinePassed}
         className={`${base} bg-rose-800 hover:bg-rose-900 focus-visible:outline-rose-800`}>{pending ? 'Sending…' : 'Deny'}</button>
     </div>
     {!canApproveHere && <p className="mt-2 text-sm text-stone-700">To approve, use the Guardian notification on your phone.</p>}
+    {deadlinePassed && <p role="status" className="mt-3 text-sm font-semibold text-stone-700">Time is up. Refresh to see the latest payment status.</p>}
     {!state.decided && <p role="status" className="mt-3 text-sm text-teal-900">{state.message}</p>}
   </form>;
 }

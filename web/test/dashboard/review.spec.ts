@@ -38,6 +38,26 @@ test('Guardian and viewer modes expose only the permitted controls', async ({ pa
   await expect(page.getByRole('article').getByRole('button')).toHaveCount(0);
 });
 
+test('expiry disables stale decisions and refreshes server state once', async ({ page }) => {
+  await page.clock.install();
+  let refreshes = 0;
+  page.on('request', (request) => {
+    if (request.url().includes('/dashboard/preview') && request.headers()['rsc'] === '1') refreshes++;
+  });
+  await page.getByRole('button', { name: 'Expire in two seconds' }).click();
+  await expect(page.getByRole('button', { name: 'Approve', exact: true })).toBeEnabled();
+  await page.clock.fastForward(3000);
+  await expect(page.getByRole('button', { name: 'Approve', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Deny', exact: true })).toBeDisabled();
+  await expect(page.getByRole('article')).toContainText('Time is up. Checking payment status.');
+  await expect.poll(() => refreshes).toBe(1);
+  await page.clock.fastForward(10000);
+  expect(refreshes).toBe(1);
+  // A new hold deadline must not inherit the old timer's expired state.
+  await page.getByRole('button', { name: 'Expire in two seconds' }).click();
+  await expect(page.getByRole('button', { name: 'Approve', exact: true })).toBeEnabled();
+});
+
 test('decision text meets contrast requirements and the card fits at 200% text size', async ({ page }) => {
   for (const name of ['Approve', 'Deny']) {
     const ratio = await page.getByRole('button', { name, exact: true }).evaluate((button) => {

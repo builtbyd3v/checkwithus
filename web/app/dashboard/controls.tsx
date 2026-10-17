@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useState } from 'react';
+import { useActionState } from 'react';
 import { addPayeeAction, decideAction, freezeAction, inviteAction, joinAction, pairingAction, saveSettingsAction, unfreezeAction, type FormState } from './actions';
 
 import { DecisionForm } from './decision-ui';
@@ -9,19 +9,7 @@ const initial: FormState = { message: '' };
 const inputClass = 'h-11 w-full rounded-lg border border-stone-300 bg-white px-3 text-stone-900 outline-none focus:border-teal-700 focus:ring-2 focus:ring-teal-700/20';
 const buttonClass = 'inline-flex min-h-11 items-center justify-center rounded-lg bg-teal-800 px-4 font-semibold text-white hover:bg-teal-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800 disabled:opacity-60';
 
-export function Countdown({ expiresAt }: { expiresAt: string }) {
-  const [remaining, setRemaining] = useState<string>('—');
-  useEffect(() => {
-    const update = () => {
-      const seconds = Math.max(0, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 1000));
-      setRemaining(seconds ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')} left` : 'Time is up. It will be blocked.');
-    };
-    update();
-    const timer = window.setInterval(update, 1000);
-    return () => window.clearInterval(timer);
-  }, [expiresAt]);
-  return <time dateTime={expiresAt} aria-label={`Decision deadline ${new Date(expiresAt).toLocaleString()}`}>{remaining}</time>;
-}
+export { Countdown } from './deadline';
 
 function Feedback({ state }: { state: FormState }) {
   if (!state.message) return null;
@@ -42,8 +30,8 @@ export function JoinForm() {
 
 export { DecisionStatus } from './decision-ui';
 
-export function DecisionButtons({ paymentId, canApproveHere }: { paymentId: string; canApproveHere: boolean }) {
-  return <DecisionForm paymentId={paymentId} canApproveHere={canApproveHere} decideAction={decideAction} />;
+export function DecisionButtons({ paymentId, canApproveHere, expiresAt }: { paymentId: string; canApproveHere: boolean; expiresAt?: string | null }) {
+  return <DecisionForm paymentId={paymentId} canApproveHere={canApproveHere} decideAction={decideAction} expiresAt={expiresAt} />;
 }
 
 /** One tap during a live scam: the spending money goes to the vault and every payment waits. */
