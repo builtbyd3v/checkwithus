@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useEffect, useState } from 'react';
-import { addPayeeAction, freezeAction, inviteAction, joinAction, pairingAction, saveSettingsAction, unfreezeAction, type FormState } from './actions';
+import { addPayeeAction, decideAction, freezeAction, inviteAction, joinAction, pairingAction, saveSettingsAction, unfreezeAction, type FormState } from './actions';
 
 const initial: FormState = { message: '' };
 const inputClass = 'h-11 w-full rounded-lg border border-stone-300 bg-white px-3 text-stone-900 outline-none focus:border-teal-700 focus:ring-2 focus:ring-teal-700/20';
@@ -12,13 +12,13 @@ export function Countdown({ expiresAt }: { expiresAt: string }) {
   useEffect(() => {
     const update = () => {
       const seconds = Math.max(0, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 1000));
-      setRemaining(`${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`);
+      setRemaining(seconds ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')} left` : 'Time is up. It will be blocked.');
     };
     update();
     const timer = window.setInterval(update, 1000);
     return () => window.clearInterval(timer);
   }, [expiresAt]);
-  return <time dateTime={expiresAt} aria-label={`Decision deadline ${new Date(expiresAt).toLocaleString()}`}>{remaining} left</time>;
+  return <time dateTime={expiresAt} aria-label={`Decision deadline ${new Date(expiresAt).toLocaleString()}`}>{remaining}</time>;
 }
 
 function Feedback({ state }: { state: FormState }) {
@@ -34,6 +34,23 @@ export function JoinForm() {
     <div><label htmlFor="displayName" className="mb-1 block font-medium">Your name</label>
       <input id="displayName" name="displayName" autoComplete="name" required maxLength={80} className={inputClass} /></div>
     <button disabled={pending} className={buttonClass}>{pending ? 'Joining…' : 'Join family circle'}</button>
+    <Feedback state={state} />
+  </form>;
+}
+
+/** Approve or deny one held payment. Under CIBA, approving happens in the Guardian push only. */
+export function DecisionButtons({ paymentId, canApproveHere }: { paymentId: string; canApproveHere: boolean }) {
+  const [state, decide, pending] = useActionState(decideAction, initial);
+  const base = 'inline-flex min-h-12 min-w-28 items-center justify-center rounded-lg px-5 text-base font-semibold text-white focus-visible:outline-3 focus-visible:outline-offset-2 disabled:opacity-60';
+  return <form action={decide} className="mt-5 border-t border-stone-100 pt-4">
+    <input type="hidden" name="paymentId" value={paymentId} />
+    <div className="flex flex-wrap gap-3">
+      {canApproveHere && <button name="decision" value="approve" disabled={pending}
+        className={`${base} bg-teal-800 hover:bg-teal-900 focus-visible:outline-teal-800`}>Approve</button>}
+      <button name="decision" value="deny" disabled={pending}
+        className={`${base} bg-rose-800 hover:bg-rose-900 focus-visible:outline-rose-800`}>{pending ? 'Sending…' : 'Deny'}</button>
+    </div>
+    {!canApproveHere && <p className="mt-2 text-sm text-stone-700">To approve, use the Guardian notification on your phone.</p>}
     <Feedback state={state} />
   </form>;
 }
