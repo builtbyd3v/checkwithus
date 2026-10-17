@@ -9,12 +9,14 @@ const DOMAIN = 'checkwith-test.us.auth0.com';
 const ISSUER = `https://${DOMAIN}/`;
 const AUDIENCE = 'https://api.checkwith.us/';
 
+const rbac = vi.hoisted(() => ({ AUTH0_RBAC: 'false' }));
 vi.mock('@/lib/env', () => ({
   auth0Env: () => ({
     AUTH0_DOMAIN: DOMAIN,
     AUTH0_AUDIENCE: AUDIENCE,
     AUTH0_CLIENT_ID: 'x',
     AUTH0_CLIENT_SECRET: 'x',
+    ...rbac,
   }),
 }));
 
@@ -69,6 +71,24 @@ describe('requireFamilyUser', () => {
       sub: 'auth0|maria',
       name: 'Maria',
     });
+  });
+
+  it('passes on the Auth0 RBAC permissions claim, and treats a malformed one as no permissions', async () => {
+    await expect(requireFamilyUser(request(await sign({ permissions: ['approve:payments'] })))).resolves.toMatchObject({
+      permissions: ['approve:payments'],
+    });
+    await expect(requireFamilyUser(request(await sign({ permissions: 'approve:payments' })))).resolves.toMatchObject({
+      permissions: [],
+    });
+  });
+
+  it('with AUTH0_RBAC=true, a token without the claim has no permissions', async () => {
+    rbac.AUTH0_RBAC = 'true';
+    try {
+      await expect(requireFamilyUser(request(await sign()))).resolves.toMatchObject({ permissions: [] });
+    } finally {
+      rbac.AUTH0_RBAC = 'false';
+    }
   });
 
   it('rejects no token', async () => {

@@ -31,7 +31,7 @@ All paths below are relative to the base URL.
 | `GET /family/payments` | Family | Latest 50 payments across the member's circles |
 | `GET /family/payments?status=held` | Family | Pending payments, independently of recent completed payments |
 | `GET /family/payments/:id` | Family | Payment detail, Guardian polling and interrupted-send recovery |
-| `POST /family/payments/:id/decision` | Family | `{decision: "approve" \| "deny"}`; CIBA mode accepts denial only |
+| `POST /family/payments/:id/decision` | Family (approver) | `{decision: "approve" \| "deny"}`; CIBA mode accepts denial only; `403 permission_required` if the token has a `permissions` claim without `approve:payments` |
 | `POST /family/circles/:id/freeze` | Family (approver) | `{}` -> `{frozen: true, movedCents}`: spending balance to the vault |
 | `POST /family/circles/:id/unfreeze` | Family (approver, fresh login) | `{amountCents}` -> `{frozen: false, movedCents}`: that amount back |
 | `GET /family/circles/:id/balance` | Family | Ledger balance (vault excluded) and `frozen` |
@@ -137,15 +137,84 @@ cannot override new payees, gift cards, crypto, wire transfers, active calls,
 Guard warnings, or the two-approval threshold. Each permitted payment stores the
 allowance id. Expired/revoked grants and grants by demoted members stop applying.
 
-### Auth0 configuration and live verification still required
+### Auth0 for AI agents: what needs whom
 
-CIBA now sends `AUTH0_AUDIENCE` and Guardian-compatible `authorization_details`.
-Register `urn:auth0:schemas:authorization-details:v1:payment` on the Auth0 API and
-allow that type for this application's user grant before testing. See the
-[official Guardian RAR schema](https://auth0.com/docs/get-started/apis/configure-rich-authorization-requests).
-The details contain amount, payee and hold reasons, never message/bill contents.
-Tenant RAR configuration and real Guardian display/approval have not been verified;
-the family test account is not enrolled yet. Automated tests use a fake Auth0.
+The AI on the phone only suggests: its score can add a hold reason, never remove
+one. Fixed rules decide, and Auth0 decides who may override them.
+
+| What happens | Who must say yes | How |
+| --- | --- | --- |
+| A payment inside an allowance (known payee, matching payee or category, at or under the cap, before expiry, granted by a current approver, no scam reason, under the two-approval threshold) | Nobody: it pays at once | The payment stores `allowanceId` |
+| Any held payment (new payee, gift card, crypto, wire, during a call, Guard flag, over the hold limit, unusual spending, ATM cash then gift card, frozen) | One approver | CIBA push to every approver's Auth0 Guardian (`APPROVAL_MODE=ciba`), or the family app (`app` mode) |
+| A held payment over the two-approval threshold (default $1,000) | Two distinct approvers; one Deny stops it | Same channels; one tally across them |
+| Grant an allowance, change the threshold or roles, unfreeze | One approver with a fresh login (`auth_time` within 5 minutes) | `max_age=0` sign-in |
+| Deny, freeze, revoke an allowance | One approver, no fresh login | These only stop money |
+
+Approver means the circle role in our database. Approving also needs Auth0's
+`approve:payments` permission when the verified token carries a `permissions`
+claim, or always when `AUTH0_RBAC=true` (then a missing claim is a no). The
+family API decision route returns `403 permission_required` otherwise. Deny is
+not gated on the permission: it only stops money, so the circle role is enough.
+Without the claim and without `AUTH0_RBAC`, the circle role alone decides. Other
+approver routes (allowances, freeze, policy) check the circle role only.
+
+Guardian approvals are permission-checked only when `AUTH0_CIBA_RAR=true`:
+only then does `bc-authorize` send the API `audience`, so only then does Auth0
+return an access token for our API. That token fails closed: if it does not
+verify or names someone else, the approval is recorded as failed and not
+counted. With `AUTH0_CIBA_RAR` off (or after the plain retry) there is no API
+token, so Guardian approvals rely on the verified ID token and circle role.
+
+Two-approval quorum is tested on both paths: `app/api/v1/api.int.test.ts`
+(family app route: one approval holds, a repeat does not count, the second
+approver pays once, approve then deny blocks) and `lib/approvals.int.test.ts`
+(Guardian through a fake Auth0: the same cases, plus a Guardian vote and an app
+vote together).
+
+### CIBA push details (`AUTH0_CIBA_RAR`)
+
+Every push has a binding message such as `Rosa: 1,500.00 USD to QuickGift
+Cards` (letters, digits, whitespace and `+-_.,:#`, at most 64 characters).
+
+With `AUTH0_CIBA_RAR=true`, `bc-authorize` also sends `audience=AUTH0_AUDIENCE`
+and one Rich Authorization Requests object of type
+`urn:auth0:schemas:authorization-details:v1:payment` in Auth0's Guardian display
+schema: amount, payee, plain-words hold reasons, "Approvals needed" when two are
+required, and a hidden integer `amount_cents`. Never message or bill contents.
+Payee and reasons use the binding message charset (payee up to 64 characters,
+reasons up to 200). If Auth0 answers 400, the error code is logged and the push
+is retried once without audience and details.
+Unset or `false` sends neither. That is the default because our tenant refuses
+`audience` today: a probe on October 17 (a user that does not exist, so no push)
+answered `Client ... is not authorized to access resource server`.
+
+Docs: [CIBA with RAR](https://auth0.com/docs/get-started/authentication-and-authorization-flow/client-initiated-backchannel-authentication-flow/user-authorization-with-ciba),
+[Configure RAR](https://auth0.com/docs/get-started/apis/configure-rich-authorization-requests),
+[Client grants](https://auth0.com/docs/get-started/applications/application-access-to-apis-client-grants),
+[RBAC for APIs](https://auth0.com/docs/manage-users/access-control/configure-core-rbac/enable-role-based-access-control-for-apis).
+
+### Auth0 dashboard steps (Dev)
+
+1. APIs > the API whose Identifier is `AUTH0_AUDIENCE` > Permissions: add
+   `approve:payments`. Settings > RBAC: turn on Enable RBAC and Add Permissions
+   in the Access Token. User Management > Roles: create `Approver` with that
+   permission and assign it to each approver.
+2. Same API > Settings > Application Access Policy: User-Delegated Access to
+   Per-app authorization. Application Access tab > the web app > User-Delegated
+   Access > Grant Access, with `approve:payments`.
+3. Register the details type on the API (Management API):
+   `PATCH /api/v2/resource-servers/{id}` with
+   `{"authorization_details":[{"type":"urn:auth0:schemas:authorization-details:v1:payment"}]}`.
+   With Per-app authorization, also add it to the app's user client grant:
+   `PATCH /api/v2/client-grants/{id}` with
+   `{"authorization_details_types":["urn:auth0:schemas:authorization-details:v1:payment"]}`.
+4. Set `AUTH0_CIBA_RAR=true` and run `npm run check:auth0`. It must print
+   `✓ CIBA audience accepted` and `✓ CIBA authorization_details accepted`. The
+   probe uses a user that does not exist, so it sends no push. Then set
+   `AUTH0_RBAC=true` so a token without the claim cannot approve.
+5. Enroll a family test account in Guardian and approve one real push. Not yet
+   done: Guardian display of the details and an RBAC-carrying token are untested
+   against the real tenant. Automated tests use `test/fake-auth0.ts`.
 
 ### Freeze (#18) and Nessie transfers
 

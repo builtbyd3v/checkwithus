@@ -21,12 +21,18 @@ function keys() {
   ));
 }
 
-export type FamilyUser = { sub: string; name: string | null; authTime?: number };
+export type FamilyUser = {
+  sub: string;
+  name: string | null;
+  authTime?: number;
+  /** Auth0 RBAC `permissions` claim; [] when AUTH0_RBAC=true and the token has none. */
+  permissions?: string[];
+};
 
 /** The signed-in family member, or AuthError (401). */
 export async function requireFamilyUser(request: Request): Promise<FamilyUser> {
   const token = bearerToken(request);
-  const { AUTH0_DOMAIN, AUTH0_AUDIENCE } = auth0Env();
+  const { AUTH0_DOMAIN, AUTH0_AUDIENCE, AUTH0_RBAC } = auth0Env();
   try {
     const { payload } = await jwtVerify(token, keys(), {
       issuer: `https://${AUTH0_DOMAIN}/`,
@@ -35,7 +41,16 @@ export async function requireFamilyUser(request: Request): Promise<FamilyUser> {
     });
     if (!payload.sub) throw new AuthError('Token has no subject');
     const name = typeof payload.name === 'string' ? payload.name : null;
-    return { sub: payload.sub, name, ...(typeof payload.auth_time === 'number' ? { authTime: payload.auth_time } : {}) };
+    const { permissions } = payload;
+    return {
+      sub: payload.sub,
+      name,
+      ...(typeof payload.auth_time === 'number' ? { authTime: payload.auth_time } : {}),
+      // A malformed claim must not read as "no claim": it yields no permissions.
+      ...(permissions !== undefined
+        ? { permissions: Array.isArray(permissions) ? permissions.filter((p): p is string => typeof p === 'string') : [] }
+        : AUTH0_RBAC === 'true' ? { permissions: [] } : {}),
+    };
   } catch (error) {
     if (error instanceof AuthError) throw error;
     if (error instanceof errors.JWTExpired) throw new AuthError('Sign-in expired');
