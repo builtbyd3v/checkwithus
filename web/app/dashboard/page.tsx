@@ -7,11 +7,11 @@ import { CATEGORY_LABELS, type Category } from '@/lib/categories';
 import { db } from '@/lib/db';
 import { familyPayments, memberships } from '@/lib/family';
 import { formatCents, toCents } from '@/lib/money';
+import { weeklySpending } from '@/lib/spending';
 import { cibaApprovals, payments } from '@/lib/services';
 import { Countdown, JoinForm, SettingsForms } from './controls';
 
 type SpendRow = { day: Date; category: Category; total_cents: string };
-type WeekRow = { weeks_ago: number; total_cents: string };
 type CircleRow = { hold_over_cents: string; protected_name: string };
 type MemberRow = { id: string; display_name: string };
 type PayeeRow = { id: string; name: string; kind: string; category: Category };
@@ -48,13 +48,7 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
          from spending_daily where circle_id = $1 and day >= now() - interval '90 days'
         order by day`, [active.circleId],
     ),
-    // Monday weeks from the spending_weekly continuous aggregate; 0 is this week.
-    db().query<WeekRow>(
-      `select round(extract(epoch from time_bucket(interval '7 days', now(), 'America/New_York') - week) / 604800)::int as weeks_ago,
-              sum(total_cents)::text as total_cents
-         from spending_weekly where circle_id = $1 and week > now() - interval '13 weeks'
-        group by week`, [active.circleId],
-    ),
+    weeklySpending(db(), active.circleId),
     db().query<CircleRow>('select protected_name, hold_over_cents::text from circles where id = $1', [active.circleId]),
     db().query<MemberRow>('select id, display_name from circle_members where circle_id = $1 order by created_at', [active.circleId]),
     db().query<PayeeRow>('select id, name, kind, category from payees where circle_id = $1 order by name', [active.circleId]),
@@ -65,7 +59,7 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
   for (const row of spendResult.rows) {
     categories.set(row.category, (categories.get(row.category) ?? 0n) + BigInt(row.total_cents));
   }
-  for (const row of weekResult.rows) {
+  for (const row of weekResult) {
     if (row.weeks_ago >= 0 && row.weeks_ago < weeks.length) weeks[12 - row.weeks_ago] = BigInt(row.total_cents);
   }
   const total = [...categories.values()].reduce((sum, cents) => sum + cents, 0n);

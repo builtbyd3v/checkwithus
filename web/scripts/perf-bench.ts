@@ -40,8 +40,17 @@ async function time(sql: string, params: unknown[]): Promise<number> {
 
 async function main() {
   await client.connect();
-  const schema = (await client.query<{ s: string }>('select current_schema() as s')).rows[0]!.s;
-  if (!schema.startsWith('wt_')) throw new Error(`refusing to seed ${ROWS} rows into schema ${schema}; use a wt_* schema`);
+  // Tables are unqualified, so check where each one actually resolves, not
+  // just current_schema(): a wt_* schema without migrations falls through to public.
+  const resolved = (await client.query<{ rel: string; ns: string | null }>(
+    `select rel, (select n.nspname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+                   where c.oid = to_regclass(rel)) as ns
+       from unnest(array['spending', 'circles', 'spending_daily', 'spending_weekly', 'spending_payee_daily']) rel`,
+  )).rows;
+  const schema = resolved[0]!.ns ?? '';
+  for (const { rel, ns } of resolved) {
+    if (!ns?.startsWith('wt_') || ns !== schema) throw new Error(`refusing to seed ${ROWS} rows: ${rel} resolves to ${ns ?? 'nothing'}; use a migrated wt_* schema`);
+  }
   const version = (await client.query<{ v: string }>(
     `select extversion || ', ' || split_part(version(), ' (', 1) as v from pg_extension where extname = 'timescaledb'`,
   )).rows[0]!.v;
@@ -51,10 +60,10 @@ async function main() {
   await client.query(`
     select alter_job(job_id, scheduled => false) from timescaledb_information.jobs
      where (hypertable_schema, hypertable_name) in (
-       select current_schema()::name, 'spending'::name
+       select $1::name, 'spending'::name
        union all
        select materialization_hypertable_schema, materialization_hypertable_name
-         from timescaledb_information.continuous_aggregates where view_schema = current_schema())`);
+         from timescaledb_information.continuous_aggregates where view_schema = $1::name)`, [schema]);
 
   console.log(`seeding ${ROWS} rows into ${schema}.spending ...`);
   await client.query('select setseed(0.42)');
@@ -150,10 +159,12 @@ async function main() {
   const md = `# Tiger Data performance
 
 Measured ${new Date().toISOString().slice(0, 10)} on Tiger Cloud (TimescaleDB ${version}) with ${Number(rowCount).toLocaleString('en-US')} synthetic rows in \`spending\` (${CIRCLES} circles, ${PAYEES} payees each, ${YEARS} years).
-Method: server time (planning + execution) from \`explain (analyze, timing off)\`, median of ${RUNS} warm runs after ${WARMUP} warm-ups; continuous aggregates refreshed first.
+Method: server time (planning + execution) from \`explain (analyze, timing off)\`, median of ${RUNS} warm runs after ${WARMUP} warm-ups; continuous aggregates fully materialized first (\`refresh_continuous_aggregate(..., null, null)\`).
 Reproduce: \`npm run bench:perf\` in \`web/\` (script \`web/scripts/perf-bench.ts\`), against a throwaway \`wt_*\` schema only.
 
 ${table}
+
+Aggregate times are a best case: everything was materialized, while in production the current week is computed live from raw rows. The queries are simplified versions of the dashboard and rules queries.
 
 Compression (columnstore, segment by circle): ${mb(stats.before)} MB to ${mb(stats.after)} MB, **${ratio}x smaller** (${stats.compressed} of ${stats.chunks} chunks).
 `;
