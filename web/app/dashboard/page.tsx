@@ -88,8 +88,8 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
           <h2 id="attention-title" className="mt-1 text-2xl font-semibold">{held.length ? `${held.length} payment${held.length === 1 ? '' : 's'} waiting` : 'All clear right now'}</h2></div>
           <p className="text-sm text-teal-950">{held.length ? 'A Guardian notification lets the family approve or deny.' : 'New held payments will appear here.'}</p></div>
         {held.length > 0 && <ul role="list" className="mt-6 grid gap-4 lg:grid-cols-2">{held.map((payment) => <li key={payment.id} className="rounded-xl border border-teal-900/10 bg-white p-5">
-          <div className="flex items-start justify-between gap-4"><div><p className="text-sm text-stone-500">{payment.protectedName} is paying</p><h3 className="mt-1 text-xl font-semibold">{payment.payee.name}</h3></div>
-            <strong className="text-xl tabular-nums">{money(payment.amountCents)}</strong></div>
+          <div className="flex flex-wrap items-start justify-between gap-4"><div className="min-w-0 flex-1 basis-40 [overflow-wrap:anywhere]"><p className="text-sm text-stone-500">{payment.protectedName} is paying</p><h3 className="mt-1 text-xl font-semibold">{payment.payee.name}</h3></div>
+            <strong className="shrink-0 text-xl tabular-nums">{money(payment.amountCents)}</strong></div>
           <p className="mt-3 text-sm font-semibold text-amber-900">{payment.expiresAt && <Countdown expiresAt={payment.expiresAt} />}</p>
           <p className="mt-3 text-sm leading-6 text-stone-700">{payment.explanation || 'This payment triggered a safety rule and needs a family decision.'}</p>
           <ul className="mt-4 flex flex-wrap gap-2" aria-label="Reasons for hold">{payment.holdReasons.map((reason) => <li key={reason.code} className="rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-700">{reason.label}</li>)}</ul>
@@ -102,10 +102,21 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
           <p className="text-3xl font-semibold tabular-nums">{money(total)}</p></div>
         <div className="mt-5 grid gap-5 lg:grid-cols-[1.3fr_0.7fr]">
           <div className="rounded-xl border border-stone-200 bg-white p-5"><h3 className="font-semibold">Weekly spending</h3>
-            <div role="img" aria-label="Weekly spending across the last 90 days" className="mt-6 flex h-44 items-end gap-2 border-b border-stone-200 pb-1">{weeks.map((week, index) => <div key={index} className="group relative flex h-full flex-1 items-end">
+            <div aria-hidden="true" className="mt-6 flex h-44 items-end gap-2 border-b border-stone-200 pb-1">{weeks.map((week, index) => <div key={index} className="group relative flex h-full flex-1 items-end">
               <div className="w-full rounded-t bg-teal-700/80" style={{ height: `${Math.max(week > 0n ? 5 : 0, Number(week * 100n / largestWeek))}%` }} />
-              <span className="sr-only">Week {index + 1}: {money(week)}.</span></div>)}</div>
+              </div>)}</div>
             <div className="mt-2 flex justify-between text-xs text-stone-500"><span>12 weeks ago</span><span>This week</span></div>
+            <details className="mt-4">
+              <summary className="min-h-11 cursor-pointer rounded px-2 py-3 text-sm font-semibold text-teal-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800">View weekly amounts</summary>
+              <table className="mt-2 w-full text-left text-sm">
+                <caption className="sr-only">Weekly spending, oldest to newest</caption>
+                <thead><tr><th scope="col" className="py-2 font-semibold">Week</th><th scope="col" className="py-2 text-right font-semibold">Amount</th></tr></thead>
+                <tbody>{weeks.map((week, index) => <tr key={index} className="border-t border-stone-100">
+                  <th scope="row" className="py-2 font-normal">{index === 12 ? 'This week' : index === 11 ? '1 week ago' : `${12 - index} weeks ago`}</th>
+                  <td className="py-2 text-right tabular-nums">{money(week)}</td>
+                </tr>)}</tbody>
+              </table>
+            </details>
           </div>
           <div className="rounded-xl border border-stone-200 bg-white p-5"><h3 className="font-semibold">By category</h3>
             {categoryRows.length ? <ul role="list" className="mt-5 space-y-4">{categoryRows.slice(0, 5).map(([category, cents]) => <li key={category}>
