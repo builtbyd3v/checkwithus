@@ -2,6 +2,8 @@
 
 Copy each section into the matching Devpost field. Check every `TODO(Dev):` before submitting. Due **Sun Oct 18, 8:00 AM ET**.
 
+TODO(Dev): cut anything not merged on `main` by submission. These parts depend on open PRs: the family iPhone app, Face ID approvals and the allowance screen (#30); the weekly and per-payee aggregates and the 1M-row numbers (#31); Freeze, the vault account, Nessie transfers and the "cash then gift card" hold (#32); the landing page widget (#33); the bank-while-on-a-call alert (#34).
+
 - **Project name:** checkwith.us
 - **Elevator pitch (max 200 characters):** Scam protection where the older adult does nothing and the family does the work. Scam texts filtered on the phone, scam calls labeled, risky payments paused for family approval.
 - **Links:** https://checkwith.us and https://github.com/builtbyd3v/checkwithus
@@ -30,24 +32,24 @@ checkwith.us is one iPhone app with two roles, plus a web dashboard.
 
 **For the family:**
 - **Approve or deny** each held payment on the family iPhone app (approve needs Face ID) or the web dashboard. Each reason is in plain words, with a short note written on the older adult's phone by Apple's on-device model.
-- **Family circle:** approvers and viewers. Payments over $1,000 (default) need two approvers.
+- **Family circle:** approvers and viewers. Over $1,000 (default), two approvers must say yes; one no stops it.
 - **Freeze:** one tap moves the whole spending balance to a vault account.
-- **Allowances:** a scoped, expiring "yes in advance", for example utilities up to $200 until Nov 30.
+- **Allowances:** a scoped, expiring "yes in advance", for example utilities up to $400 until Nov 30. It lifts only the amount limits for a known payee, never a scam hold.
 
 **Three hard rules:** AI suggests, code decides money. Money is integer cents everywhere. The older adult's texts and bills never go to a cloud AI model.
 
 ## How we built it
 
 - **iPhone (Swift, SwiftUI):** the app, a Message Filter extension (IdentityLookup), a Call Directory extension (CallKit), a Live Activity (ActivityKit), a bank geofence watcher (Core Location `CLMonitor`), Auth0 native login with PKCE, and Face ID (LocalAuthentication). Scam scoring lives in GuardKit, our own Swift package: a WordPiece tokenizer, 9 action-based rules, an n-gram scorer and a Core ML scorer.
-- **On-device AI:** two models trained by us on openly licensed SMS datasets. Guard v2 fine-tunes DistilBERT. Guard tiny is a 1 MB character and word n-gram logistic regression that fits in the Message Filter. Apple Foundation Models rewrites the true facts about a held payment into a calm note for the family; code picks the facts and checks the note kept them.
+- **On-device AI:** two models trained by us on openly licensed SMS datasets. The app ships only Guard tiny (`NGramScorer`), a 1 MB character and word n-gram logistic regression that runs in the Message Filter and the app. Guard v2 fine-tunes DistilBERT; it is trained and evaluated but not shipped, because at 67 MB it does not fit in the Message Filter. Apple Foundation Models rewrites the true facts about a held payment into a calm note for the family; code picks the facts and checks the note kept them.
 - **Backend (Next.js App Router, TypeScript, Vercel):** a payment API with idempotency keys, a pure `decideHold` rule function, the family API and dashboard, and a landing page whose "Try a payment" widget runs the same `decideHold` code.
 - **Data:** Tiger Data (TimescaleDB on Tiger Cloud) holds the spending ledger as a hypertable with compression and real-time continuous aggregates.
 - **Money:** Capital One Nessie is the bank. Every allowed payment becomes a Nessie purchase or bill.
-- **Identity:** Auth0 for logins, API tokens, roles, fresh-login checks and the CIBA Guardian push.
+- **Identity:** Auth0 for logins, API tokens, roles and fresh-login checks. A CIBA Guardian push is implemented but off by default.
 
 ## Challenges we ran into
 
-- **The Message Filter has a tight memory limit.** Our 67 MB Core ML DistilBERT killed the extension on a real iPhone. A probe build died about 21 MB above baseline on iOS 26. We trained a 1 MB n-gram model instead. It uses 2.6 MB in the extension, takes 11 ms on an iPhone 18 Pro Max, and catches 96.0% of real scam texts in our test set.
+- **The Message Filter has a tight memory limit.** Our 67 MB Core ML DistilBERT killed the extension on a real iPhone. A probe build died about 21 MB above baseline on iOS 26. We trained a 1 MB n-gram model instead. It uses 2.6 MB in the extension and catches 96.0% of real scam texts in our test set.
 - **Our first dataset split leaked.** A read-only Codex review found near-duplicate scam campaigns in both train and test, and a validation set that was 91% generated text. We clustered texts by character 5-gram similarity, kept whole clusters in one split, and made val and test real texts only.
 - **Nessie surprises.** Purchases must be whole dollars. The reported account balance does not change after payments. So Tiger Data keeps the payment ledger, and each payment is still a real Nessie purchase or bill.
 - **Exactly once.** A payment must never be sent twice, even when a phone retries, an app restarts mid-request, or two family members tap at once. Idempotency keys, row locks and several rounds of review fixed real race conditions.
@@ -92,14 +94,14 @@ Nessie is the bank in every step. Each endpoint has a job:
 - **Withdrawals and ATMs:** ATM cash at a real Nessie ATM, followed by a gift card within 2 hours, is held as a scam sequence.
 - **Transfers:** Freeze moves the whole spending balance to the vault, exactly once.
 - **ATMs and branches:** the phone watches the nearest ones and alerts the family if she is there during a phone call.
-- **Deposits:** part of the spending history.
+- **Deposits:** read when matching a payment to its Nessie record, so a deposit is never mistaken for a payment.
 
 ### MLH: Best Use of Auth0
 - Auth0 login on the family dashboard, and native PKCE login in the family iPhone app.
 - Every family API route checks a signed Auth0 access token for our API audience.
 - Roles on the server: approvers decide, viewers watch. Payments over the threshold need two different approvers.
 - Fresh login (no older than 5 minutes, from `auth_time`) before granting an allowance or changing roles.
-- **Auth0 for AI Agents:** Client-Initiated Backchannel Authentication (CIBA) sends a Guardian push with the amount, payee and hold reasons as rich `authorization_details`. A held payment waits for a human, out of band. TODO(Dev): confirm the Guardian push worked live on the demo tenant; if not, say "built and tested against a fake Auth0, not verified live".
+- **Auth0 for AI Agents:** we implemented Client-Initiated Backchannel Authentication (CIBA). In CIBA mode, a held payment sends a Guardian push with the amount, payee and hold reasons as rich `authorization_details`, and waits for a human out of band. Honest status: it is tested against a fake Auth0 only, it is off by default (`APPROVAL_MODE=app`, where the family app approves with Face ID), and a live Guardian push is not verified.
 
 ### MLH: Best Use of Tiger Data
 - `spending` is a hypertable (7-day chunks) with columnstore compression, segmented by family circle.
@@ -121,8 +123,8 @@ TODO(Dev): add the DEV post link (draft in `docs/dev-post.md`).
 
 ### Best Use of AI/ML (our specialized track)
 Two models we trained, with honest scores on 884 real test texts (README "Model evaluation"):
-- Guard tiny (n-gram logistic regression, 1 MB, runs in the Message Filter): 97.2% accuracy, 96.0% scam recall, 2.4% false holds, 11 ms on an iPhone 18 Pro Max.
-- Guard v2 (DistilBERT): 97.4% accuracy, 93.9% scam recall, 1.3% false holds. Core ML 8-bit: 67 MB, 94.0% recall, 1.1% false holds.
+- Guard tiny (n-gram logistic regression, 1 MB, shipped in the Message Filter and the app): 97.2% accuracy, 96.0% scam recall, 2.4% false holds, 0.14 ms per text on a Mac.
+- Guard v2 (DistilBERT, trained and evaluated, not shipped): 97.4% accuracy, 94.0% scam recall, 1.3% false holds. Core ML 8-bit: 67 MB, 94.0% recall, 1.1% false holds.
 - Caveat we disclose: the 97% validation recall target was picked after seeing one test result, so these test numbers are slightly optimistic. Investment "wrong number" openers are a weak spot (13% recall on 15 synthetic probe texts).
 - The model never moves money: it can only add a hold reason.
 
@@ -131,9 +133,9 @@ Two models we trained, with honest scores on 884 real test texts (README "Model 
 ## AI tools disclosure
 
 We used AI coding tools, as allowed by the SwampHacks and MLH rules:
-- **Claude Code (Anthropic, Opus 5 and Opus 5.5):** wrote most of the code in `web/`, `ios/` and `ml/`, and drafted these docs, with Haiku subagents for dataset search. A human checked every dataset license by hand.
-- **Codex (OpenAI, GPT-6):** continued parts of the web backend (approval and reconciliation fixes, the demo seed, the dashboard).
-- **Codex CLI:** read-only second-opinion code review on changed files and review panels on the dataset and app. It found real bugs, which we verified and fixed.
+- **Claude Code (Anthropic, Opus 5 and Opus 5.5):** wrote most of the code in `web/`, `ios/` and `ml/`, and drafted these docs, with Haiku subagents for dataset search. TODO(Dev): confirm a human checked every dataset license by hand, then keep or cut this sentence: "A human checked every dataset license by hand."
+- **OpenAI Codex CLI:** continued parts of the web backend (approval and reconciliation fixes, the demo seed, the dashboard).
+- **OpenAI Codex CLI (review):** read-only second-opinion code review on changed files and review panels on the dataset and app. It found real bugs, which we verified and fixed.
 - **Inside the product:** Apple Foundation Models runs on the phone to rewrite facts into a note for the family. Our scam models are trained by us. checkwith.us is not a reskin of an existing AI tool.
 
 All code was written during the event. Each pull request names the AI tools it used.
