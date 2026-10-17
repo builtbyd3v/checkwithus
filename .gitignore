@@ -15,14 +15,19 @@ node_modules/
 .venv/
 __pycache__/
 ml/data/raw/
+ml/models/*.mlpackage/
+ml/models/*.log
 *.safetensors
 *.gguf
 
 # Xcode
 xcuserdata/
 DerivedData/
+.build/
+.swiftpm/
 *.xcuserstate
 
 # OS
 .DS_Store
 .vercel
+ios/CheckWithUs/MessageFilter/GuardInt8.mlpackage/

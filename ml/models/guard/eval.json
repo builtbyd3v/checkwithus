@@ -1,0 +1,98 @@
+{
+  "base": "distilbert-base-uncased",
+  "epochs": 2,
+  "max_len": 128,
+  "temperature": 1.2869,
+  "threshold": 0.7624,
+  "val_tuned_on": {
+    "n": 854,
+    "accuracy": 0.9778,
+    "scam_recall": 0.9726,
+    "precision": 0.9425,
+    "false_hold_rate": 0.0205,
+    "ece": 0.0187,
+    "recall_by_type": {
+      "bank_alert": {
+        "n": 34,
+        "recall": 1.0
+      },
+      "delivery": {
+        "n": 36,
+        "recall": 1.0
+      },
+      "impostor": {
+        "n": 2,
+        "recall": 1.0
+      },
+      "investment": {
+        "n": 6,
+        "recall": 1.0
+      },
+      "other": {
+        "n": 108,
+        "recall": 0.944
+      },
+      "prize": {
+        "n": 33,
+        "recall": 1.0
+      }
+    }
+  },
+  "test": {
+    "n": 884,
+    "accuracy": 0.974,
+    "scam_recall": 0.9395,
+    "precision": 0.9668,
+    "false_hold_rate": 0.0126,
+    "ece": 0.0138,
+    "recall_by_type": {
+      "bank_alert": {
+        "n": 34,
+        "recall": 1.0
+      },
+      "delivery": {
+        "n": 35,
+        "recall": 0.886
+      },
+      "gift_card": {
+        "n": 2,
+        "recall": 1.0
+      },
+      "impostor": {
+        "n": 32,
+        "recall": 1.0
+      },
+      "investment": {
+        "n": 6,
+        "recall": 1.0
+      },
+      "other": {
+        "n": 105,
+        "recall": 0.924
+      },
+      "prize": {
+        "n": 34,
+        "recall": 0.912
+      }
+    }
+  },
+  "test_toll_legit_flagged": "0 of 3",
+  "probe_synthetic": {
+    "n": 40,
+    "accuracy": 0.675,
+    "scam_recall": 0.5667,
+    "precision": 1.0,
+    "false_hold_rate": 0.0,
+    "ece": 0.3285,
+    "recall_by_type": {
+      "delivery": {
+        "n": 15,
+        "recall": 1.0
+      },
+      "investment": {
+        "n": 15,
+        "recall": 0.133
+      }
+    }
+  }
+}
