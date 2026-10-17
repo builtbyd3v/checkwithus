@@ -2,69 +2,96 @@
   "base": "distilbert-base-uncased",
   "epochs": 2,
   "max_len": 128,
-  "temperature": 1.5054,
-  "threshold": 0.7249,
+  "temperature": 1.2869,
+  "threshold": 0.7624,
   "val_tuned_on": {
-    "n": 842,
-    "accuracy": 0.9751,
-    "scam_recall": 0.9519,
-    "precision": 0.9474,
-    "false_hold_rate": 0.0174,
-    "ece": 0.0155,
+    "n": 854,
+    "accuracy": 0.9778,
+    "scam_recall": 0.9726,
+    "precision": 0.9425,
+    "false_hold_rate": 0.0205,
+    "ece": 0.0187,
     "recall_by_type": {
       "bank_alert": {
-        "n": 36,
-        "recall": 0.944
+        "n": 34,
+        "recall": 1.0
       },
       "delivery": {
-        "n": 31,
-        "recall": 0.968
+        "n": 36,
+        "recall": 1.0
       },
       "impostor": {
         "n": 2,
         "recall": 1.0
       },
+      "investment": {
+        "n": 6,
+        "recall": 1.0
+      },
       "other": {
-        "n": 109,
-        "recall": 0.936
+        "n": 108,
+        "recall": 0.944
       },
       "prize": {
-        "n": 30,
+        "n": 33,
         "recall": 1.0
       }
     }
   },
   "test": {
-    "n": 878,
-    "accuracy": 0.9761,
-    "scam_recall": 0.9836,
-    "precision": 0.9339,
-    "false_hold_rate": 0.0268,
-    "ece": 0.0285,
+    "n": 884,
+    "accuracy": 0.974,
+    "scam_recall": 0.9395,
+    "precision": 0.9668,
+    "false_hold_rate": 0.0126,
+    "ece": 0.0138,
     "recall_by_type": {
       "bank_alert": {
-        "n": 36,
+        "n": 34,
         "recall": 1.0
       },
       "delivery": {
         "n": 35,
-        "recall": 1.0
+        "recall": 0.886
       },
       "gift_card": {
         "n": 2,
         "recall": 1.0
       },
       "impostor": {
-        "n": 31,
+        "n": 32,
+        "recall": 1.0
+      },
+      "investment": {
+        "n": 6,
         "recall": 1.0
       },
       "other": {
-        "n": 108,
-        "recall": 0.981
+        "n": 105,
+        "recall": 0.924
       },
       "prize": {
-        "n": 32,
-        "recall": 0.938
+        "n": 34,
+        "recall": 0.912
+      }
+    }
+  },
+  "test_toll_legit_flagged": "0 of 3",
+  "probe_synthetic": {
+    "n": 40,
+    "accuracy": 0.675,
+    "scam_recall": 0.5667,
+    "precision": 1.0,
+    "false_hold_rate": 0.0,
+    "ece": 0.3285,
+    "recall_by_type": {
+      "delivery": {
+        "n": 15,
+        "recall": 1.0
+      },
+      "investment": {
+        "n": 15,
+        "recall": 0.133
       }
     }
   }

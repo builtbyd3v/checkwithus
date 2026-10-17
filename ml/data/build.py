@@ -28,9 +28,15 @@ TYPE_RULES = [
     ("tech_support", r"computer virus|virus(es)? (detected|found|alert)|(computer|device|pc|laptop|mac) (is|has been|may be) (infected|hacked|locked)"
                      r"|malware|spyware|tech(nical)? support|microsoft (support|tech|technician|security|windows|defender)"
                      r"|windows (support|defender|security)|norton|mcafee|geek squad|anydesk|teamviewer|remote access|icloud.*(locked|hacked)"),
+    # Crypto and investment before romance and impostor: pig-butchering starts as a chat, then pitches a platform.
+    ("investment", r"crypto|bitcoin|\bbtc\b|usdt|ethereum|binance|coinbase|invest(ment|ing|or)?\b|trading (app|platform|signals?)"
+                   r"|forex|(guaranteed|weekly|daily) (returns?|profits?)|wrong number"),
     ("romance", r"\b(my love|darling|sweetheart|my dear|honey)\b|lonely|soulmate|widow(er)?|oil rig"),
     ("impostor", r"\birs\b|social security|\bssa\b|medicare|warrant|arrest|sheriff|marshal|government|tax refund|customs|police|court|fbi\b"),
-    ("delivery", r"usps|\bups\b|fedex|\bdhl\b|parcel|package|shipment|deliver|courier|tracking"),
+    # Toll scams fold into delivery. "toll" alone is not enough ("Reply Toll Free"): it needs a link or pay-now wording.
+    ("delivery", r"usps|\bups\b|fedex|\bdhl\b|parcel|package|shipment|deliver|courier|tracking"
+                 r"|\btolls?\b.*(https?://|\.(com|net|org|info|xyz|top|us)\b|pay (now|today|immediately)|unpaid|past due|late fee)"
+                 r"|e-?zpass|sunpass|fastrak"),
     ("prize", r"\bwon\b|winner|prize|lottery|sweepstake|claim|reward|selected|congratulations|free (entry|gift)|cash award|\bbonus\b"),
     ("bank_alert", r"\bbank|account (has been|is|was) (locked|suspended|limited|on hold)|verify your (account|identity)|unusual (activity|sign)|debit card|credit card|paypal|zelle|venmo|password|login|log in|sign in"),
 ]

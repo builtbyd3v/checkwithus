@@ -9,7 +9,7 @@ from pathlib import Path
 import pandas as pd
 
 D = Path(__file__).resolve().parent
-TYPES = {"impostor", "tech_support", "gift_card", "prize", "romance", "grandparent", "bank_alert", "delivery", "other", "none"}
+TYPES = {"impostor", "tech_support", "gift_card", "prize", "romance", "grandparent", "bank_alert", "delivery", "investment", "other", "none"}
 
 full = pd.read_csv(D / "scams.csv")
 parts = {n: pd.read_csv(D / f"{n}.csv") for n in ("train", "val", "test")}
@@ -55,8 +55,11 @@ def leaks(queries, pool, thr=0.8):
     return hits
 
 
-for a, b in (("val", "train"), ("test", "train"), ("test", "val")):
-    hits = leaks(parts[a].text.tolist(), parts[b].text.tolist())
+probe = pd.read_csv(D / "probe.csv")
+parts_and_probe = {**parts, "probe": probe}
+print(f"\n== probe (held-out synthetic, not in scams.csv): {len(probe)} rows", probe.groupby(["label", "scam_type"]).size().to_dict())
+for a, b in (("val", "train"), ("test", "train"), ("test", "val"), ("probe", "train")):
+    hits = leaks(parts_and_probe[a].text.tolist(), parts[b].text.tolist())
     print(f"near-duplicates {a} vs {b}: {len(hits)}", *hits[:3], sep="\n  ")
     assert not hits, f"near-duplicate text leaks: {a} vs {b}"
 assert full.source.value_counts(normalize=True).max() <= 0.40 + 1e-9, "a source is above 40%"

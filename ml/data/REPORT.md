@@ -1,6 +1,6 @@
 # Scam dataset report (2026-10-16)
 
-- **9,255 rows** in `scams.csv`: 6,336 legit, 2,919 scam. Splits: train 7,535 / val 842 / test 878.
+- **9,346 rows** in `scams.csv`: 6,382 legit, 2,964 scam. Splits: train 7,608 / val 854 / test 884. Plus `probe.csv`: 40 held-out synthetic rows.
 - **Val and test are 100% real text** (Mendeley, NCSU, UCI). Generated sources (our synthetic, AI-in-the-Loop, CloveAI) all go to train. Val sets the threshold, so it must look like real traffic.
 - **No near-duplicates across splits:** rows are clustered (character 5-gram Jaccard >= 0.75) and whole clusters go to one split; `check.py` re-tests with its own search at 0.8 and finds 0.
 - **Biggest gap:** no real, openly licensed grandparent, romance or tech-support texts exist. Those types are generated only, so test has 0 of them.
@@ -10,15 +10,17 @@
 
 | source | legit | scam | total | in val/test? |
 |---|---|---|---|---|
-| mendeley_smishing | 3,311 | 391 | 3,702 | yes |
+| mendeley_smishing | 3,347 | 391 | 3,738 | yes |
 | clove_india_sms | 1,977 | 99 | 2,076 | no (template-made) |
 | aitl_scam_dialogues | 730 | 796 | 1,526 | no (GPT-made) |
 | ncsu_sms_phishing | 0 | 1,426 | 1,426 | yes |
-| synthetic | 200 | 200 | 400 | no |
+| synthetic | 210 | 245 | 455 | no |
 | uci_sms_spam | 118 | 7 | 125 | yes |
-| **total** | **6,336** | **2,919** | **9,255** | |
+| **total** | **6,382** | **2,964** | **9,346** | |
 
 ## Rows per scam_type (scam rows)
+
+(Table from the v1 build; v2 adds `investment` (48 / 6 / 6) and 20 toll rows to `delivery` train. Run `check.py` for current counts.)
 
 | scam_type | total | real (val/test-eligible) | train / val / test |
 |---|---|---|---|
@@ -65,11 +67,14 @@ Gap: no openly licensed set of fake virus / tech-support pop-ups. Synthetic scre
 
 ## Guard model results (DistilBERT, `ml/train_guard.py`)
 
-Threshold set on val for 95% scam recall; test scored once. Full numbers in `ml/models/guard/eval.json`.
+v2 (current). Threshold set on val for 97% scam recall; test scored once. Full numbers in `ml/models/guard/eval.json` and `ml/models/coreml_eval.json`.
 
 | split | n | scam recall | precision | false holds | ECE |
 |---|---|---|---|---|---|
-| val (threshold tuned here) | 842 | 95.2% | 94.7% | 1.7% | 0.016 |
-| test | 878 | 98.4% | 93.4% | 2.7% (17 of 634) | 0.029 |
+| val (threshold tuned here) | 854 | 97.3% | 94.3% | 2.1% | 0.019 |
+| test | 884 | 93.9% | 96.7% | 1.3% | 0.014 |
+| probe (synthetic, held-out templates) | 40 | toll 100%, investment 13% | 100% | 0% | |
 
-Next: score grandparent, romance, gift card and tech-support recall on Teammate C's hand-written elder scams, since test has almost none.
+- Misses the 95% test target by about 1 point. The weakest types are `delivery` (88.6%) and `prize` (91.2%).
+- Investment: real crypto texts in test are caught (6 of 6), but pig-butchering openers ("sorry, wrong number") are not (2 of 15 probe rows caught). Pitch limit: the text filter will miss many of these; the payment hold and the crypto app lock are the real catch.
+- Core ML: 8-bit weights, 67 MB, 1 decision of 884 differs from PyTorch.

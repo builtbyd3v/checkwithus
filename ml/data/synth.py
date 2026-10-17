@@ -1,11 +1,11 @@
 """Synthetic elder-scam and hard-legit SMS. Fake people, fake numbers (555), made-up domains.
 
-Usage: python ml/data/synth.py > ml/data/synthetic.csv
+Usage: ml/.venv/bin/python -I ml/data/synth.py  (writes ml/data/synthetic.csv and ml/data/probe.csv)
 """
 import csv
 import random
 import re
-import sys
+from pathlib import Path
 
 R = random.Random(42)
 N_PER_SIDE = 200
@@ -130,6 +130,73 @@ LEGIT = [
 ]
 
 
+TOLLS = ["E-ZPass", "SunPass", "FasTrak", "TxTag", "Peach Pass", "The Toll Roads", "Illinois Tollway", "Toll Services"]
+ROADS = ["I-95", "the Turnpike", "SR-408", "I-90", "Route 1", "the Parkway"]
+TOLL_DOMAINS = ["ezpass-tollpay.com", "toll-service-billing.xyz", "sunpass-pay.info", "tollroads-notice.top"]
+PERSONAS = ["Jessica", "Amy Chen", "Vivian", "Lisa Wong", "Kevin", "Mark Liu", "Sophia"]
+PLACES = ["wine tasting", "church picnic", "yoga class", "golf club", "community center"]
+
+
+def toll_amt():
+    return R.choice(["3.75", "4.15", "5.80", "6.99", "11.69", "12.51"])
+
+
+def toll_url():
+    return f"https://{R.choice(TOLL_DOMAINS)}/{R.choice(['pay', 'bill', 'v'])}{R.randint(1000, 99999)}"
+
+
+# Toll scams count as "delivery": same pattern (small fee + link + urgency), and the task folds them together.
+EXTRA_SCAMS = {
+    "delivery": [
+        lambda: f"{R.choice(TOLLS)}: You have an unpaid toll balance of ${toll_amt()}. Pay now to avoid a ${R.choice([25, 50, 75])} late fee: {toll_url()}",
+        lambda: f"{R.choice(TOLLS)} final notice: outstanding toll of ${toll_amt()} on your vehicle. Pay today or your license may be suspended: {toll_url()}",
+        lambda: f"Your {R.choice(TOLLS)} account has an unpaid toll. Settle ${toll_amt()} within 24 hours at {toll_url()}",
+        lambda: f"{R.choice(TOLLS)}: We noticed an unpaid toll charge. Reply Y, then reopen this message to activate the link: {toll_url()}",
+        lambda: f"Toll notice: ${toll_amt()} due for travel on {R.choice(ROADS)}. Pay immediately to avoid fines: {toll_url()}",
+    ],
+    "investment": [
+        lambda: f"Hi, is this {R.choice(NAMES)}? This is {R.choice(PERSONAS)}, we met at the {R.choice(PLACES)} last week. Sorry if wrong number!",
+        lambda: f"Sorry, wrong number. But you seem nice. I'm {R.choice(PERSONAS)}, I work in finance in {R.choice(CITIES)}. Where are you from?",
+        lambda: f"Hello, are we still on for lunch {R.choice(['Saturday', 'Sunday', 'Friday'])}? -{R.choice(PERSONAS)}",
+        lambda: f"My uncle is an analyst and showed me a crypto trick. I made ${R.choice([3200, 8500, 12000, 26000])} this week. I can teach you, just open an account at {url()}",
+        lambda: f"Guaranteed {R.choice([12, 18, 25, 30])}% weekly returns with our Bitcoin trading signals. Join our private group: {url()}",
+        lambda: f"Your crypto account shows ${R.choice([18400, 42000, 96500])} profit. To withdraw you must first pay a ${amt()} tax fee.",
+        lambda: f"Exclusive offer for retirees: double your savings with gold and crypto. Call {phone()} today, limited spots.",
+        lambda: f"{R.choice(PERSONAS)} here. The platform I told you about is up {R.choice([8, 14, 22])}% today. Deposit ${amt()} USDT to start: {url()}",
+    ],
+}
+EXTRA_N = {"delivery": 20, "investment": 25}
+
+TOLL_LEGIT = [
+    lambda: f"{R.choice(TOLLS)}: Your account was replenished with ${R.choice([10, 20, 25, 35])}.00 from your card on file. No action needed.",
+    lambda: f"{(t := R.choice(TOLLS))}: Your monthly statement is ready. Sign in to the {t} app or the website on your card to view it.",
+    lambda: f"{R.choice(TOLLS)}: The transponder for your vehicle ending {R.randint(100, 999)} is active. Thank you for driving with us.",
+    lambda: f"Thanks for calling {R.choice(['Publix', 'Walgreens', 'your pharmacy', 'Medicare'])}. Our toll-free number is 1-800-555-{R.randint(100, 199):04d}. Hours are 8 to 6.",
+]
+TOLL_LEGIT_N = 10
+
+# Probe set: held-out templates, never in train/val/test. Measures toll and investment recall, since no real texts exist.
+PROBE = {
+    ("scam", "delivery"): [
+        lambda: f"NOTICE from {R.choice(TOLLS)}: toll invoice #{R.randint(10000, 99999)} for ${toll_amt()} is past due. Avoid collections by paying at {toll_url()}",
+        lambda: f"{R.choice(TOLLS)} Billing: a payment of ${toll_amt()} failed. Update your card at {toll_url()} to keep your account open.",
+        lambda: f"State Toll Authority: unpaid tolls on your plate. ${toll_amt()} plus fees due tonight. {toll_url()}",
+    ],
+    ("scam", "investment"): [
+        lambda: f"Hey, sorry, I think I texted the wrong person. I'm {R.choice(PERSONAS)}, nice to meet you anyway :)",
+        lambda: f"Hi {R.choice(NAMES)}, it's {R.choice(PERSONAS)} from the {R.choice(PLACES)}. Did you get a chance to look at the trading app I mentioned?",
+        lambda: f"Earn ${R.choice([4000, 6500, 9000])} a month from home with AI crypto arbitrage. No experience needed. Start: {url()}",
+        lambda: f"Your wallet bonus of {R.choice(['0.15', '0.3', '0.5'])} BTC is waiting. Pay the ${amt()} activation fee to unlock it.",
+    ],
+    ("legit", "none"): [
+        lambda: f"{R.choice(TOLLS)}: Thanks for your payment of ${toll_amt()}. Your balance is now $0.00.",
+        lambda: f"{R.choice(TOLLS)}: Low balance alert. Auto-replenish will add ${R.choice([10, 20])} from your card on file tonight.",
+        lambda: f"Questions about your order? Call our toll-free customer line at 1-800-555-{R.randint(100, 199):04d}.",
+    ],
+}
+PROBE_N = {("scam", "delivery"): 15, ("scam", "investment"): 15, ("legit", "none"): 10}
+
+
 def key(text):
     # Same idea as build.norm: rows that differ only in digits or links are one row.
     s = re.sub(r"\W+", " ", re.sub(r"https?://\S+|\d+", " ", text.lower())).strip()
@@ -151,10 +218,34 @@ def build():
         if key(text) not in seen:
             seen.add(key(text))
             rows.append((text, "legit", "none", "synthetic"))
+    # Added after the original 400 so those rows stay byte-identical.
+    groups = [(("scam", t), fs, EXTRA_N[t]) for t, fs in EXTRA_SCAMS.items()] + [(("legit", "none"), TOLL_LEGIT, TOLL_LEGIT_N)]
+    rows += fill(groups, seen, "synthetic")
     return rows
 
 
+def fill(groups, seen, source):
+    out = []
+    for (label, t), fs, n in groups:
+        got = 0
+        while got < n:
+            text = R.choice(fs)()
+            if key(text) not in seen:
+                seen.add(key(text))
+                out.append((text, label, t, source))
+                got += 1
+    return out
+
+
+def write(path, rows):
+    with open(path, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["text", "label", "scam_type", "source"])
+        w.writerows(rows)
+
+
 if __name__ == "__main__":
-    w = csv.writer(sys.stdout)
-    w.writerow(["text", "label", "scam_type", "source"])
-    w.writerows(build())
+    out = Path(__file__).resolve().parent
+    rows = build()
+    write(out / "synthetic.csv", rows)
+    write(out / "probe.csv", fill([(k, PROBE[k], PROBE_N[k]) for k in PROBE], {key(r[0]) for r in rows}, "probe"))

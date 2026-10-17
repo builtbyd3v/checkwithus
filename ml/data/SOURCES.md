@@ -11,7 +11,7 @@
 | `uci_sms_spam`: Almeida & Hidalgo, SMS Spam Collection (2011) | https://archive.ics.uci.edu/dataset/228/sms+spam+collection | CC BY 4.0 (UCI page) | 5,574 | 125 | Classic real ham and spam. Most rows duplicate Mendeley, which wins on duplicates. |
 | `aitl_scam_dialogues`: SUPREME Lab, AI-in-the-Loop, SSD set (2025) | https://github.com/supreme-lab/ai-in-the-loop (file `data/classification/ssd_dataset/all_data.chat.json`) | MIT (repo LICENSE) | 1,600 | 1,526 | Phone-call scripts: SSN, tech support, refund, reward scams and legit delivery or appointment calls. Fills elder call-scam types. GPT-made, so train only. |
 | `clove_india_sms`: CloveAI, india-spam-sms (2025) | https://huggingface.co/datasets/CloveAI/india-spam-sms | MIT (HF license field) | 20,010 | 2,076 | Hard negatives: bank alerts, bills, deliveries, appointments, plus look-alike scams. Template-made and Indian context, so train only. 3,204 rows with a broken amount slot ("INR Khare LLC") dropped. |
-| `synthetic`: our templates (`ml/data/synth.py`) | this repo | ours | 400 | 400 | Elder-scam gaps (grandparent, romance, gift card, tech support, impostor) and US hard-legit texts. Fake names, 555 numbers. Train only. |
+| `synthetic`: our templates (`ml/data/synth.py`) | this repo | ours | 455 | 455 | Elder-scam gaps (grandparent, romance, gift card, tech support, impostor) and US hard-legit texts. Fake names, 555 numbers. Train only. |
 
 ## Checked and not used
 
