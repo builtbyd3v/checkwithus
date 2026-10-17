@@ -3,7 +3,7 @@
 - **Every agent reads this before building, submitting or writing Devpost text.** If a task would break a rule here, stop and ask the team.
 - All code is written during the event (Oct 16, 8:30 PM to Oct 18). Anything built before is disqualified.
 - AI tools are allowed but must be disclosed on Devpost. The project must not be a reskin of an existing AI tool.
-- **At most ONE specialized track.** We enter "Most Creative Use of AI". Challenges (sponsor, MLH, SwampHacks-specific) can be several.
+- **At most ONE specialized track.** Confirmed by organizers (Discord, Oct 16): the 4 specialized tracks are Hardware & Physical Computing, Entertainment & Creative Technology, Best AI/ML, and First Timers. We enter **Best Use of AI/ML**. Challenges (sponsor, MLH, SwampHacks-specific) can be several.
 - Devpost due **Sun Oct 18, 8:00 AM ET**. Live demo max 3 minutes (+1 minute questions). Demo video max 2 minutes.
 
 ## Official rules (Devpost)
@@ -45,6 +45,9 @@ Source: SwampHacks XII hacker guide (Notion) and Devpost, read 2026-10-16.
 | MLH: Best Use of Auth0 | MLH challenge | Real use of Auth0 APIs; Auth0 for AI Agents is called out | Wireless headphones |
 | MLH: Best Use of Tiger Data | MLH challenge | Innovative, impactful, performance-driven use of Tiger Data (time series, continuous aggregates) | Stream Deck Mini |
 | MLH: Best Domain Name from GoDaddy Registry | MLH challenge | Register the domain with GoDaddy Registry (use the MLH code) | Digital gift card |
+| MLH: DEV Writing Challenge | MLH challenge | A written post about our build on DEV (exact rules on Devpost / from MLH) | See Devpost |
+
+**Devpost opt-ins (exact names):** Best Use of AI/ML; Capital One - The Best Use of Nessie!; MLH Prize: Best Domain Name from GoDaddy Registry; MLH Prize: Best Use of Auth0; MLH Prize: Best Use of Tiger Data; Easy On the Eyes Award - Best UI/UX Design; MLH - DEV Writing Challenge.
 
 **Not entering:** Hardware, Entertainment, First Timers (specialized tracks; we use our one on AI), Least Vibe Coded (we use AI tools), DeepSpace, Sperry Tech, Gemini, Vultr, Solana, Roblox.
 
