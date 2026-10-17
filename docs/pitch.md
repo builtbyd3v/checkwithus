@@ -1,32 +1,35 @@
-# Expo pitch: 30-second video + sponsor deep dive (draft for Hitesh)
+# Expo pitch: 30 s judge video + 2:00 live talk (draft for Hitesh)
 
 - **Owner:** Hitesh. This is a starting draft. Improve it with your agents, then rehearse it.
 - **Goal:** win the sponsor challenges (Nessie, Auth0, Tiger Data, Easy On The Eyes, GoDaddy). Overall and Best Use of AI/ML are side entries. Do not build the pitch around them.
 - **The trap:** if judges hear "scam protection for elderly people", we sound like every other team. Lead with how deep each sponsor's tech goes and what it does in the product.
-- **Shape:** a 30 s video, then 2:15 of live talk with one block per sponsor (tech, benefit, proof on the table). Inside 3:00, then 1 minute of questions.
+- **Shape:** a 30 s judge video with only the wow moments, then a 2:00 live talk with one block per sponsor (tech, benefit, proof on the table). That is 2:30, with 30 s of buffer inside the 3:00 limit, then 1 minute of questions. The Devpost video (1:30 to 2:00) is a separate deliverable: [video-script.md](video-script.md).
 - **Before the expo:** check every claim against the code and the live build. Cut anything that is not verified (see "Unverified").
 
-Related: [demo.md](demo.md) (full live demo, checklist, fallbacks), [PLAN.md](PLAN.md) (what we build and why), [RULES.md](RULES.md) (judging criteria), [perf.md](perf.md) (Tiger Data numbers).
+Related: [demo.md](demo.md) (device setup, how to film the judge video, live "show me" steps, fallbacks), [PLAN.md](PLAN.md) (what we build and why), [RULES.md](RULES.md) (judging criteria), [perf.md](perf.md) (Tiger Data numbers).
 
 ## Hard requirements
 
 1. The video is 30 s or less. It has captions and no voiceover, because the expo is loud.
-2. The total is 3:00 or less: the video, then the talk. The 1 minute of judge questions comes after.
+2. The talk is 2:00 or less. With the video, the total is 2:30. The 1 minute of judge questions comes after.
 3. Every sponsor block names the real features we use. "We used Auth0 for login" loses. Name the endpoints, the features and the numbers.
 4. Every claim has a proof that a judge can see: a phone, the dashboard, a terminal, or a README table. Keep both phones live on the table.
 5. Use synthetic Rosa only. Show no real names, numbers, tokens or pairing codes.
 
 **Judges rotate (science-fair style).** When a sponsor judge walks up, start with their block and stretch it to about 60 s. Cut the other blocks to one line each. Know your audience before you speak: ask "Which sponsor are you judging?"
 
-## Flow (3:00)
+## Flow (2:30 of the 3:00 limit)
 
 | Time | Part | Who (suggested) |
 | --- | --- | --- |
-| 0:00–0:30 | Video plays | Hitesh starts it |
-| 0:30–0:50 | Opener: how we differ | Dev |
-| 0:50–2:30 | Sponsor blocks, 20 s each: Nessie, Auth0, Tiger Data, Easy On The Eyes, then a 10 s AI/ML line | Haadi (Nessie, Auth0), rgons (Tiger Data, design), Dev (AI/ML) |
-| 2:30–2:40 | GoDaddy + close | Dev |
-| 2:40–3:00 | Buffer | |
+| 0:00–0:30 | Judge video plays | Hitesh starts it |
+| 0:30–0:45 | Opener: how we differ (15 s) | Dev |
+| 0:45–2:05 | Sponsor blocks, 20 s each: Nessie, Auth0, Tiger Data, Easy On The Eyes | Haadi (Nessie, Auth0), rgons (Tiger Data, design) |
+| 2:05–2:15 | AI/ML line (10 s) | Dev |
+| 2:15–2:25 | GoDaddy + close (10 s) | Dev |
+| 2:25–3:00 | Buffer | |
+
+When a judge asks "show me", use the matching live step in [demo.md](demo.md).
 
 ## Part 1: the 30-second video
 
@@ -39,14 +42,14 @@ Related: [demo.md](demo.md) (full live demo, checklist, fallbacks), [PLAN.md](PL
 | 0:22–0:27 | Family taps Freeze. "Money is in the safe account." | "One tap. Her balance goes to a vault." | Nessie |
 | 0:27–0:30 | checkwith.us logo | "She does nothing. Her family does the work." | GoDaddy |
 
-Shoot it on the real phones with the reviewed demo build. Steps and setup: [demo.md](demo.md).
+Shoot it on the real phones with the pinned `main` build. How to film each shot: [demo.md](demo.md).
 
 ## Part 2: the talk
 
 Each block has three parts: **Tech** (what we use), **Benefit** (why it matters to Rosa and her family), and **Proof** (what to point at).
 
-### Opener (20 s): how we differ
-> "Every scam tool asks the victim to act: read a warning, hang up, call the bank. Scammers talk victims right past warnings. The bank can't stop it, because she makes the payment herself, so it looks real. Monitoring apps alert the family after the money is gone. We move the decision. Rosa changes nothing. A payment that looks like a scam waits for her family before it reaches the bank. And one rule: AI suggests, code decides money."
+### Opener (15 s): how we differ
+> "Every scam tool asks the victim to act, and scammers talk victims right past warnings. The bank can't stop it, because she makes the payment herself. Monitoring apps alert the family after the money is gone. We move the decision. Rosa changes nothing. A payment that looks like a scam waits for her family before it reaches the bank. And one rule: AI suggests, code decides money."
 
 ### Capital One Nessie (20 s, 60 s if the Nessie judge is here)
 **Tech.** Nessie is our bank, not just a data source. Our client calls 10 resource types, and each one has a job:
@@ -123,5 +126,5 @@ Have ready if asked: DistilBERT crashed the filter's memory limit at 67 MB, so w
 1. Have your agents check every claim here against the code. Fix or cut anything wrong.
 2. Make each sponsor block deeper and sharper. Stay at 20 s each in the default order.
 3. Write the 60 s version of each block, for when that sponsor's judge is at the table.
-4. Record the 30 s video on the real phones. Use [demo.md](demo.md) for setup.
-5. Run the full 3:00 with a timer, twice, with the whole team.
+4. Film the 30 s judge video on the real phones ([demo.md](demo.md)). Then record the Devpost video ([video-script.md](video-script.md)).
+5. Run the video plus the 2:00 talk with a timer, twice, with the whole team.

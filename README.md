@@ -182,7 +182,7 @@ ml/.venv/bin/python -I ml/export_coreml.py   # Core ML export, writes coreml_eva
 ## Repo layout
 
 Submission materials: [Devpost draft](docs/devpost.md), [DEV article](docs/dev-post.md),
-[three-minute expo demo](docs/demo.md), [two-minute video script](docs/video-script.md),
+[expo pitch](docs/pitch.md), [demo runbook](docs/demo.md), [two-minute video script](docs/video-script.md),
 and [publishing handoff](docs/publishing.md).
 
 ```
