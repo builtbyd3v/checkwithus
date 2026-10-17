@@ -116,9 +116,9 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
           <p className="max-w-md text-sm text-teal-950">{!held.length ? 'New held payments will appear here.'
             : active.role !== 'approver' ? 'An approver in your family decides these.'
             : canApproveHere ? 'Approve or deny here, or from the family app.' : 'Deny here. Approve from the Guardian notification on your phone.'}</p></div>
-        <DecisionStatus />
+        <DecisionStatus key={active.circleId} />
         {held.length > 0 && <ul role="list" className="mt-6 grid gap-4 lg:grid-cols-2">{held.map((payment) => { const usualLine = usualLabel(usual.get(payment.id), payment.payee.name, firstName); return <li key={payment.id} className="min-w-0"><PaymentCard payment={payment} usualLine={usualLine} deadline={payment.expiresAt ? <Countdown expiresAt={payment.expiresAt} /> : null}>
-          {active.role === 'approver' && <DecisionButtons paymentId={payment.id} canApproveHere={canApproveHere} />}
+          {active.role === 'approver' && <DecisionButtons paymentId={payment.id} canApproveHere={canApproveHere} expiresAt={payment.expiresAt} />}
         </PaymentCard></li>; })}</ul>}
         {decided.length > 0 && <div className="mt-6"><h3 id="decided-title" tabIndex={-1} className="text-sm font-bold uppercase tracking-widest text-teal-900 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal-800">Recently decided</h3>
           <ul role="list" className="mt-3 grid gap-3 lg:grid-cols-2">{decided.map((payment) => <li key={payment.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-900/10 bg-white/70 px-5 py-4">
