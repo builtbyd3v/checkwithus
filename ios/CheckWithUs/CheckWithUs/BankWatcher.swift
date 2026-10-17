@@ -221,7 +221,7 @@ struct BankPermissionView: View {
         Page {
             Image(systemName: "building.columns.fill")
                 .font(.system(size: 100))
-                .foregroundStyle(.blue)
+                .foregroundStyle(.tint)
                 .frame(maxWidth: .infinity)
                 .accessibilityHidden(true)
             Text("Bank safety")

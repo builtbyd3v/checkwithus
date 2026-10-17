@@ -293,7 +293,8 @@ import SwiftUI
         case "detail": holdsPath = ["p1"]
         case "alerts": tab = .alerts
         case "money": tab = .money
-        case "frozen": tab = .money; balance?.frozen = true; frozenByCircle = ["c1": 241_288]
+        // Freeze sweeps the spending balance to the safe account, so nothing is left to spend.
+        case "frozen": tab = .money; balance = .init(availableCents: 0, ledgerBalanceCents: 0, reservedCents: 0, checkedAt: iso(-1), frozen: true); frozenByCircle = ["c1": 241_288]
         case "allowances": tab = .allowances
         case "grant": tab = .allowances; addingAllowance = true
         case "settings": tab = .settings

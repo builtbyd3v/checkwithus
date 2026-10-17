@@ -34,6 +34,7 @@ struct ContentView: View {
 
 struct PairView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var code = ""
 
     var body: some View {
@@ -42,7 +43,7 @@ struct PairView: View {
                 .font(.largeTitle.bold())
             Text("Ask your family for the code on their screen. Type it here.")
                 .font(.title2)
-            TextField("Code", text: $code)
+            TextField("Code", text: $code, prompt: Text("Code").foregroundStyle(Color.secondaryText))
                 .font(.largeTitle.monospaced())
                 .textInputAutocapitalization(.characters)
                 .autocorrectionDisabled()
@@ -50,10 +51,16 @@ struct PairView: View {
                 .background(.quaternary, in: .rect(cornerRadius: 16))
                 .accessibilityLabel("Family code")
             ErrorText()
+            // Very large text: Connect scrolls with the page, so the code box is fully in view at first.
+            if typeSize.isAccessibilitySize { connect }
         } action: {
-            BigButton("Connect", symbol: "link") { await model.pair(code: code.trimmingCharacters(in: .whitespaces)) }
-                .disabled(code.trimmingCharacters(in: .whitespaces).count < 8)
+            if !typeSize.isAccessibilitySize { connect }
         }
+    }
+
+    private var connect: some View {
+        BigButton("Connect", symbol: "link") { await model.pair(code: code.trimmingCharacters(in: .whitespaces)) }
+            .disabled(code.trimmingCharacters(in: .whitespaces).count < 8)
     }
 }
 
@@ -85,8 +92,9 @@ struct HomeView: View {
             .accessibilityHint(paused ? "Shows the paused payment." : "")
             .onTapGesture { if paused { model.go(.status) } }
             // Read the change aloud when a payment pauses or settles while Home is open.
-            .onChange(of: paused) { _, now in
-                AccessibilityNotification.Announcement(now ? OutcomeText.headline("waiting") : "You're safe").post()
+            // The real outcome, so "Stopped" or "It did not go through" is heard too.
+            .onChange(of: paused) {
+                AccessibilityNotification.Announcement(outcome.map(OutcomeText.headline) ?? "You're safe").post()
             }
             ErrorText()
             // Very large text: only the main button stays pinned, the rest scrolls with the page.
@@ -97,7 +105,8 @@ struct HomeView: View {
             #endif
         } action: {
             BigButton("Ask my family", symbol: "person.2.fill") { await model.askFamily() }
-            if !typeSize.isAccessibilitySize { more }
+            // The other buttons scroll at this size; this says so and takes you there.
+            if typeSize.isAccessibilitySize { MoreBelowButton() } else { more }
         }
     }
 
@@ -275,6 +284,8 @@ struct AskedView: View {
 /// Content on top, big buttons pinned to the bottom, an optional big Back button.
 struct Page<Content: View, Actions: View>: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var position = ScrollPosition()
     var back: Screen?
     @ViewBuilder var content: Content
     @ViewBuilder var action: Actions
@@ -300,20 +311,49 @@ struct Page<Content: View, Actions: View>: View {
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .scrollPosition($position)
         // Shows the scroll bar briefly, a hint that very large text continues below.
         .scrollIndicatorsFlash(onAppear: true)
         .safeAreaInset(edge: .bottom) {
             // No bar at all on a page without actions.
             if Actions.self != EmptyView.self {
                 VStack(spacing: 12) { action }
+                    // Its full height always, so a big button is never cut to "Ask my fa...".
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity)
                     .padding(.horizontal, 24)
                     .padding(.top, 12)
                     .padding(.bottom, 8)
                     // Opaque, so text scrolling under the buttons never shows through them.
                     .background(.background)
+                    .environment(\.scrollToBottom) {
+                        withAnimation(reduceMotion ? nil : .default) { position.scrollTo(edge: .bottom) }
+                    }
             }
         }
     }
+}
+
+/// Its own view, so it reads the scroll action Page puts in the bar's environment.
+struct MoreBelowButton: View {
+    @Environment(\.scrollToBottom) private var scrollToBottom
+
+    var body: some View {
+        Button { scrollToBottom() } label: {
+            Label("More below", systemImage: "chevron.down")
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .contentShape(.rect)
+        }
+        .font(.title3.weight(.semibold))
+        // ponytail: capped so the hint stays one line and leaves room for the page; VoiceOver users get the hint.
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+        .accessibilityHint("Shows Pay a bill and more.")
+    }
+}
+
+extension EnvironmentValues {
+    /// Scrolls the current Page to its end (Home's "More below").
+    @Entry var scrollToBottom: () -> Void = {}
 }
 
 struct BigButton: View {
@@ -362,8 +402,9 @@ struct ErrorText: View {
 }
 
 extension Color {
-    /// Text colors with at least 4.5:1 contrast on the light background. System orange and red text fall short.
+    /// Text colors with at least 4.5:1 contrast on the light background. System orange, red and gray text fall short.
     static let warningText = Color(UIColor { $0.userInterfaceStyle == .dark ? .systemOrange : UIColor(red: 0.64, green: 0.28, blue: 0, alpha: 1) })
+    static let secondaryText = Color(UIColor { $0.userInterfaceStyle == .dark ? .secondaryLabel : UIColor(white: 0.36, alpha: 1) })
     static let errorText = Color(UIColor { $0.userInterfaceStyle == .dark ? .systemRed : UIColor(red: 0.77, green: 0.12, blue: 0.12, alpha: 1) })
     /// Button tint: white on it is 6.4:1 in light mode (system blue is 3.5:1). Dark mode keeps system blue.
     static let action = Color(UIColor { $0.userInterfaceStyle == .dark ? .systemBlue : UIColor(red: 0, green: 0.34, blue: 0.8, alpha: 1) })
