@@ -112,20 +112,27 @@ func dollars(_ cents: Int) -> String {
     cents % 100 == 0 ? "$\(cents / 100)" : String(format: "$%d.%02d", cents / 100, cents % 100)
 }
 
-/// The device token is a credential, so it lives in the Keychain, not UserDefaults.
+/// The device token is a credential, so it lives in the Keychain, not UserDefaults. The family app keeps its
+/// Auth0 tokens here too, under its own service name.
 enum TokenStore {
-    private static let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "us.checkwith.device"]
+    private static func query(_ service: String) -> [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service]
+    }
 
-    static func load() -> String? {
+    static func load(service: String = "us.checkwith.device") -> String? {
         var item: CFTypeRef?
-        let q = query.merging([kSecReturnData as String: true]) { $1 }
+        let q = query(service).merging([kSecReturnData as String: true]) { $1 }
         guard SecItemCopyMatching(q as CFDictionary, &item) == errSecSuccess, let data = item as? Data else { return nil }
         return String(data: data, encoding: .utf8)
     }
 
-    static func save(_ token: String) {
-        SecItemDelete(query as CFDictionary)
-        let q = query.merging([kSecValueData as String: Data(token.utf8), kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock]) { $1 }
+    static func save(_ token: String, service: String = "us.checkwith.device", accessible: CFString = kSecAttrAccessibleAfterFirstUnlock) {
+        delete(service: service)
+        let q = query(service).merging([kSecValueData as String: Data(token.utf8), kSecAttrAccessible as String: accessible]) { $1 }
         SecItemAdd(q as CFDictionary, nil)
+    }
+
+    static func delete(service: String) {
+        SecItemDelete(query(service) as CFDictionary)
     }
 }
