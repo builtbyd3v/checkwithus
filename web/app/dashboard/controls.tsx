@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useEffect, useState } from 'react';
-import { addPayeeAction, freezeAction, inviteAction, joinAction, pairingAction, saveSettingsAction, unfreezeAction, type FormState } from './actions';
+import { addPayeeAction, decideAction, freezeAction, inviteAction, joinAction, pairingAction, saveSettingsAction, unfreezeAction, type FormState } from './actions';
 
 const initial: FormState = { message: '' };
 const inputClass = 'h-11 w-full rounded-lg border border-stone-300 bg-white px-3 text-stone-900 outline-none focus:border-teal-700 focus:ring-2 focus:ring-teal-700/20';
@@ -12,13 +12,13 @@ export function Countdown({ expiresAt }: { expiresAt: string }) {
   useEffect(() => {
     const update = () => {
       const seconds = Math.max(0, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 1000));
-      setRemaining(`${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`);
+      setRemaining(seconds ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')} left` : 'Time is up. It will be blocked.');
     };
     update();
     const timer = window.setInterval(update, 1000);
     return () => window.clearInterval(timer);
   }, [expiresAt]);
-  return <time dateTime={expiresAt} aria-label={`Decision deadline ${new Date(expiresAt).toLocaleString()}`}>{remaining} left</time>;
+  return <time dateTime={expiresAt} aria-label={`Decision deadline ${new Date(expiresAt).toLocaleString()}`}>{remaining}</time>;
 }
 
 function Feedback({ state }: { state: FormState }) {
@@ -35,6 +35,47 @@ export function JoinForm() {
       <input id="displayName" name="displayName" autoComplete="name" required maxLength={80} className={inputClass} /></div>
     <button disabled={pending} className={buttonClass}>{pending ? 'Joining…' : 'Join family circle'}</button>
     <Feedback state={state} />
+  </form>;
+}
+
+const DECIDED_EVENT = 'checkwith:decided';
+
+/**
+ * Always mounted above the held payments. A decided card leaves the list, so
+ * its own message would vanish unread: this live region says it instead and
+ * moves focus to "Recently decided", where the card now is.
+ */
+export function DecisionStatus() {
+  const [message, setMessage] = useState('');
+  useEffect(() => {
+    const show = (event: Event) => {
+      setMessage((event as CustomEvent<string>).detail);
+      requestAnimationFrame(() => (document.getElementById('decided-title') ?? document.getElementById('decision-status'))?.focus());
+    };
+    window.addEventListener(DECIDED_EVENT, show);
+    return () => window.removeEventListener(DECIDED_EVENT, show);
+  }, []);
+  return <p id="decision-status" role="status" tabIndex={-1} className={message ? 'mt-4 rounded-lg bg-white px-4 py-3 font-semibold text-teal-950 outline-none' : 'sr-only'}>{message}</p>;
+}
+
+/** Approve or deny one held payment. Under CIBA, approving happens in the Guardian push only. */
+export function DecisionButtons({ paymentId, canApproveHere }: { paymentId: string; canApproveHere: boolean }) {
+  const [state, decide, pending] = useActionState(async (previous: FormState, form: FormData) => {
+    const result = await decideAction(previous, form);
+    if (result.decided) window.dispatchEvent(new CustomEvent(DECIDED_EVENT, { detail: result.message }));
+    return result;
+  }, initial);
+  const base = 'inline-flex min-h-12 min-w-28 items-center justify-center rounded-lg px-5 text-base font-semibold text-white focus-visible:outline-3 focus-visible:outline-offset-2 disabled:opacity-60';
+  return <form action={decide} className="mt-5 border-t border-stone-100 pt-4">
+    <input type="hidden" name="paymentId" value={paymentId} />
+    <div className="flex flex-wrap gap-3">
+      {canApproveHere && <button name="decision" value="approve" disabled={pending}
+        className={`${base} bg-teal-800 hover:bg-teal-900 focus-visible:outline-teal-800`}>Approve</button>}
+      <button name="decision" value="deny" disabled={pending}
+        className={`${base} bg-rose-800 hover:bg-rose-900 focus-visible:outline-rose-800`}>{pending ? 'Sending…' : 'Deny'}</button>
+    </div>
+    {!canApproveHere && <p className="mt-2 text-sm text-stone-700">To approve, use the Guardian notification on your phone.</p>}
+    {!state.decided && <Feedback state={state} />}
   </form>;
 }
 

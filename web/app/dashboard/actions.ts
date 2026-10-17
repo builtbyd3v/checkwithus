@@ -11,9 +11,10 @@ import { formatCents, parseDollars } from '@/lib/money';
 import { normalizeName } from '@/lib/names';
 import { requirePermission } from '@/lib/permissions';
 import { allowanceBody, grantAllowance, revokeAllowance } from '@/lib/allowances';
-import { freeze } from '@/lib/services';
+import { PaymentError } from '@/lib/payments';
+import { approvalsUseCiba, freeze, payments } from '@/lib/services';
 
-export type FormState = { message: string; code?: string; expiresAt?: string };
+export type FormState = { message: string; code?: string; expiresAt?: string; decided?: boolean };
 const fail = (error: unknown): FormState => ({
   message: error instanceof Error ? error.message : 'Please try again.',
 });
@@ -95,6 +96,35 @@ export async function pairingAction(_state: FormState, form: FormData): Promise<
     const pairing = await createPairingCode(db(), sub, circleId.data);
     return { message: 'Enter this code on the older adult’s phone.', ...pairing };
   } catch (error) { return fail(error); }
+}
+
+/** Approve or deny a held payment. Same rules as the family app's decision route. */
+export async function decideAction(_state: FormState, form: FormData): Promise<FormState> {
+  const parsed = z.object({ paymentId: z.uuid(), decision: z.enum(['approve', 'deny']) })
+    .safeParse({ paymentId: value(form, 'paymentId'), decision: value(form, 'decision') });
+  if (!parsed.success) return { message: 'Payment not found.' };
+  const sub = await actor();
+  // With CIBA, only the Guardian push (enrolled phone + Face ID) can approve.
+  // A dashboard session alone must not move money. Denying only stops money.
+  if (parsed.data.decision === 'approve' && approvalsUseCiba()) {
+    return { message: 'Approve from the Auth0 Guardian notification on your phone.' };
+  }
+  try {
+    const payment = await payments().decidePayment({
+      paymentId: parsed.data.paymentId, member: { auth0Sub: sub }, decision: parsed.data.decision, via: 'dashboard',
+    });
+    revalidatePath('/dashboard');
+    if (payment.status === 'held') return { message: 'Your approval is in. It still needs another approver.' };
+    if (payment.status === 'denied') return { message: 'Denied. The payment will not go through.', decided: true };
+    if (payment.status === 'failed') return { message: 'Approved, but the bank could not send it.', decided: true };
+    return { message: 'Approved. The payment is on its way.', decided: true };
+  } catch (error) {
+    if (error instanceof PaymentError && (error.code === 'expired' || error.code === 'already_decided')) {
+      revalidatePath('/dashboard');
+      return { ...fail(error), decided: true };
+    }
+    return fail(error);
+  }
 }
 
 export async function freezeAction(_state: FormState, form: FormData): Promise<FormState> {
