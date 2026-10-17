@@ -9,6 +9,8 @@ struct ContentView: View {
         Group {
             if model.token == nil {
                 PairView()
+            } else if BankWatcher.shared.needsPermission {
+                BankPermissionView()
             } else {
                 switch model.screen {
                 case .home: HomeView()
@@ -80,6 +82,9 @@ struct HomeView: View {
             .accessibilityElement(children: .combine)
             .onTapGesture { if paused { model.go(.status) } }
             ErrorText()
+            #if DEBUG
+            BankDebugPanel()
+            #endif
         } action: {
             BigButton("Ask my family", symbol: "person.2.fill") { await model.askFamily() }
             BigButton("Pay a bill", symbol: "dollarsign.circle", prominent: false) { model.go(.choosePayee) }

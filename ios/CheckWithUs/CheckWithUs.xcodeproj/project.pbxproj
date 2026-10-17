@@ -516,6 +516,8 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Check With Us";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "If someone keeps you on the phone and sends you to the bank, we tell your family. We never share where you are.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "If someone keeps you on the phone and sends you to the bank, we tell your family. We never share where you are.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				CODE_SIGN_ENTITLEMENTS = CheckWithUs.entitlements;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -557,6 +559,8 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Check With Us";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "If someone keeps you on the phone and sends you to the bank, we tell your family. We never share where you are.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "If someone keeps you on the phone and sends you to the bank, we tell your family. We never share where you are.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				CODE_SIGN_ENTITLEMENTS = CheckWithUs.entitlements;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;

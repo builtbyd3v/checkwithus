@@ -65,6 +65,25 @@ struct API {
         let _: Created = try await send("POST", "device/alerts", body: ["kind": "ask_family"], token: token)
     }
 
+    /// Nessie ATMs and branches. Only entries with coordinates can be watched.
+    struct BankLocation: Decodable {
+        struct Coordinates: Decodable { let latitude: Double; let longitude: Double }
+        let id: String
+        let name: String
+        let coordinates: Coordinates?
+    }
+
+    static func bankLocations(token: String) async throws -> [BankLocation] {
+        struct List: Decodable { let locations: [BankLocation] }
+        let list: List = try await send("GET", "device/bank-locations", body: Optional<String>.none, token: token)
+        return list.locations
+    }
+
+    static func bankAlert(detail: String, token: String) async throws {
+        struct Created: Decodable { let id: String }
+        let _: Created = try await send("POST", "device/alerts", body: ["kind": "bank_during_call", "detail": detail], token: token)
+    }
+
     static func pay(_ request: PaymentRequest, token: String) async throws -> Payment {
         try await send("POST", "payments", body: request, token: token)
     }
@@ -117,6 +136,10 @@ enum TokenStore {
     private static let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "us.checkwith.device"]
 
     static func load() -> String? {
+        #if DEBUG
+        // Simulator tests: launch with `-deviceToken <token>` from a curl pairing instead of typing the code.
+        if let token = UserDefaults.standard.string(forKey: "deviceToken") { return token }
+        #endif
         var item: CFTypeRef?
         let q = query.merging([kSecReturnData as String: true]) { $1 }
         guard SecItemCopyMatching(q as CFDictionary, &item) == errSecSuccess, let data = item as? Data else { return nil }
