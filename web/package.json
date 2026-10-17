@@ -9,6 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "check:db": "node --env-file=.env.local scripts/check-db.mjs",
+    "check:nessie": "node --env-file=.env.local --conditions=react-server --import tsx scripts/check-nessie.ts",
     "test": "vitest run",
     "db:migrate": "node --env-file=.env.local scripts/migrate.mjs",
     "seed:demo": "node --env-file=.env.local --conditions=react-server --import tsx scripts/seed-demo.ts",

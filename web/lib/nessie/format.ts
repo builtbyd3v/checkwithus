@@ -272,6 +272,22 @@ export const merchantListSchema = z.array(merchantSchema);
 export const customerListSchema = z.array(customerSchema);
 export const accountListSchema = z.array(accountSchema);
 
+const bankLocationSchema = z.object({
+  _id: z.string(),
+  name: z.string(),
+  geocode: z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }).nullable().optional(),
+  address: z.object({ street_number: z.string(), street_name: z.string(), city: z.string(), state: z.string(), zip: z.string() }).nullable().optional(),
+}).loose();
+export const bankLocationListSchema = z.array(bankLocationSchema);
+
+export function fromBankLocation(location: z.infer<typeof bankLocationSchema>, kind: 'atm' | 'branch') {
+  return {
+    id: location._id, kind, name: location.name,
+    coordinates: location.geocode ? { latitude: location.geocode.lat, longitude: location.geocode.lng } : null,
+    address: location.address ?? null,
+  };
+}
+
 /**
  * An account as the rest of the app sees it. Nessie never updates `balance`
  * after a payment, so this is only the opening balance; the live balance is

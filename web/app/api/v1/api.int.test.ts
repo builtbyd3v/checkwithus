@@ -10,6 +10,11 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createFakeNessie } from '@/test/fake-nessie';
 import { toCents } from '@/lib/money';
 
+const bankDirectory = vi.hoisted(() => vi.fn(async () => ({ locations: [
+  { id: 'synthetic-atm', kind: 'atm', name: 'Test ATM', coordinates: { latitude: 29.65, longitude: -82.32 }, address: null },
+] })));
+vi.mock('@/lib/bank-locations', () => ({ bankLocations: bankDirectory }));
+
 vi.mock('next/server', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/server')>()),
   // Outside Next's request scope there is nothing to wait for.
@@ -53,6 +58,7 @@ const routes = {
   pairingCode: await import('./family/circles/[id]/pairing-code/route'),
   pair: await import('./device/pair/route'),
   config: await import('./device/config/route'),
+  bankLocations: await import('./device/bank-locations/route'),
   alerts: await import('./device/alerts/route'),
   labels: await import('./device/labels/route'),
   payments: await import('./payments/route'),
@@ -149,6 +155,16 @@ describe('pairing the older adult\'s phone', () => {
 });
 
 describe('device authentication', () => {
+  it('serves the bank directory only to paired devices', async () => {
+    bankDirectory.mockClear();
+    const denied = await routes.bankLocations.GET(req('/device/bank-locations'), noParams);
+    expect(denied.status).toBe(401);
+    expect(bankDirectory).not.toHaveBeenCalled();
+    const response = await read(await routes.bankLocations.GET(req('/device/bank-locations', { device: deviceToken }), noParams));
+    expect(response).toMatchObject({ status: 200, body: { locations: [{ id: 'synthetic-atm', kind: 'atm' }] } });
+    expect(bankDirectory).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects a missing, malformed or unknown token with 401', async () => {
     for (const device of [undefined, 'not-a-token', 'cwd_' + 'A'.repeat(43)]) {
       const response = await routes.config.GET(req('/device/config', { device }), noParams);
