@@ -2,7 +2,7 @@
 
 Copy each section into the matching Devpost field. Check every `TODO(Dev):` before submitting. Due **Sun Oct 18, 8:00 AM ET**.
 
-TODO(Dev): this draft describes `main` with #30 to #44 merged and deployed. Use the PR checklist at the top of the README: for each PR not merged by submission, cut the claims it lists here too. Delete the "Bill-pay agent" section unless the PR for #19 merges.
+TODO(Dev): this draft describes `main` with #30 to #44 merged and deployed. Use the PR checklist at the top of the README: for each PR not merged by submission, cut the claims it lists here too. Delete the "Bill-pay agent" section and the agent lines unless #46 (needs #40) merges.
 
 - **Project name:** checkwith.us
 - **Elevator pitch (max 200 characters):** Scam protection where the older adult does nothing and the family does the work. Scam texts filtered on the phone, scam calls labeled, risky payments paused for family approval.
@@ -38,6 +38,7 @@ checkwith.us is one iPhone app with two roles, plus a web dashboard.
 - **Top up:** an approver adds money from their own account (API built; no phone screen yet).
 - **Alerts and context:** "Ask my family" and bank alerts in a list, and "About Nx Rosa's usual" (from her history at that payee) next to a held payment.
 - **Allowances:** a scoped, expiring "yes in advance", for example utilities up to $400 until Nov 30. It lifts only the amount limits for a known payee, never a scam hold.
+- **Bill-pay agent:** an agent with its own Auth0 identity proposes routine bills. Inside the allowance they pay; outside, the family is asked.
 
 **Three hard rules:** AI suggests, code decides money. Money is integer cents everywhere. The older adult's texts and bills never go to a cloud AI model.
 
@@ -91,8 +92,13 @@ swift, swiftui, core-ml, foundation-models, callkit, identitylookup, activitykit
 
 ## Sponsor challenges
 
-### Bill-pay agent (placeholder)
-TODO(Dev): keep only if the PR for #19 merges; otherwise delete this section. Describe from the merged code: what the agent pays, its own Auth0 machine-to-machine identity, and how a family allowance bounds it.
+### Bill-pay agent (Auth0 for AI Agents)
+Rosa's bill-pay agent has its own Auth0 identity: a Machine-to-Machine client whose token holds one scope, `pay:bills`.
+- It can only ask. For each known biller it proposes the next bill with a fixed rule; no AI model sees Rosa's bills.
+- The same rules decide, the same path as Rosa's phone. Inside the family's expiring allowance, the bill pays with no push. Outside it, the payment is held and the family is asked once (family app, or Guardian push in CIBA mode).
+- Least privilege: it acts only where the family granted a live allowance, never pays a cycle twice, and never asks again after a no. Every family route rejects machine tokens, so it can never approve, freeze or grant itself more. Revoking the allowance stops it.
+- The dashboard labels its payments ("Paid by the bill agent under your Utilities allowance").
+- TODO(Dev): the real M2M grant is not verified on the live tenant. Verify one `npm run agent:bills` run, or say "tested against a fake Auth0".
 
 ### Capital One: Best Use of Nessie
 Nessie is the bank in every step. Each endpoint has a job:
@@ -112,6 +118,7 @@ Nessie is the bank in every step. Each endpoint has a job:
 - Optional RBAC (`AUTH0_RBAC=true`): approving needs the `approve:payments` permission in the access token; a missing claim counts as no. Denying needs only the circle role, because it only stops money.
 - Fresh login (no older than 5 minutes, from `auth_time`) before granting an allowance, changing roles, unfreezing or topping up.
 - **Auth0 for AI Agents:** we implemented Client-Initiated Backchannel Authentication (CIBA). With `APPROVAL_MODE=ciba`, a held payment sends a Guardian push and waits for a human out of band. With `AUTH0_CIBA_RAR=true` as well, the push carries the amount, payee and hold reasons as rich `authorization_details`. Honest status: both are off by default (`APPROVAL_MODE=app`, where the family app approves), tested against a fake Auth0 only, and a live Guardian push is not verified. We did fix one bug only the real tenant showed (an `audience` it rejects).
+- **Agent identity:** the bill-pay agent is its own Machine-to-Machine client with only `pay:bills` (client credentials). Its route checks the grant type, its own `sub` and the scope; every family route rejects machine tokens. See "Bill-pay agent" above.
 
 ### MLH: Best Use of Tiger Data
 - `spending` is a hypertable (7-day chunks) with columnstore compression, segmented by family circle.

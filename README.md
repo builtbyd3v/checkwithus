@@ -21,8 +21,9 @@ Live at [checkwith.us](https://checkwith.us). Built at SwampHacks XII (Oct 16 to
 > - [ ] #43 dashboard alerts list, "Nx usual" line, live Tiger Data speed card, dashboard gallery shots
 > - [ ] #44 iPhone accessibility pass
 > - [ ] The no-passcode fix (a phone with no passcode cannot approve). Until it merges, keep the caveat under "The family does the work".
-> - [ ] The bill-pay agent for #19. Until it merges, delete the "Bill-pay agent" section.
-> - [ ] Merged `main` deployed to checkwith.us, migrations 014 to 017 applied to the live database.
+> - [ ] #45 test-only fix (flaky bill test); no claims depend on it
+> - [ ] #46 bill-pay agent (needs #40 first): the "Bill-pay agent" section, `npm run agent:bills`, migration 020. Until it merges, delete that section and the agent lines in Auth0 below.
+> - [ ] Merged `main` deployed to checkwith.us, migrations 014 to 017 (and 020 with #46) applied to the live database.
 
 ## How it works
 
@@ -70,14 +71,20 @@ family dashboard.
 
 The landing page has a "Try a payment" widget that runs this same `decideHold` function in the browser.
 
-### Bill-pay agent (placeholder)
+### Bill-pay agent
 
-TODO(Dev): keep only if the PR for #19 merges; otherwise delete this section. Describe in 3 lines, from the merged code: what the agent pays, its own Auth0 machine-to-machine identity, and how it stays inside a family allowance (no allowance or outside it: the payment holds like any other).
+Rosa's bill-pay agent has its own Auth0 identity: a Machine-to-Machine app that signs in with the client credentials grant. Its token holds one scope, `pay:bills`.
+- **It can only ask.** `npm run agent:bills` calls `POST /api/v1/agent/bills/run`. For each known biller it proposes the next bill (due one month after the last one, for the last amount). That is a fixed rule with no AI model, and bill data never leaves our server except to Nessie.
+- **The same rules decide.** Every proposal goes through `createPayment`, the same path as the phone. Inside a live family allowance it pays with no push. Outside it, the payment is held and the family is asked once (family app, or a Guardian push with `APPROVAL_MODE=ciba`). It never pays a cycle twice and never asks again after a no.
+- **Least privilege.** It acts only in circles with a live allowance. The route checks RS256, our issuer and audience, `gty = client-credentials`, the agent's own `sub`, and `pay:bills`. Every family route rejects machine tokens (`403 agent_not_allowed`), so the agent can never approve, deny, freeze, unfreeze, grant allowances or change policy. Revoking the allowance stops it.
+- **Visible.** Each agent payment stores `initiated_by = 'agent'`; the dashboard shows "Paid by the bill agent under your Utilities allowance" or "Asked by the bill agent".
+
+TODO(Dev): the real M2M grant is not verified on the live Auth0 tenant yet. Create the M2M app with only `pay:bills`, set `AUTH0_AGENT_CLIENT_ID`, run `npm run agent:bills -- --within 14` once, then delete this line. Until then, say "tested against a fake Auth0".
 
 ### Sponsor tech doing real work
 
 - **Capital One Nessie.** Each endpoint has a job. Customers and accounts: a spending account and a vault account. Merchants: payee categories. Purchases and bills: every allowed payment is sent to Nessie. Withdrawals and ATMs: the "cash then gift card" sequence. Transfers: Freeze, Unfreeze and the family top-up. Deposits: the seed writes Rosa's monthly pension as Nessie deposits, which add to her ledger balance. ATMs and branches: the bank-while-on-a-call alert. Nessie never updates its stored balance, so the available balance is our ledger minus reserved payments; Nessie's reported balance is shown for information. Client: [`web/lib/nessie/client.ts`](web/lib/nessie/client.ts).
-- **Auth0.** Login for the dashboard and native PKCE login in the family iPhone app. Signed API access tokens on every family route. Approver and viewer roles enforced on the server, plus an opt-in `approve:payments` RBAC permission (`AUTH0_RBAC=true`). A fresh login (no older than 5 minutes) before granting an allowance, changing roles, unfreezing or topping up. Client-Initiated Backchannel Authentication (CIBA, part of Auth0 for AI Agents) is implemented: with `APPROVAL_MODE=ciba`, a held payment sends a Guardian push. With `AUTH0_CIBA_RAR=true` as well, the push carries the amount, payee and hold reasons as rich `authorization_details`. Both are off by default, tested only against a fake Auth0, and a live push is not verified. We fixed a bug where the push always sent `audience`, which the real tenant rejects. Code: [`web/lib/auth0/ciba.ts`](web/lib/auth0/ciba.ts), [`web/lib/auth/family.ts`](web/lib/auth/family.ts).
+- **Auth0.** Login for the dashboard and native PKCE login in the family iPhone app. Signed API access tokens on every family route. Approver and viewer roles enforced on the server, plus an opt-in `approve:payments` RBAC permission (`AUTH0_RBAC=true`). A fresh login (no older than 5 minutes) before granting an allowance, changing roles, unfreezing or topping up. The bill-pay agent is its own Machine-to-Machine client with only `pay:bills`, and family routes reject machine tokens. Client-Initiated Backchannel Authentication (CIBA, part of Auth0 for AI Agents) is implemented: with `APPROVAL_MODE=ciba`, a held payment sends a Guardian push. With `AUTH0_CIBA_RAR=true` as well, the push carries the amount, payee and hold reasons as rich `authorization_details`. Both are off by default, tested only against a fake Auth0, and a live push is not verified. We fixed a bug where the push always sent `audience`, which the real tenant rejects. Code: [`web/lib/auth0/ciba.ts`](web/lib/auth0/ciba.ts), [`web/lib/auth/family.ts`](web/lib/auth/family.ts).
 - **Tiger Data.** `spending` is a hypertable with columnstore compression (segment by circle). Real-time continuous aggregates do the reading: `spending_daily` feeds the unusual-spending rule; `spending_weekly`, built on top of it, feeds the dashboard's weekly chart; `spending_payee_daily` feeds the dashboard's "About Nx usual" line (display only; it does not decide holds). A time-window query on the hypertable catches "ATM cash, then a gift card within 2 hours". The dashboard speed card times the weekly query live; the 1M-row numbers are below.
 - **GoDaddy Registry.** checkwith.us is our product name and our live domain.
 
@@ -151,7 +158,7 @@ npm run seed:demo              # synthetic "Rosa" circle, payees, history, invit
 npm run dev                    # http://localhost:3000
 ```
 
-Optional flags in `.env.example`: `APPROVAL_MODE` (`app` or `ciba`), `AUTH0_CIBA_RAR`, `AUTH0_RBAC`, `DEMO_BANK_LOCATIONS`. Demo helpers: `npm run demo:reset` (throwaway `wt_*` schema only, or `-- --live` for the real demo circle), `npm run demo:atm`, `npm run smoke:demo`.
+Optional flags in `.env.example`: `APPROVAL_MODE` (`app` or `ciba`), `AUTH0_CIBA_RAR`, `AUTH0_RBAC`, `DEMO_BANK_LOCATIONS`. Demo helpers: `npm run demo:reset` (throwaway `wt_*` schema only, or `-- --live` for the real demo circle), `npm run demo:atm`, `npm run smoke:demo`, `npm run agent:bills` (needs `AUTH0_AGENT_CLIENT_ID` and `AUTH0_AGENT_CLIENT_SECRET`).
 
 Checks: `npm run typecheck && npm run build && npm test`. Database tests: `npm run test:db`. More detail: [`web/INTEGRATION.md`](web/INTEGRATION.md).
 

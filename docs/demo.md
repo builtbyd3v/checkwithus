@@ -18,9 +18,10 @@ Rosa is synthetic ("Rosa CheckWith (synthetic)"). Never use a real person's name
 One build for everything
 - [ ] One build: every demo PR (#30 to #44) is merged to `main`. Both iPhones are built from that `main`, and that `main` is deployed to checkwith.us. Never mix feature branches.
 - [ ] `curl https://checkwith.us/api/health` prints `{"ok":true,"database":"reachable"}`. Freeze must not 404: the deployed build is the merged one.
-- [ ] Migrations on the live database: `cd web && npm run db:migrate` (014 freeze, 015 ATM cash, 016 weekly and per-payee aggregates, 017 ledger credits).
+- [ ] Migrations on the live database: `cd web && npm run db:migrate` (014 freeze, 015 ATM cash, 016 weekly and per-payee aggregates, 017 ledger credits, and 020 payment initiator if #46 is merged).
 - [ ] `DEMO_BANK_LOCATIONS` is set on Vercel to a spot at the expo table, for example `[{"name":"SwampHacks Demo Bank","lat":29.6463,"lng":-82.3478}]`. TODO(Dev): confirm the coordinates on site, redeploy after changing it, then relaunch the app on iPhone A.
-- [ ] `npm run smoke:demo` passes (a $350 City Power & Light bill pays with no push while the allowance exists, and holds when it is revoked; runs on a throwaway schema).
+- [ ] `npm run smoke:demo` passes (a $350 City Power & Light bill pays with no push while the allowance exists, and holds when it is revoked; with #46, step 6a: the agent pays the $350 water bill only because of the allowance; runs on a throwaway schema).
+- [ ] If showing the agent: `AUTH0_AGENT_CLIENT_ID` and `AUTH0_AGENT_CLIENT_SECRET` are in the MacBook's `.env.local`, and a second terminal has `npm run agent:bills -- --within 14` typed, not run. Run it only after `demo:reset`.
 - [ ] `npm run demo:reset -- --live` on the real demo circle (only there; without `--live` it refuses anything but a throwaway `wt_*` schema). It reseeds Rosa, clears held payments, unfreezes, clears recent ATM cash, and grants the utilities allowance up to $400 until Nov 30.
 - [ ] Do NOT run `npm run demo:atm` after the reset until step 5. If you do, step 3 also shows the ATM reason.
 - [ ] `APPROVAL_MODE=app` on Vercel (the default). The family approves in the family app, which asks for Face ID first. The Guardian push (`ciba`) is implemented but not verified live, so do not use it in the demo.
@@ -121,6 +122,7 @@ Times are cumulative. The script ends at 2:45, so 15 seconds are left as buffer.
 ### If there is time, or a judge asks
 Unfreeze first if step 7 ran, and make sure no call is active (a call adds a hold an allowance never lifts).
 - **Approve with Face ID:** iPhone A: Pay a bill, Neighborhood Pharmacy (a known payee), 350, Yes, pay. It holds because $350 is over the $300 limit (it may also show "Much more than they usually spend on this"). iPhone B: Approve, Face ID. iPhone A shows "Paid".
+- **Bill-pay agent (needs #46):** MacBook: press Enter on `npm run agent:bills -- --within 14`. It prints "Signed in as the bill-pay agent (scope: pay:bills)", then "Paid under the family's allowance: Sunshine Water Co. $350.00". Reload the dashboard: "Paid by the bill agent under your Utilities allowance". Say: "The agent has its own Auth0 identity with one scope. It can only ask; the same rules decide. $350 is over the $300 limit, so it paid only because of the family's $400 allowance."
 - **Allowance off:** iPhone B: Allowances, Revoke the utilities allowance. iPhone A pays City Power & Light $350 again: now it holds as "Over the limit you set".
 - **Dashboard:** MacBook: reload checkwith.us/dashboard to show the waiting payments and the spending chart.
 
