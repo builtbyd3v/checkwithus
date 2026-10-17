@@ -20,6 +20,7 @@ let payments: ReturnType<typeof createPaymentService>;
 let freezer: ReturnType<typeof createFreezeService>;
 
 const key = () => `test-${crypto.randomUUID()}`;
+const fresh = () => Math.floor(Date.now() / 1000);
 const bill: NewPayment = {
   idempotencyKey: 'unused', amountCents: toCents(8_400), payeeName: 'City Power & Light', payeeKind: 'biller',
   category: 'utilities', onCall: false, guard: null, explanation: null,
@@ -92,11 +93,11 @@ describe('Freeze', () => {
   it('unfreeze moves the chosen amount back once, and payments flow again', async () => {
     const circleId = await makeCircle();
     await freezer.freeze(APPROVER, circleId);
-    await expect(freezer.unfreeze(APPROVER, circleId, toCents(600_000))).rejects.toMatchObject({ status: 409 });
-    await expect(freezer.unfreeze(APPROVER, circleId, toCents(10_050))).rejects.toMatchObject({ status: 422 });
+    await expect(freezer.unfreeze(APPROVER, fresh(), circleId, toCents(600_000))).rejects.toMatchObject({ status: 409 });
+    await expect(freezer.unfreeze(APPROVER, fresh(), circleId, toCents(10_050))).rejects.toMatchObject({ status: 422 });
 
-    expect(await freezer.unfreeze(APPROVER, circleId, toCents(100_000))).toEqual({ frozen: false, movedCents: 100_000 });
-    expect(await freezer.unfreeze(APPROVER, circleId, toCents(100_000))).toEqual({ frozen: false, movedCents: 100_000 });
+    expect(await freezer.unfreeze(APPROVER, fresh(), circleId, toCents(100_000))).toEqual({ frozen: false, movedCents: 100_000 });
+    expect(await freezer.unfreeze(APPROVER, fresh(), circleId, toCents(100_000))).toEqual({ frozen: false, movedCents: 100_000 });
     expect(transfers()).toHaveLength(2);
     expect(transfers()[1]!.path).toBe(`/accounts/${fake.accounts[0]!._id}/transfers`);
     expect(transfers()[1]!.body).toMatchObject({ amount: 1000 });
@@ -108,10 +109,42 @@ describe('Freeze', () => {
     expect(fake.accounts).toHaveLength(1);
   });
 
+  it('unfreeze needs a recent sign-in; freeze does not', async () => {
+    const circleId = await makeCircle();
+    await freezer.freeze(APPROVER, circleId);
+    await expect(freezer.unfreeze(APPROVER, undefined, circleId, toCents(100)))
+      .rejects.toMatchObject({ status: 403, code: 'step_up_required' });
+    await expect(freezer.unfreeze(APPROVER, fresh() - 3600, circleId, toCents(100)))
+      .rejects.toMatchObject({ status: 403, code: 'step_up_required' });
+  });
+
+  it('unfreeze waits while a freeze is still sending', async () => {
+    const circleId = await makeCircle();
+    fake.failNext('/transfers', 'timeout');
+    // Unknown outcome: the freeze row stays 'sending'.
+    expect(await freezer.freeze(APPROVER, circleId)).toEqual({ frozen: true, movedCents: 500_000 });
+    await expect(freezer.unfreeze(APPROVER, fresh(), circleId, toCents(100)))
+      .rejects.toMatchObject({ status: 409, code: 'freeze_in_progress' });
+    await pool.query(`update vault_transfers set created_at = now() - interval '31 seconds' where circle_id = $1`, [circleId]);
+    expect(await freezer.unfreeze(APPROVER, fresh(), circleId, toCents(100))).toEqual({ frozen: false, movedCents: 100 });
+  });
+
+  it('a held payment cannot be approved while frozen, only denied', async () => {
+    const circleId = await makeCircle();
+    const held = await payments.createPayment(circleId, { ...giftCard, idempotencyKey: key() });
+    expect(held.status).toBe('held');
+    await freezer.freeze(APPROVER, circleId);
+    await expect(payments.decidePayment({ paymentId: held.id, member: { auth0Sub: APPROVER }, decision: 'approve', via: 'app' }))
+      .rejects.toMatchObject({ code: 'frozen', message: 'Spending is frozen. Unfreeze first.' });
+    expect(fake.calls.filter((c) => c.path.endsWith('/purchases'))).toHaveLength(0);
+    const denied = await payments.decidePayment({ paymentId: held.id, member: { auth0Sub: APPROVER }, decision: 'deny', via: 'app' });
+    expect(denied.status).toBe('denied');
+  });
+
   it('a viewer cannot freeze or unfreeze (403), and nothing reaches Nessie', async () => {
     const circleId = await makeCircle();
     await expect(freezer.freeze(VIEWER, circleId)).rejects.toMatchObject({ status: 403 });
-    await expect(freezer.unfreeze(VIEWER, circleId, toCents(0))).rejects.toMatchObject({ status: 403 });
+    await expect(freezer.unfreeze(VIEWER, fresh(), circleId, toCents(0))).rejects.toMatchObject({ status: 403 });
     await expect(freezer.freeze('test|stranger', circleId)).rejects.toMatchObject({ status: 404 });
     expect(fake.calls.filter((c) => c.method === 'POST')).toHaveLength(0);
   });
@@ -142,6 +175,18 @@ describe('cash at an ATM, then a gift card', () => {
     await atmCash(circleId, 30);
     const payment = await payments.createPayment(circleId, { ...giftCard, idempotencyKey: key() });
     expect(payment.status).toBe('held');
+    expect(payment.holdReasons).toContain('cash_then_gift_card');
+  });
+
+  it('counts cash exactly at the two-hour boundary', async () => {
+    const circleId = await makeCircle();
+    // A few seconds inside the boundary, so the test does not race the clock.
+    await pool.query(
+      `insert into spending (occurred_at, circle_id, amount_cents, category, payee_name, atm_id)
+       values (now() - interval '2 hours' + interval '5 seconds', $1, 20000, 'other', 'ATM cash: Test ATM', 'test-atm')`,
+      [circleId],
+    );
+    const payment = await payments.createPayment(circleId, { ...giftCard, idempotencyKey: key() });
     expect(payment.holdReasons).toContain('cash_then_gift_card');
   });
 

@@ -8,5 +8,5 @@ export const POST = handle(async (request, { params }: { params: Promise<{ id: s
   const user = await requireFamilyUser(request);
   const id = uuidParam((await params).id);
   const { amountCents } = await readBody(request, body);
-  return json(await freeze().unfreeze(user.sub, id, toCents(amountCents)));
+  return json(await freeze().unfreeze(user.sub, user.authTime, id, toCents(amountCents)));
 });

@@ -27,7 +27,8 @@ vi.mock('@/lib/auth/family', async () => {
     requireFamilyUser: async (request: Request) => {
       const sub = request.headers.get('x-test-sub');
       if (!sub) throw new AuthError('Missing bearer token');
-      return { sub, name: null };
+      const authTime = request.headers.get('x-test-auth-time');
+      return { sub, name: null, ...(authTime ? { authTime: Number(authTime) } : {}) };
     },
   };
 });
@@ -466,7 +467,12 @@ describe('Freeze over HTTP (the family app contract)', () => {
     expect(frozen.body.movedCents).toBeGreaterThan(0);
 
     expect((await routes.unfreeze.POST(req(`${path}/unfreeze`, { sub: MARIA, body: { amountCents: '100' } }), params(circleId))).status).toBe(400);
+    // Unfreezing removes a protection: it needs a recent sign-in.
     expect(await read(await routes.unfreeze.POST(req(`${path}/unfreeze`, { sub: MARIA, body: { amountCents: 10_000 } }), params(circleId))))
+      .toMatchObject({ status: 403, body: { error: 'step_up_required' } });
+    const fresh = req(`${path}/unfreeze`, { sub: MARIA, body: { amountCents: 10_000 } });
+    fresh.headers.set('x-test-auth-time', String(Math.floor(Date.now() / 1000)));
+    expect(await read(await routes.unfreeze.POST(fresh, params(circleId))))
       .toEqual({ status: 200, body: { frozen: false, movedCents: 10_000 } });
   });
 });

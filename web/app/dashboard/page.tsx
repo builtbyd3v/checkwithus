@@ -85,8 +85,8 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
             className={`rounded-full border px-4 py-2 text-sm font-medium ${item.circleId === active.circleId ? 'border-teal-800 bg-teal-800 text-white' : 'border-stone-300 bg-white text-stone-700'}`}>{item.protectedName}</Link>)}</div>}
       </section>
 
-      <FreezeControl circleId={active.circleId} frozen={circle.frozen} firstName={circle.protected_name.split(' ')[0]!}
-        vaultLabel={money(circle.vault_cents)} vaultDollars={String(Math.floor(circle.vault_cents / 100))} />
+      {active.role === 'approver' && <FreezeControl circleId={active.circleId} frozen={circle.frozen} firstName={circle.protected_name.split(' ')[0]!}
+        vaultLabel={money(circle.vault_cents)} vaultDollars={String(Math.floor(circle.vault_cents / 100))} />}
       <section aria-labelledby="attention-title" className="rounded-2xl border border-teal-900/15 bg-[#e6f0eb] p-5 sm:p-7">
         <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-bold uppercase tracking-widest text-teal-800">Needs attention</p>
           <h2 id="attention-title" className="mt-1 text-2xl font-semibold">{held.length ? `${held.length} payment${held.length === 1 ? '' : 's'} waiting` : 'All clear right now'}</h2></div>

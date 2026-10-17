@@ -22,12 +22,12 @@ import { HttpError } from '@/lib/http';
 import { toCents, type Cents } from '@/lib/money';
 import { NessieError, type NessieClient } from '@/lib/nessie/client';
 import { taggedDescription, transferBody } from '@/lib/nessie/format';
-import { requirePermission } from '@/lib/permissions';
+import { requireFreshLogin, requirePermission } from '@/lib/permissions';
 import { ensureVaultAccount, VAULT_CENTS_SQL } from '@/lib/vault';
 
 export type FreezeResult = { frozen: boolean; movedCents: Cents };
 
-type Transfer = { id: string; direction: 'freeze' | 'unfreeze'; status: string; amount_cents: number };
+type Transfer = { id: string; direction: 'freeze' | 'unfreeze'; status: string; amount_cents: number; in_flight?: boolean };
 type CircleRow = {
   frozen: boolean;
   nessie_account_id: string;
@@ -54,7 +54,9 @@ export function createFreezeService(deps: { pool: pg.Pool; nessie: NessieClient 
       [circleId],
     );
     const last = await q.query<Transfer>(
-      `select id, direction, status, amount_cents from vault_transfers
+      `select id, direction, status, amount_cents,
+              status = 'sending' and created_at > now() - interval '30 seconds' as in_flight
+         from vault_transfers
         where circle_id = $1 order by id desc limit 1`,
       [circleId],
     );
@@ -129,8 +131,10 @@ export function createFreezeService(deps: { pool: pg.Pool; nessie: NessieClient 
     return { frozen: true, movedCents: toCents(tap.moved) };
   }
 
-  async function unfreeze(sub: string, circleId: string, amountCents: Cents): Promise<FreezeResult> {
+  /** Unfreezing removes a protection, so it needs a recent sign-in (freeze stays one tap). */
+  async function unfreeze(sub: string, authTime: unknown, circleId: string, amountCents: Cents): Promise<FreezeResult> {
     await requirePermission(pool, sub, circleId, 'approve:payments');
+    requireFreshLogin(authTime);
     if (amountCents % 100 !== 0) {
       throw new HttpError(422, 'whole_dollars_only', 'The bank only moves whole dollars between accounts.');
     }
@@ -139,6 +143,10 @@ export function createFreezeService(deps: { pool: pg.Pool; nessie: NessieClient 
       if (!circle.frozen) {
         const moved = last?.direction === 'unfreeze' && last.status !== 'failed' ? last.amount_cents : 0;
         return { transfer: null, moved, circle };
+      }
+      // A freeze still sending: let it land first, so the vault total is real.
+      if (last?.direction === 'freeze' && last.in_flight) {
+        throw new HttpError(409, 'freeze_in_progress', 'The freeze is still moving the money. Try again in a moment.');
       }
       // No vault account yet means the first freeze is still moving the money.
       if (amountCents > circle.vault || (amountCents > 0 && !circle.vault_account_id)) {

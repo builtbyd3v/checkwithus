@@ -112,9 +112,12 @@ export async function unfreezeAction(_state: FormState, form: FormData): Promise
   const parsed = z.object({ circleId: z.uuid(), dollars: z.string().trim().regex(/^\d+$/) })
     .safeParse({ circleId: value(form, 'circleId'), dollars: value(form, 'dollars') });
   if (!parsed.success) return { message: 'Enter a whole dollar amount.' };
-  const sub = await actor();
+  const session = await auth0.getSession();
+  if (!session?.user.sub) redirect('/auth/login?returnTo=/dashboard');
   try {
-    const { movedCents } = await freeze().unfreeze(sub, parsed.data.circleId, parseDollars(parsed.data.dollars));
+    const { movedCents } = await freeze().unfreeze(
+      session.user.sub, session.user.auth_time, parsed.data.circleId, parseDollars(parsed.data.dollars),
+    );
     revalidatePath('/dashboard');
     return { message: `Spending is back on. ${formatCents(movedCents)} moved back from the vault.` };
   } catch (error) { return fail(error); }
