@@ -23,6 +23,8 @@ ml/models/*.log
 # Xcode
 xcuserdata/
 DerivedData/
+.build/
+.swiftpm/
 *.xcuserstate
 
 # OS
