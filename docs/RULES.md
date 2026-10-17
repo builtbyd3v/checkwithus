@@ -39,7 +39,7 @@ Source: SwampHacks XII hacker guide (Notion) and Devpost, read 2026-10-16.
 | Entry | Type | What judges want | Prize |
 |---|---|---|---|
 | Overall (Hack of the Year) | Automatic | Innovation, technical achievement, impact, execution | $1,000 / $750 / $500, split across the team |
-| Most Creative Use of AI (UF Data Science & Informatics) | **Our one specialized track** | AI central to the project: fine-tuning, RAG, agents, custom models, evals. **Public repo with a README. Judges read the code.** Depth over polish. Clean, documented code. Explain design choices and tradeoffs. | To be announced |
+| Best Use of AI/ML (UF Data Science & Informatics) | **Our one specialized track** | AI central to the project: fine-tuning, RAG, agents, custom models, evals. **Public repo with a README. Judges read the code.** Depth over polish. Clean, documented code. Explain design choices and tradeoffs. | To be announced |
 | Capital One: Best Use of Nessie | Sponsor challenge | Creative use of Nessie's endpoints (accounts, merchants, bills, peer-to-peer) to improve people's finances | $250 per team member |
 | Easy On The Eyes (Best UI/UX) | SwampHacks challenge | Outstanding user experience, interface design and polish | Acer 27" monitor each |
 | MLH: Best Use of Auth0 | MLH challenge | Real use of Auth0 APIs; Auth0 for AI Agents is called out | Wireless headphones |

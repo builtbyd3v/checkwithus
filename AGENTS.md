@@ -8,19 +8,12 @@ clean abstraction unless someone asks for the abstraction.
 
 ## What we build
 
-checkwith.us protects older adults from scams with zero effort from them. Family
-members approve risky payments with Face ID. All scam detection runs on the phone.
+**Read [docs/PLAN.md](docs/PLAN.md) first.** It is the single source of truth for what we
+build, the demo, how each sponsor challenge is won, and what is out of scope.
 
-- **Older adult iPhone app:** Message Filter extension (on-device scam model screens
-  texts), Call Directory extension ("Possible scam" labels), payment holds,
-  bank-while-on-a-call alert, Screen Time app lock, one big "Ask my family" button,
-  lock-screen card.
-- **Family iPhone app:** Auth0 CIBA push, approve or deny with Face ID, family circle
-  (up to 3 people, first answer decides, no answer in 5 minutes = blocked).
-- **Backend:** Next.js on Vercel. Capital One Nessie (accounts, payments), Auth0
-  (approvals), Tiger Data (spending history, dashboard).
-- **On-device AI:** Guard = rules + fine-tuned DistilBERT (Core ML). checkwith-1 =
-  fine-tuned Qwen3.5-2B (MLX Swift). Family decisions retrain the Guard.
+In one line: scam protection where the older adult does nothing and the family does the
+work. We are going all in on the sponsor challenges (Nessie, Auth0, Tiger Data, Easy On
+The Eyes, GoDaddy). Work is tracked in GitHub issues (`gh issue list`).
 
 ## Hard rules (never break these)
 
@@ -114,12 +107,17 @@ cd ml && python eval.py                          # ml: prints scores (script nam
 
 ## Ownership
 
-| Person | Branch | Owns |
+GitHub issues are the source of truth for who does what: `gh issue list --assignee <login>`.
+
+| Person | Branch | Area |
 | --- | --- | --- |
-| Dev (builtbyd3v) | `dev` | Lead. All ML (`ml/`: training, fine-tuning, learning loop, eval table). All iOS (`ios/`: older adult app, Message Filter, Call Directory, Screen Time lock, bank alert, lock-screen card, building and signing the family app). Integration. |
-| Haadi (haad1r) | `haadi` | `web/`: Next.js on Vercel, Nessie, Auth0 CIBA, family circle logic, Tiger Data, family dashboard |
-| rgons (rgons15) | `rgons` | Both apps' screens (Figma), SwiftUI views for the family app (PR to Dev), `docs/` research write-up |
-| [data + demo teammate, not on the repo yet] | `[their name]` | `ml/data/`: collect and label training data for Dev (about 200 hand-written elder scams, real bills, cleaned public sets). `docs/`: Devpost, demo script, backup video |
+| Dev (builtbyd3v) | `dev` | Lead. `ios/` (older adult app, Message Filter, Call Directory), `ml/`, integration |
+| Haadi (haad1r) | `haadi` | `web/` backend: Nessie, Auth0, Tiger Data migrations, deploy |
+| rgons (rgons15) | `rgons` | Design, dashboard UI, Tiger Data performance + scam sequence query, README and Devpost |
+| Data + demo teammate (joins later) | TBD | Backup video, DEV post |
+
+Touching someone else's area (for example a migration in `web/db`)? Agree on it in the
+team chat first.
 
 ## Ground rules
 
