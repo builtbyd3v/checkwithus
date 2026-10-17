@@ -89,7 +89,7 @@ export type PaymentFacts = {
 export type CircleFacts = {
   /** The family tapped Freeze. */
   frozen: boolean;
-  /** ATM cash in the ledger within `CASH_THEN_GIFT_CARD_WINDOW_SECONDS`. */
+  /** ATM cash in the ledger within `CASH_THEN_GIFT_CARD_WINDOW_SECONDS`, boundary included. */
   atmCashRecently: boolean;
 };
 
