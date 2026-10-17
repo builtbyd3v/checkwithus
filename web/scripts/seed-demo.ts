@@ -1,11 +1,12 @@
-/** Synthetic Rosa demo. Run once with `npm run seed:demo`; safe to rerun. */
+/** Synthetic Rosa demo. Run once with `npm run seed:demo`; safe to rerun. Also used by demo:reset. */
+import { pathToFileURL } from 'node:url';
 import pg from 'pg';
 import { dbEnv, nessieEnv } from '@/lib/env';
 import { ensureVaultAccount } from '@/lib/vault';
 import { issueInviteCode } from '@/lib/invites';
 import { toCents } from '@/lib/money';
 import { normalizeName } from '@/lib/names';
-import { createNessieClient } from '@/lib/nessie/client';
+import { createNessieClient, type NessieClient } from '@/lib/nessie/client';
 import {
   checkingAccountBody,
   customerBody,
@@ -35,19 +36,23 @@ const MERCHANTS: Merchant[] = [
   { name: 'Corner Cafe', category: 'dining', amountCents: 2400 },
 ];
 
-async function main() {
-  if (process.argv.slice(2).some((arg) => arg !== '--rotate-invite')) {
-    throw new Error('Only --rotate-invite is supported');
-  }
-  const nessie = createNessieClient({ key: nessieEnv().NESSIE_API_KEY });
-  const pool = new pg.Pool({ connectionString: dbEnv().DATABASE_URL, max: 2 });
-  try {
+export type SeedOptions = {
+  pool: pg.Pool;
+  nessie: NessieClient;
+  /** A different synthetic Nessie customer, so throwaway schemas never share live Rosa's accounts. */
+  customerLastName?: string;
+  rotateInvite?: boolean;
+};
+
+/** Creates or finds Rosa's circle, accounts, history and vault. Idempotent. */
+export async function seedDemo({ pool, nessie, customerLastName = CUSTOMER.lastName, rotateInvite = false }: SeedOptions) {
+  { // ponytail: bare block keeps the old body's indentation, so the diff stays small.
     const customers = await nessie.listCustomers();
     const existingCustomer = customers.find(
-      (customer) => customer.first_name === CUSTOMER.firstName && customer.last_name === CUSTOMER.lastName,
+      (customer) => customer.first_name === CUSTOMER.firstName && customer.last_name === customerLastName,
     );
     const customerId = existingCustomer?._id ?? await nessie.createCustomer(customerBody({
-      ...CUSTOMER, address: ADDRESS,
+      firstName: CUSTOMER.firstName, lastName: customerLastName, address: ADDRESS,
     }));
 
     const accounts = await nessie.listCustomerAccounts(customerId);
@@ -179,8 +184,21 @@ async function main() {
     );
 
     const inviteIsValid = circles[0]!.invite_expires_at && circles[0]!.invite_expires_at > new Date();
-    const rotate = process.argv.includes('--rotate-invite');
-    const invite = !inviteIsValid || rotate ? await issueInviteCode(pool, circleId) : null;
+    const invite = !inviteIsValid || rotateInvite ? await issueInviteCode(pool, circleId) : null;
+    return { circleId, customerId, accountId, vaultId, created, ledgerAdded, invite };
+  }
+}
+
+async function main() {
+  if (process.argv.slice(2).some((arg) => arg !== '--rotate-invite')) {
+    throw new Error('Only --rotate-invite is supported');
+  }
+  const nessie = createNessieClient({ key: nessieEnv().NESSIE_API_KEY });
+  const pool = new pg.Pool({ connectionString: dbEnv().DATABASE_URL, max: 2 });
+  try {
+    const { circleId, customerId, accountId, vaultId, created, ledgerAdded, invite } = await seedDemo({
+      pool, nessie, rotateInvite: process.argv.includes('--rotate-invite'),
+    });
     console.log(`Demo circle ${circleId}; Nessie customer ${customerId}; account ${accountId}`);
     console.log(`Nessie records created: ${created}; Tiger Data ledger rows added: ${ledgerAdded}`);
     console.log(`Freeze vault account ${vaultId}. Run npm run demo:atm right before demo step 4.`);
@@ -191,7 +209,9 @@ async function main() {
   }
 }
 
-main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : 'Demo seed failed');
-  process.exitCode = 1;
-});
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  main().catch((error: unknown) => {
+    console.error(error instanceof Error ? error.message : 'Demo seed failed');
+    process.exitCode = 1;
+  });
+}

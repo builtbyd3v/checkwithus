@@ -15,6 +15,7 @@ export function createFakeNessie() {
   let nextId = 1;
   const merchants: Array<Record<string, unknown> & { _id: string }> = [];
   const accounts: Array<Record<string, unknown> & { _id: string; customer_id: string }> = [];
+  const customers: Array<Record<string, unknown> & { _id: string }> = [];
   const records: Stored[] = [];
   const calls: Array<{ method: string; path: string; body: unknown }> = [];
   /**
@@ -49,6 +50,13 @@ export function createFakeNessie() {
       const merchant = { ...body, _id: id() };
       merchants.push(merchant);
       return json(201, { code: 201, message: 'Merchant created', objectCreated: merchant });
+    }
+
+    if (pathname === '/customers') {
+      if (method === 'GET') return json(200, customers);
+      const customer = { ...body, _id: id() };
+      customers.push(customer);
+      return json(201, { code: 201, message: 'Customer created', objectCreated: customer });
     }
 
     const customerAccounts = pathname.match(/^\/customers\/([^/]+)\/accounts$/);
