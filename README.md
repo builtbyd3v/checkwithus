@@ -36,20 +36,24 @@ Test set: real texts only (Mendeley, NCSU, UCI), no near-duplicates of training 
 
 v1 and v2 use slightly different test sets (the data changed), so compare with care. Legit "Toll Free" texts in test held by v2: 0 of 3. Rules hold 0 of 6,382 legit texts across train, val and test. The Message Filter extension is killed above roughly 25-30 MB (measured with a probe on iOS 26), so DistilBERT (67 MB) runs only in the main app; the tiny model runs in the filter.
 
-### Investment scams (probe v2, Oct 17)
+### Investment scams (Oct 17)
 
-Pig-butchering scams start as a friendly "wrong number" text, build trust, then pitch a trading app and finally ask for a "fee" to withdraw fake profit. The probe now scores those stages apart: 10 openers, 30 pitch and fee texts, and 30 legit texts (brokerage alerts, money talk, real wrong numbers). The test set's 6 "investment" rows are mostly fake Binance login-code texts, not this scam. 3 new rules (`withdraw_fee`, `trading_pitch`, `high_returns`; 12 in all) target the pitch and fee stages.
+Pig-butchering scams start as a friendly "wrong number" text, build trust, then pitch a trading app and finally ask for a "fee" to withdraw fake profit. The test set's 6 "investment" rows are mostly fake Binance login-code texts, not this scam, so we score it on two synthetic sets, split by stage:
 
-| | Opener (10) | Pitch + fee (30) | Probe legit held (30) | Test scam recall | Test false holds |
-|---|---|---|---|---|---|
-| Tiny model alone | 0% | 26.7% | 6.7% | 96.0% | 2.4% |
-| 12 rules alone | 0% | 90.0% | 0% | 3.6% | 0.0% |
-| **Rules + tiny model (the Message Filter)** | 0% | **96.7%** | 6.7% | 96.0% | 2.4% |
+- `probe.csv` (85 rows): written by us, alongside the rules. Optimistic.
+- `blind_probe.csv` (60 rows): written by a separate AI agent that never saw this repo, the rules or the training data, from FinCEN, CFTC and FBI scam descriptions. No near-duplicates of training rows. **This is the fair number.**
 
-- **The opener is let through on purpose.** On its own it reads like a real wrong number, so holding it would hold real texts. The payment hold (crypto, new payee, unusual amount) is the catch for the money step.
-- **These pitch numbers are optimistic.** The same person (with Claude Code) wrote the probe texts and the rules, in one session, with the probe in view. A fair number needs new texts written by someone who has not seen `synth.py` or `ScamRules.swift`.
-- The 12 rules hold 0 legit texts across train, val, test, synthetic and probe. Measured with a Python copy of the Swift rules and scorer, which reproduces the tiny model's README numbers exactly; confirm with `swift run guard-eval`.
-- The tiny model is not retrained yet. `synthetic.csv` has 17 investment pitch templates (40 rows) and 30 investment-themed legit rows waiting for `build.py` + `train_ngram.py`.
+| Message Filter (10 rules + tiny model) | Opener caught | Pitch + fee caught | Legit wrongly held |
+|---|---|---|---|
+| `probe.csv` | 0% (10) | 26.7% (30) | 6.7% (30) |
+| **`blind_probe.csv`** | **0% (10)** | **26.7% (30)** | **15.0% (20)** |
+
+- **The text filter is not the defense for this scam.** Most pitch texts are about love, trust and pressure ("did you put the 5000 in?"), not keywords, so one text at a time rarely gives them away. The payment hold (crypto, new payee, unusual amount) is the catch at the money step.
+- We tried two pitch rules (`trading_pitch`, `high_returns`). They caught 90% of our own probe but 1 of 30 blind texts, and held a text warning Mom about scams, so they were removed ([DECISIONS 30](ml/data/DECISIONS.md)). `withdraw_fee` stays (no legit holds anywhere).
+- Blind-set false holds: the model holds real Chase and Kraken withdrawal alerts, and `safe_account` holds an FTC warning tip.
+- Score any CSV the way the phone does, on any machine: `python -I ml/guard_check.py <csv> --rows`. It checks its regexes against `ScamRules.swift` first. Real texts from your own phone go in `ml/data/real_local.csv` (gitignored).
+- Do not tune rules or training data on `blind_probe.csv`; it stops being blind. Use a new blind set to measure a change.
+- The tiny model is not retrained. `synthetic.csv` has 17 investment pitch templates (40 rows) and 30 investment-themed legit rows waiting for `build.py` + `train_ngram.py`.
 
 ## AI tool disclosure
 
