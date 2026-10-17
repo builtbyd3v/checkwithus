@@ -18,7 +18,7 @@ enum Explainer {
         var risks: [(sentence: String, keyword: String)] {
             var out: [(String, String)] = []
             switch category {
-            case "gift_cards": out.append(("Gift cards are the most common way scammers ask to be paid, because they cannot be traced or refunded.", "gift card"))
+            case "gift_cards": out.append(("Scammers often ask to be paid with gift cards, because the money is hard to trace or get back.", "gift card"))
             case "crypto": out.append(("Crypto payments cannot be reversed, and scammers often ask for them.", "crypto"))
             case "wire_transfer": out.append(("Wire transfers are hard to reverse, and scammers often ask for them.", "wire"))
             default: break

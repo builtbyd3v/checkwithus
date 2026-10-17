@@ -40,28 +40,40 @@ struct FamilyTabs: View {
 
 struct FamilySignInView: View {
     @Environment(FamilyModel.self) private var model
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
-        VStack(spacing: 20) {
-            Spacer()
-            Image(systemName: "person.2.badge.key.fill")
-                .font(.system(size: 72))
-                .foregroundStyle(.tint)
-                .accessibilityHidden(true)
-            Text("Sign in to help your family").font(.title.bold())
-            Text("You will approve payments, see alerts and freeze money if something looks wrong.")
-                .foregroundStyle(.secondary)
-            if let error = model.error { Text(error).foregroundStyle(.red) }
-            Spacer()
-            Button { Task { await model.signIn() } } label: {
-                Text("Sign in").font(.headline).frame(maxWidth: .infinity, minHeight: 50)
+        // Scrolls, so very large text is never cut off; centered while it fits.
+        ScrollView {
+            VStack(spacing: 20) {
+                Image(systemName: "person.2.badge.key.fill")
+                    .font(.system(size: 72))
+                    .foregroundStyle(.tint)
+                    .accessibilityHidden(true)
+                Text("Sign in to help your family").font(.title.bold())
+                Text("You will approve payments, see alerts and freeze money if something looks wrong.")
+                    .foregroundStyle(.secondary)
+                if let error = model.error { Text(error).foregroundStyle(Color.errorText) }
+                // Very large text: only Sign in stays pinned.
+                if typeSize.isAccessibilitySize { SwitchRoleButton() }
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(model.busy)
-            SwitchRoleButton()
+            .padding(24)
+            .frame(maxWidth: .infinity)
+        }
+        .defaultScrollAnchor(.center, for: .alignment)
+        .safeAreaInset(edge: .bottom) {
+            VStack(spacing: 20) {
+                Button { Task { await model.signIn() } } label: {
+                    Text("Sign in").font(.headline).frame(maxWidth: .infinity, minHeight: 50)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(model.busy)
+                if !typeSize.isAccessibilitySize { SwitchRoleButton() }
+            }
+            .padding(24)
+            .background(.background)
         }
         .multilineTextAlignment(.center)
-        .padding(24)
     }
 }
 
@@ -122,19 +134,23 @@ struct HoldsView: View {
 
 struct PaymentRow: View {
     let payment: FamilyAPI.Payment
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         NavigationLink(value: payment.id) {
-            HStack(spacing: 12) {
+            // Very large text: stacked, so the amount is not squeezed into a sliver.
+            let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(spacing: 12))
+            layout {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(payment.payee.name).font(.headline)
                     Text(payment.holdReasons.first?.label ?? payment.category.label)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        // Very large text: the whole reason, not "Gift card pur...".
+                        .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
                 }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 4) {
+                Spacer(minLength: 0)
+                VStack(alignment: typeSize.isAccessibilitySize ? .leading : .trailing, spacing: 4) {
                     Text(dollars(payment.amountCents)).font(.headline.monospacedDigit())
                     StatusBadge(status: payment.status)
                 }
@@ -146,6 +162,7 @@ struct PaymentRow: View {
 
 struct PaymentDetailView: View {
     @Environment(FamilyModel.self) private var model
+    @Environment(\.dynamicTypeSize) private var typeSize
     let id: String
 
     var body: some View {
@@ -205,7 +222,9 @@ struct PaymentDetailView: View {
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
-                        HStack(spacing: 12) {
+                        // Very large text: stacked, so "Approve" and "Deny" are not broken mid-word.
+                        let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 8)) : AnyLayout(HStackLayout(spacing: 12))
+                        layout {
                             Button(role: .destructive) { Task { await model.decide(payment, approve: false) } } label: {
                                 Label("Deny", systemImage: "xmark").font(.headline).frame(maxWidth: .infinity, minHeight: 50)
                             }
@@ -234,12 +253,12 @@ struct StatusBadge: View {
     let status: String
 
     var body: some View {
+        // Dark text on a tinted capsule: colored caption text on its own tint is under 3:1.
         Text(StatusWords.label(status))
             .font(.caption.weight(.semibold))
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .foregroundStyle(StatusWords.color(status))
-            .background(StatusWords.color(status).opacity(0.15), in: .capsule)
+            .background(StatusWords.color(status).opacity(0.25), in: .capsule)
     }
 }
 
@@ -365,7 +384,7 @@ struct MoneyView: View {
                 Section {
                     if model.frozen {
                         Label("Frozen. Money is in the safe account.", systemImage: "snowflake")
-                            .foregroundStyle(.blue)
+                            .foregroundStyle(.tint)
                         Button("Unfreeze") {
                             unfreezeText = model.frozenCents > 0 ? String(format: "%d.%02d", model.frozenCents / 100, model.frozenCents % 100) : ""
                             askUnfreeze = true
@@ -373,6 +392,7 @@ struct MoneyView: View {
                     } else {
                         Button(role: .destructive) { confirmFreeze = true } label: {
                             Label("Freeze money now", systemImage: "snowflake")
+                                .foregroundStyle(Color.errorText)
                         }
                     }
                     if let notice = model.notice { Text(notice).foregroundStyle(.secondary) }
@@ -463,13 +483,14 @@ struct GrantAllowanceView: View {
                 Picker("For", selection: $category) {
                     ForEach(AllowanceWords.categories, id: \.0) { Text($0.1).tag($0.0) }
                 }
-                TextField("Up to, in dollars", text: $amount).keyboardType(.decimalPad)
+                TextField("Up to, in dollars", text: $amount, prompt: Text("Up to, in dollars").foregroundStyle(Color.secondaryText))
+                    .keyboardType(.decimalPad)
                 DatePicker("Until", selection: $until, in: Date.now.addingTimeInterval(3600)...Date.now.addingTimeInterval(364 * 86400),
                            displayedComponents: .date)
                 Section {
                     if let error = model.error { Text(error).foregroundStyle(.red) }
                 } footer: {
-                    Text("To keep this safe, you will sign in again before it is saved.")
+                    Text("To keep this safe, you will sign in again before it is saved.").foregroundStyle(Color.secondaryText)
                 }
             }
             .navigationTitle("New allowance")
