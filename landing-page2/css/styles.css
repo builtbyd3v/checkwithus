@@ -1,0 +1,1356 @@
+/*
+ * Landing page stylesheet.
+ *
+ * The checkwith.us landing page. The structure and motion system follow a measured
+ * reference build (see README.md): colour and type tokens,
+ * component sizes, radii, gradients and the responsive breakpoints.
+ *
+ * Contents
+ *   1. Fonts and design tokens
+ *   2. Base
+ *   3. Container defaults
+ *   4. Buttons
+ *   5. Header / navigation
+ *   6. Hero
+ *   7. Features
+ *   8. How it works
+ *   9. Pricing
+ *  10. Testimonials (hidden on the live page)
+ *  11. Closing call to action
+ *  12. Footer
+ *  13. Hover lighting
+ *  14. Responsive
+ *  15. Reduced motion
+ */
+
+/* ------------------------------------------------------------------ 1. Fonts + tokens */
+
+/* One variable file per family covers every weight. Latin subset only. */
+@font-face {
+  font-family: "Inter Tight";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("../assets/fonts/intertight-701d4a64.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("../assets/fonts/inter-6ab57b19.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Instrument Serif";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../assets/fonts/instrumentserif-253e49fe.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Quicksand";
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url("../assets/fonts/quicksand-21dc8b9f.woff2") format("woff2");
+}
+
+:root {
+  --Ink: #0e1116;
+  --InkLift: #1a1f28;
+  --Cloud: #ffffff;
+  --Sky: #fbf4e6;
+  --Ground: #fffaf0;
+  --Edge: #e3e8ee;
+  --Mist: #5b6472;
+  --Muted: #8a93a3;
+
+  --Indigo: #ffcc33;
+  --IndigoDeep: #b22435;
+  --IndigoInk: #b22435;
+  --IndigoText: #8f1c2b;
+  --Tint: #fff1c2;
+  --TintEdge: #ffe08a;
+  --Wash: #fff8e1;
+  --Teal: #ffcc33;
+  --TealTint: #fde8ea;
+  --Azure: #b22435;
+
+  --Display: "Inter Tight", "Inter", system-ui, sans-serif;
+  --Body: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --Accent: "Instrument Serif", Georgia, "Times New Roman", serif;
+}
+
+/* ------------------------------------------------------------------ 2. Base */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  line-height: 1.15;
+  -webkit-text-size-adjust: 100%;
+  height: auto;
+  background: var(--Sky);
+  overflow-x: hidden;
+  /* Anchor jumps clear the fixed header. */
+  scroll-padding-top: 110px;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  /* A short page still ends with the footer at the bottom of the window. */
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  color: var(--Mist);
+  font-family: var(--Body);
+  font-size: 1rem;
+  font-weight: 400;
+  /* 1.55em on the body resolves to 24.8px once and is inherited as that exact length,
+     so large text (prices, the hero accent) keeps a compact 24.8px unless it sets its own. */
+  line-height: 1.55em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--Ground);
+  /* Soft sky behind the page, fixed to the window. */
+  background-image:
+    radial-gradient(58% 40% at 14% 6%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0) 62%),
+    radial-gradient(50% 34% at 86% 2%, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0) 56%),
+    radial-gradient(46% 34% at 68% 20%, rgba(255, 227, 163, 0.55), rgba(255, 227, 163, 0) 60%),
+    linear-gradient(180deg, #ffe3a3 0%, var(--Sky) 46%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+
+h1, h2, h3, p, ul {
+  margin: 0;
+}
+
+a {
+  color: var(--IndigoInk);
+  text-decoration: none;
+  background-color: transparent;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-style: none;
+}
+
+ul {
+  padding: 0;
+  list-style: none;
+}
+
+/* Buttons carry the site's button type: Inter 17px / 500, tight leading. */
+button {
+  font-family: var(--Body);
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1em;
+}
+
+main {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+/* Anchored sections keep clear of the fixed header. */
+#features,
+#how-it-works,
+#pricing,
+#testimonials {
+  scroll-margin-top: 110px;
+}
+
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 8px;
+  z-index: 100;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: var(--Cloud);
+  color: var(--Ink);
+  font: 500 15px/1 var(--Body);
+}
+.skip-link:focus {
+  top: 8px;
+}
+
+/* ------------------------------------------------------------------ 3. Container defaults */
+
+/*
+ * The page's building blocks share one set of defaults: a flex row with 10px of
+ * padding (or, for `.rm-includes-cols`, a block). Components override whichever
+ * sides they care about below, and the rest keeps the 10px.
+ */
+.rm-nav-wrap, .rm-nav-pill, .rm-brand, .rm-nav-links,
+.rm-sec-hero, .rm-hero-box, .rm-phones, .rm-phone, .rm-phone-lead,
+.rm-sec, .rm-head, .rm-fgrid, .rm-fcolumn, .rm-card, .rm-tile, .rm-tile-teal,
+.rm-shot, .rm-shot-copy, .rm-shot-img,
+.rm-sec-tight, .rm-band, .rm-head-center, .rm-steps, .rm-step,
+.rm-sec-price, .rm-plans, .rm-plan, .rm-plan-best, .rm-includes,
+.rm-sec-testi, .rm-testi-grid, .rm-testi, .rm-testi-person,
+.rm-sec-cta, .rm-cta-box, .rm-cta-copy, .rm-cta-side, .rm-qr,
+.rm-footer, .rm-footer-inner, .rm-footer-mark, .rm-footer-grid,
+.rm-fcol-brand, .rm-fcol, .rm-fbot {
+  width: 100%; /* components that set their own width below override this */
+  padding: 10px;
+  display: flex;
+  flex-direction: row;
+}
+.rm-includes-cols {
+  min-width: 30px;
+  padding: 10px;
+  display: block;
+}
+
+/* ------------------------------------------------------------------ 4. Buttons */
+
+.rm-btn-dark {
+  position: relative;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  padding: 12px 24px;
+  border: 0;
+  border-radius: 999px;
+  background-color: var(--Ink);
+  color: var(--Cloud);
+  font-family: var(--Body);
+  font-weight: 500;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+.rm-btn-dark:hover,
+.rm-btn-dark:focus-visible {
+  background-color: var(--InkLift);
+  color: var(--Cloud);
+}
+/* The brand accent shows up as a soft glow on hover, not as a text colour. */
+.rm-btn-dark:hover {
+  box-shadow: 0 10px 30px -8px rgba(255, 204, 51, 0.6), 0 6px 40px -6px rgba(178, 36, 53, 0.3);
+}
+/* A thin gradient ring drifts around the button on hover or keyboard focus. */
+.rm-btn-dark::before {
+  content: "";
+  position: absolute;
+  inset: -1.5px;
+  z-index: 1;
+  padding: 1.5px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(115deg, #ffcc33, #ffcc33, #b22435, #ffcc33);
+  background-size: 300% 100%;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.rm-btn-dark:hover::before,
+.rm-btn-dark:focus-visible::before {
+  opacity: 1;
+  animation: rm-ring-drift 3.2s linear infinite;
+}
+@keyframes rm-ring-drift {
+  to { background-position: 300% 0; }
+}
+
+.rm-btn-nav {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 0 22px;
+  font-size: 15px;
+}
+.rm-btn-lg {
+  min-height: 52px;
+  padding: 0 28px;
+  font-size: 17px;
+}
+.rm-btn-plan {
+  align-self: stretch;
+  width: 100%;
+  min-height: 46px;
+  margin-top: auto;
+  font-size: 15px;
+}
+
+/* ------------------------------------------------------------------ 5. Header / navigation */
+
+.rm-nav-wrap {
+  position: fixed;
+  inset-block-start: 14px;
+  inset-inline: 0;
+  z-index: 50;
+  margin: 0;
+  padding: 0 32px;
+  justify-content: center;
+}
+
+/* A transparent pill that turns solid once the page scrolls (`.is-stuck`). */
+.rm-nav-pill {
+  width: 100%;
+  max-width: 1240px;
+  padding: 10px 10px 10px 22px;
+  gap: 24px;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background-color: transparent;
+  box-shadow: none;
+  transition: background-color 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+}
+.rm-nav-pill.is-stuck {
+  background-color: var(--Cloud);
+  border-color: var(--Edge);
+  box-shadow: 0 1px 1px rgba(14, 17, 22, 0.04), 0 18px 40px -24px rgba(14, 17, 22, 0.22);
+}
+
+.rm-brand {
+  flex: 0 0 auto;
+  width: fit-content;
+  gap: 10px;
+  align-items: center;
+}
+.rm-mark-img {
+  width: 34px;
+  height: 34px;
+  overflow: hidden;
+  object-fit: cover;
+  border-radius: 22.5%; /* Apple's app-icon corner ratio */
+}
+.rm-brand-text {
+  font-family: "Quicksand", var(--Body);
+  font-weight: 700;
+  font-size: 19px;
+  letter-spacing: -0.01em;
+  color: var(--Ink);
+  transition: color 0.18s ease;
+}
+.rm-brand:hover .rm-brand-text {
+  color: var(--IndigoDeep);
+}
+
+.rm-nav-links {
+  flex: 1 1 auto;
+  gap: clamp(12px, 1.5vw, 24px);
+  justify-content: center;
+  align-items: center;
+}
+.rm-navlink {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background-color: transparent;
+  color: var(--Mist);
+  font-family: var(--Body);
+  font-weight: 500;
+  font-size: 15px;
+  white-space: nowrap;
+}
+.rm-navlink:hover {
+  color: var(--Ink);
+}
+
+/*
+ * The menu button lives in a wrapper that keeps its place in the pill even while
+ * the button itself is hidden on wide screens. That empty slot is why the
+ * Download button sits 24px (one pill gap) in from the right edge.
+ */
+.rm-nav-toggle-wrap {
+  flex: 0 0 auto;
+  width: auto;
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+
+/* The menu button only exists in the compact layout. */
+.rm-nav-toggle {
+  display: none;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-inline-start: 4px;
+  padding: 0;
+  border: 1px solid var(--Edge);
+  border-radius: 999px;
+  background-color: var(--Cloud);
+  color: var(--Ink);
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+.rm-nav-toggle:hover { border-color: #c9d0dd; }
+.rm-nav-toggle:focus-visible { outline: 2px solid var(--IndigoDeep); outline-offset: 3px; }
+
+/* Three bars that morph into a close mark. */
+.rm-nav-bars,
+.rm-nav-bars::before,
+.rm-nav-bars::after {
+  display: block;
+  width: 17px;
+  height: 1.5px;
+  border-radius: 2px;
+  background-color: var(--Ink);
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
+}
+.rm-nav-bars { position: relative; }
+.rm-nav-bars::before,
+.rm-nav-bars::after { content: ""; position: absolute; left: 0; }
+.rm-nav-bars::before { top: -5.5px; }
+.rm-nav-bars::after { top: 5.5px; }
+.rm-nav-pill.is-open .rm-nav-bars { background-color: transparent; }
+.rm-nav-pill.is-open .rm-nav-bars::before { transform: translateY(5.5px) rotate(45deg); }
+.rm-nav-pill.is-open .rm-nav-bars::after { transform: translateY(-5.5px) rotate(-45deg); }
+
+/* ------------------------------------------------------------------ 6. Hero */
+
+.rm-sec-hero {
+  width: 100%;
+  max-width: 1304px;
+  padding: 8px 32px 0;
+  flex-direction: column;
+  align-items: center;
+}
+
+.rm-hero-box {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  overflow: hidden;
+  padding: 128px 48px 0;
+  flex-direction: column;
+  align-items: center;
+  border: 1px solid var(--Edge);
+  border-radius: 36px;
+  background-color: var(--Cloud);
+  background-image:
+    radial-gradient(circle at 12% 4%, #ffcc334d 0%, #ffcc3300 62%),
+    radial-gradient(circle at 88% 8%, #ffcc3347 0%, #ffcc3300 60%),
+    linear-gradient(180deg, #fffaf0 0%, var(--Cloud) 60%);
+}
+/* Slow-drifting colour wash behind the headline. */
+.rm-hero-box::before {
+  content: "";
+  position: absolute;
+  /* Card-sized (not oversized) and offset up and left: width/height win over the
+     right/bottom insets, so only top/left take effect. */
+  inset: -18%;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 44% at 24% 30%, rgba(255, 204, 51, 0.3), transparent 68%),
+    radial-gradient(34% 40% at 78% 22%, rgba(178, 36, 53, 0.26), transparent 66%),
+    radial-gradient(30% 34% at 58% 68%, rgba(255, 204, 51, 0.2), transparent 70%);
+  will-change: transform;
+  animation: rm-hero-drift 28s ease-in-out infinite alternate;
+}
+@keyframes rm-hero-drift {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  50%  { transform: translate3d(2.6%, -2%, 0) scale(1.07); }
+  100% { transform: translate3d(-2.2%, 1.6%, 0) scale(1.03); }
+}
+
+.rm-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 16px;
+  border: 1px solid var(--Edge);
+  border-radius: 999px;
+  background-color: var(--Cloud);
+  color: var(--Ink);
+  font-family: var(--Body);
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.rm-h1 {
+  max-width: 800px;
+  text-wrap: balance;
+  margin-top: 26px;
+  color: var(--Ink);
+  font-family: var(--Display);
+  font-weight: 700;
+  font-size: 66px;
+  line-height: 1.04em;
+  letter-spacing: -0.025em;
+  text-align: center;
+}
+/* The serif italic is the brand's voice; the hero animation wipes it in. */
+.rm-h1-accent {
+  color: var(--IndigoDeep);
+  font-family: var(--Accent);
+  font-weight: 400;
+  font-style: italic;
+  font-size: 69px;
+  line-height: 1.04em;
+  text-align: center;
+}
+.rm-hero-sub {
+  max-width: 560px;
+  margin-top: 22px;
+  color: var(--Mist);
+  font-family: var(--Body);
+  font-size: 17px;
+  line-height: 1.55em;
+  text-align: center;
+}
+.rm-hero-cta-sp {
+  margin-top: 32px;
+}
+
+/* Three phones, flush with the bottom of the hero card and cropped by it. */
+.rm-phones {
+  width: 100%;
+  margin-top: 56px;
+  padding: 0;
+  gap: 0;
+  justify-content: center;
+  align-items: flex-end;
+}
+.rm-phone {
+  flex: 0 0 auto;
+  width: 300px;
+  height: 345px;
+  overflow: hidden;
+  padding: 0;
+  justify-content: center;
+  align-items: flex-start;
+}
+.rm-phone-lead {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  width: 318px;
+  height: 440px;
+  overflow: hidden;
+  margin: 0 -55px;
+  padding: 0;
+  justify-content: center;
+  align-items: flex-start;
+}
+.rm-phone-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+}
+
+/* ------------------------------------------------------------------ 7. Features */
+
+.rm-sec {
+  width: 100%;
+  max-width: 1304px;
+  padding: 96px 32px 40px;
+  flex-direction: column;
+  gap: 40px;
+}
+.rm-head {
+  max-width: 620px;
+  flex-direction: column;
+  gap: 14px;
+}
+.rm-h2 {
+  color: var(--Ink);
+  font-family: var(--Display);
+  font-weight: 700;
+  font-size: 48px;
+  line-height: 1.06em;
+  letter-spacing: -0.025em;
+}
+.rm-lead {
+  color: var(--Mist);
+  font-family: var(--Body);
+  font-size: 17px;
+  line-height: 1.55em;
+}
+
+/* Three columns: cards | card + phone shot | cards. */
+.rm-fgrid {
+  gap: 24px;
+  align-items: stretch;
+}
+.rm-fcolumn {
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 24px;
+}
+.rm-card {
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 32px;
+  border: 1px solid var(--Edge);
+  border-radius: 28px;
+  background-color: var(--Cloud);
+}
+.rm-tile,
+.rm-tile-teal {
+  width: 36px;
+  height: 36px;
+  padding: 6px;
+  justify-content: center;
+  align-items: center;
+  border-radius: 20px;
+}
+.rm-tile { background-color: var(--Tint); }
+.rm-tile-teal { background-color: var(--TealTint); }
+.rm-tile-ico {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.rm-card-title {
+  color: var(--Ink);
+  font-family: var(--Display);
+  font-weight: 600;
+  font-size: 22px;
+  line-height: 1.25em;
+}
+.rm-card-sub {
+  color: var(--Mist);
+  font-family: var(--Body);
+  font-size: 16px;
+  line-height: 1.55em;
+}
+
+.rm-shot {
+  min-height: 320px;
+  overflow: hidden;
+  padding: 0 32px;
+  flex-direction: column;
+  justify-content: flex-end;
+  border: 1px solid var(--Edge);
+  border-radius: 28px;
+  background-color: var(--Wash);
+  background-image: radial-gradient(circle at 50% 0%, #ffcc3338 0%, #ffcc3300 66%);
+}
+.rm-shot-copy {
+  padding: 32px 0 0;
+  flex-direction: column;
+  gap: 10px;
+}
+.rm-shot-img {
+  width: 100%;
+  height: 230px;
+  overflow: hidden;
+  margin-top: 22px;
+  padding: 0;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+/* ------------------------------------------------------------------ 8. How it works */
+
+.rm-sec-tight {
+  width: 100%;
+  max-width: 1304px;
+  padding: 40px 32px;
+  flex-direction: column;
+}
+.rm-band {
+  padding: 72px 48px;
+  flex-direction: column;
+  align-items: center;
+  gap: 40px;
+  border: 1px solid var(--Edge);
+  border-radius: 36px;
+  background-color: var(--Wash);
+  background-image:
+    radial-gradient(circle at 12% 8%, #ffcc3329 0%, #ffcc3300 64%),
+    radial-gradient(circle at 88% 90%, #ffcc332b 0%, #ffcc3300 60%);
+}
+.rm-head-center {
+  max-width: 620px;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.rm-h2c {
+  color: var(--Ink);
+  font-family: var(--Display);
+  font-weight: 700;
+  font-size: 48px;
+  line-height: 1.06em;
+  letter-spacing: -0.025em;
+  text-align: center;
+}
+.rm-lead-c {
+  color: var(--Mist);
+  font-family: var(--Body);
+  font-size: 17px;
+  text-align: center;
+}
+
+.rm-steps {
+  width: 100%;
+  gap: 24px;
+  align-items: stretch;
+}
+.rm-step {
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 32px;
+  border: 1px solid var(--Edge);
+  border-radius: 28px;
+  background-color: var(--Cloud);
+}
+.rm-step-badge {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 7px;
+  object-fit: contain;
+  border-radius: 999px;
+  background-color: var(--Tint);
+}
+/* The numerals exist for the animation but the icon badge is what shows. */
+.rm-stepnum {
+  display: none;
+  justify-content: center;
+  align-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background-color: var(--Tint);
+  color: var(--IndigoText);
+  font-family: var(--Display);
+  font-weight: 600;
+  font-size: 15px;
+  text-align: center;
+}
+
+/* ------------------------------------------------------------------ 9. Pricing */
+
+.rm-sec-price {
+  width: 100%;
+  max-width: 1304px;
+  padding: 96px 32px 40px;
+  flex-direction: column;
+  align-items: center;
+  gap: 40px;
+}
+.rm-plans {
+  width: 100%;
+  gap: 24px;
+  align-items: stretch;
+}
+.rm-plan,
+.rm-plan-best {
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 32px;
+  border: 1px solid var(--Edge);
+  border-radius: 28px;
+  background-color: var(--Cloud);
+}
+.rm-plan-best {
+  position: relative;
+  border-color: var(--TintEdge);
+  box-shadow: 0 20px 40px -24px #0e111638;
+}
+.rm-flag {
+  position: absolute;
+  inset-block-start: 24px;
+  inset-inline-end: 24px;
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background-color: var(--Tint);
+  color: var(--IndigoText);
+  font-family: var(--Body);
+  font-weight: 500;
+  font-size: 13px;
+}
+.rm-price {
+  color: var(--Ink);
+  font-family: var(--Display);
+  font-weight: 700;
+  font-size: 44px;
+  letter-spacing: -0.025em;
+}
+.rm-cadence {
+  color: var(--Mist);
+  font-family: var(--Body);
+  font-size: 15px;
+}
+.rm-note {
+  color: var(--Mist);
+  font-family: var(--Body);
+  font-size: 15px;
+  line-height: 1.5em;
+}
+
+.rm-includes {
+  width: 100%;
+  max-width: 900px;
+  margin: 16px auto 0;
+  padding: 36px 40px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 22px;
+  border: 1px solid var(--Edge);
+  border-radius: 28px;
+  background-color: var(--Cloud);
+}
+.rm-includes-h {
+  color: var(--Ink);
+  font-family: var(--Display);
+  font-weight: 600;
+  font-size: 20px;
+  line-height: 1.25em;
+  text-align: center;
+}
+.rm-includes-cols {
+  width: 100%;
+  column-count: 2;
+  column-gap: 44px;
+}
+/*
+ * Items are spaced with 7px below and 7px above (14px between), so each box is
+ * 31.8px tall. That, and letting columns break freely, is what balances the two
+ * columns the way the original does on narrow screens.
+ */
+.rm-list-item {
+  display: flex;
+  align-items: center;
+}
+.rm-list-item:not(:last-child) { padding-bottom: 7px; }
+.rm-list-item:not(:first-child) { margin-top: 7px; }
+.rm-list-icon {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  margin-right: 5px;
+}
+.rm-list-text {
+  padding-left: 5px;
+  color: var(--Ink);
+  font-family: var(--Body);
+  font-size: 15px;
+}
+.rm-family {
+  max-width: 620px;
+  color: var(--Mist);
+  font-family: var(--Body);
+  font-size: 15px;
+  line-height: 1.5em;
+  text-align: center;
+}
+
+/* ------------------------------------------------------------------ 10. Testimonials */
+
+/* Placeholder quotes: the live page ships this section switched off, so it is too. */
+.rm-sec-testi {
+  display: none;
+  width: 100%;
+  max-width: 1304px;
+  padding: 96px 32px 40px;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.rm-testi-grid {
+  width: 100%;
+  margin-top: 40px;
+  padding: 0;
+  display: grid;
+  gap: 24px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.rm-testi {
+  height: 100%;
+  flex-direction: column;
+  gap: 18px;
+  padding: 30px;
+  border: 1px solid var(--Edge);
+  border-radius: 28px;
+  background-color: var(--Cloud);
+}
+.rm-testi-stars { width: 92px; height: 17px; object-fit: contain; }
+.rm-testi-quote {
+  flex: 1 1 auto;
+  color: var(--Mist);
+  font-family: var(--Body);
+  font-size: 16px;
+  line-height: 1.65em;
+  text-wrap: pretty;
+}
+.rm-testi-person {
+  padding: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 12px;
+  align-items: center;
+}
+.rm-testi-initials {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background-color: var(--Tint);
+  color: var(--IndigoInk);
+  font-family: var(--Display);
+  font-weight: 600;
+  font-size: 14px;
+}
+.rm-testi-name { color: var(--Ink); font-family: var(--Display); font-weight: 600; font-size: 15px; }
+.rm-testi-role { color: var(--Muted); font-family: var(--Body); font-size: 13.5px; }
+
+/* ------------------------------------------------------------------ 11. Closing CTA */
+
+/* The panel hangs over the top of the footer by 132px. */
+.rm-sec-cta {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 1304px;
+  margin: 0 0 -132px;
+  padding: 40px 32px 0;
+  flex-direction: column;
+}
+.rm-cta-box {
+  position: relative;
+  overflow: hidden;
+  padding: 56px;
+  justify-content: space-between;
+  align-items: center;
+  gap: 40px;
+  border-radius: 36px;
+  background-color: #b22435;
+  background-image:
+    radial-gradient(circle at 78% 50%,
+      #ffffff66 0%, #ffffff66 13%, #ffffff42 13%, #ffffff42 22%, #ffffff2b 22%, #ffffff2b 32%,
+      #ffffff1a 32%, #ffffff1a 44%, #ffffff0d 44%, #ffffff0d 57%, #ffffff00 57%),
+    linear-gradient(112deg, #8f1c2b 0%, #b22435 48%, #ffcc33 100%);
+}
+.rm-cta-copy {
+  max-width: 460px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+}
+.rm-cta-h {
+  color: var(--Cloud);
+  font-family: var(--Display);
+  font-weight: 700;
+  font-size: 42px;
+  line-height: 1.1em;
+  letter-spacing: -0.025em;
+}
+.rm-cta-sub {
+  color: var(--Cloud);
+  font-family: var(--Body);
+  font-size: 17px;
+  line-height: 1.55em;
+}
+.rm-cta-btn-sp {
+  margin-top: 12px;
+}
+.rm-cta-side {
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.rm-qr {
+  width: 148px;
+  height: 148px;
+  justify-content: center;
+  align-items: center;
+  border-radius: 20px;
+  background-color: var(--Cloud);
+}
+.rm-qr-img {
+  width: 118px;
+  height: 118px;
+}
+.rm-qr-cap {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background-color: var(--Cloud);
+  color: var(--Ink);
+  font-family: var(--Body);
+  font-weight: 500;
+  font-size: 13px;
+}
+/* A signal ring leaves the QR code. Armed by script once the panel is on screen. */
+.rm-cta-box::after {
+  content: "";
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 78%;
+  width: 320px;
+  height: 320px;
+  margin-block-start: -160px;
+  margin-inline-start: -160px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+}
+.rm-cta-box.rm-cta-live::after {
+  animation: rm-cta-ping 4.2s cubic-bezier(0.2, 0.6, 0.3, 1) 0.6s infinite;
+}
+@keyframes rm-cta-ping {
+  0%   { transform: scale(0.3); opacity: 0; }
+  14%  { opacity: 0.45; }
+  100% { transform: scale(2.1); opacity: 0; }
+}
+
+/* ------------------------------------------------------------------ 12. Footer */
+
+.rm-footer {
+  width: 100%;
+  padding: 196px 32px 40px;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 36px 36px 0 0;
+  background-color: var(--Ink);
+  color: var(--Cloud);
+}
+.rm-footer a { color: #a9b1bd; }
+.rm-footer a:hover { color: #ffffff; }
+
+.rm-footer-inner {
+  width: 100%;
+  max-width: 1240px;
+  flex-direction: column;
+  gap: 44px;
+}
+
+/*
+ * The big ghost wordmark. Two copies of the logo: a faint resting layer (::before)
+ * and a lit layer (::after) revealed through a radial mask. The script moves the
+ * light with --rm-spot-x/-y (unitless, 0-100) and fades it with --rm-mark-lit.
+ */
+.rm-footer-mark {
+  position: relative;
+  width: 100%;
+  max-width: 1240px;
+  aspect-ratio: 1201 / 200;
+  margin: 0 0 8px;
+  padding: 0;
+  pointer-events: none;
+  user-select: none;
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 42%, rgba(0, 0, 0, 0.45) 72%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0%, #000 42%, rgba(0, 0, 0, 0.45) 72%, transparent 100%);
+}
+.rm-footer-mark::before,
+.rm-footer-mark::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("../assets/img/wordmark-white.svg");
+  background-repeat: no-repeat;
+  background-position: center top;
+  background-size: contain;
+}
+.rm-footer-mark::before {
+  opacity: var(--rm-mark-base, 0.07);
+}
+.rm-footer-mark::after {
+  opacity: var(--rm-mark-lit, 0);
+  -webkit-mask-image: radial-gradient(ellipse 21% 70% at calc(var(--rm-spot-x, 50) * 1%) calc(var(--rm-spot-y, 50) * 1%), #000 0%, rgba(0, 0, 0, 0.55) 44%, transparent 76%);
+  mask-image: radial-gradient(ellipse 21% 70% at calc(var(--rm-spot-x, 50) * 1%) calc(var(--rm-spot-y, 50) * 1%), #000 0%, rgba(0, 0, 0, 0.55) 44%, transparent 76%);
+}
+
+.rm-footer-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1.7fr 1fr 1fr 1fr;
+  gap: 40px;
+  align-items: start;
+}
+.rm-fcol-brand {
+  max-width: 320px;
+  flex-direction: column;
+  gap: 12px;
+}
+.rm-fbrand-text {
+  color: var(--Cloud);
+  font-family: "Quicksand", var(--Body);
+  font-weight: 700;
+  font-size: 21px;
+}
+.rm-fblurb {
+  color: #a9b1bd;
+  font-family: var(--Body);
+  font-size: 15px;
+}
+.rm-fcol {
+  flex-direction: column;
+  gap: 10px;
+}
+.rm-fcol-head {
+  margin-bottom: 4px;
+  color: var(--Cloud);
+  font-family: var(--Display);
+  font-weight: 600;
+  font-size: 16px;
+}
+.rm-flink {
+  display: inline-flex;
+  justify-content: flex-start;
+  padding: 2px 0;
+  border-radius: 2px;
+  background-color: transparent;
+  font-family: var(--Body);
+  font-weight: 400;
+  font-size: 15px;
+  text-align: center;
+}
+
+.rm-fbot {
+  width: 100%;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+.rm-fbot > * {
+  width: auto;
+  max-width: 100%;
+  flex: 0 1 auto;
+}
+.rm-fcopy2 {
+  color: #8a93a3;
+  font-family: var(--Body);
+  font-size: 13px;
+}
+
+/* ------------------------------------------------------------------ 13. Hover lighting */
+
+/* While the page loads the hero is hidden, so nothing flashes before the entrance. */
+.rm-motion .rm-hero-box > * { opacity: 0; }
+
+/*
+ * Cards light up from wherever the pointer is: a soft glow inside plus a 1px
+ * gradient border. The script writes --rm-cx/--rm-cy. Hover devices only, so a
+ * tap never leaves a glow stuck on.
+ */
+@media (hover: hover) and (pointer: fine) {
+  :is(.rm-card, .rm-plan, .rm-includes, .rm-tile, .rm-testi) {
+    position: relative;
+    isolation: isolate;
+  }
+  :is(.rm-card, .rm-plan, .rm-includes, .rm-tile, .rm-testi)::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
+    background: radial-gradient(circle 220px at var(--rm-cx, 50%) var(--rm-cy, 50%), rgba(255, 204, 51, 0.16), rgba(178, 36, 53, 0.07) 42%, transparent 68%);
+    opacity: 0;
+    transition: opacity 0.34s ease;
+  }
+  :is(.rm-card, .rm-plan, .rm-includes, .rm-tile, .rm-testi)::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    padding: 1px;
+    border-radius: inherit;
+    pointer-events: none;
+    background: radial-gradient(circle 200px at var(--rm-cx, 50%) var(--rm-cy, 50%), rgba(255, 204, 51, 0.8), rgba(178, 36, 53, 0.34) 40%, transparent 66%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.34s ease;
+  }
+  :is(.rm-card, .rm-plan, .rm-includes, .rm-tile, .rm-testi).rm-lit::after,
+  :is(.rm-card, .rm-plan, .rm-includes, .rm-tile, .rm-testi).rm-lit::before {
+    opacity: 1;
+  }
+}
+
+/* ------------------------------------------------------------------ 14. Responsive */
+
+/* Compact navigation: the same link row becomes a dropdown panel. */
+@media (max-width: 1240px) {
+  .rm-nav-pill { position: relative; }
+  .rm-nav-toggle { display: inline-flex; }
+  .rm-nav-pill > .rm-btn-nav { margin-inline-start: auto; }
+  .rm-nav-pill .rm-nav-links {
+    position: absolute;
+    inset-block-start: calc(100% + 10px);
+    inset-inline: 0;
+    z-index: 60;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    padding: 10px;
+    border: 1px solid var(--Edge);
+    border-radius: 22px;
+    background-color: var(--Cloud);
+    box-shadow: 0 1px 1px rgba(14, 17, 22, 0.04), 0 24px 48px -28px rgba(14, 17, 22, 0.34);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-8px);
+    transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.28s;
+  }
+  .rm-nav-pill.is-open .rm-nav-links {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+  }
+  .rm-nav-pill .rm-nav-links .rm-navlink {
+    justify-content: flex-start;
+    min-height: 46px;
+    padding: 0 14px;
+    border-radius: 14px;
+    font-size: 16px;
+  }
+  .rm-nav-pill .rm-nav-links .rm-navlink:hover { background-color: #fbf4e6; }
+}
+
+/* Tablet */
+@media (max-width: 1024px) {
+  .rm-nav-wrap { padding-inline: 24px; }
+
+  .rm-hero-box { padding: 80px 32px 0; }
+  .rm-sec { padding: 64px 24px 32px; }
+  .rm-sec-tight { padding: 32px 24px; }
+  .rm-band { padding: 56px 32px; }
+  .rm-sec-price { padding: 64px 24px 32px; }
+  .rm-sec-testi { padding: 64px 24px 32px; }
+  .rm-sec-cta { padding: 32px 24px 0; }
+
+  .rm-testi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rm-footer-grid { grid-template-columns: 1fr 1fr; }
+
+  /* The QR code is for people on a desktop looking at a phone. */
+  .rm-cta-side { display: none; }
+  .rm-cta-copy { max-width: 640px; }
+}
+
+/* Phones (touch devices of any width also lose the QR code) */
+@media (pointer: coarse) {
+  .rm-cta-side { display: none; }
+  .rm-cta-copy { max-width: 640px; }
+}
+
+@media (max-width: 880px) {
+  .rm-footer-mark::before { opacity: calc(var(--rm-mark-base, 0.07) * 1.3); }
+  .rm-fbot { flex-direction: column; align-items: flex-start; gap: 14px; }
+  .rm-cta-box.rm-cta-live::after { animation: none; }
+}
+
+@media (max-width: 767px) {
+  .rm-sec-hero { padding-inline: 8px; }
+  .rm-hero-box { padding: 104px 20px 0; }
+  .rm-h1 { font-size: 40px; }
+  .rm-h1-accent { font-size: 42px; }
+  .rm-h2, .rm-h2c { font-size: 34px; }
+
+  /* Three smaller phones, side by side. */
+  .rm-phones { margin-top: 24px; }
+  .rm-phone { display: flex; width: 120px; height: 138px; }
+  .rm-phone-lead { width: 127px; height: 176px; margin: 0 -22px; }
+
+  .rm-sec { padding: 40px 20px 28px; }
+  .rm-fgrid { flex-direction: column; }
+  .rm-sec-tight { padding: 24px 20px; }
+  .rm-band { padding: 40px 16px; }
+  .rm-steps { flex-direction: column; }
+  .rm-sec-price { padding: 40px 20px 28px; }
+  .rm-plans { flex-direction: column; }
+  .rm-includes { padding: 28px 24px; }
+  .rm-includes-cols { column-count: 1; }
+  .rm-sec-testi { padding: 40px 20px 28px; }
+  .rm-testi-grid { gap: 18px; grid-template-columns: 1fr; }
+
+  .rm-sec-cta { margin-bottom: -84px; padding: 24px 20px 0; }
+  .rm-cta-box { flex-direction: column; padding: 40px 28px; }
+  .rm-cta-h { font-size: 32px; }
+
+  .rm-footer-grid { grid-template-columns: 1fr; }
+}
+
+/* Narrow phones */
+@media (max-width: 700px) {
+  /* A snugger pill; the brand may shrink; the menu button sits flush against Download. */
+  .rm-nav-pill { gap: 10px; padding-inline: 14px; }
+  .rm-brand { flex: 0 1 auto; min-width: 0; }
+  .rm-nav-toggle { margin-inline-start: 0; }
+
+  .rm-phones { max-width: none; }
+  .rm-phones > .rm-phone-lead {
+    flex: 0 0 auto;
+    width: min(58%, 210px);
+    min-width: 0;
+    height: auto;
+    aspect-ratio: 9 / 12;
+  }
+  .rm-band { padding: 34px 18px; gap: 24px; }
+  .rm-steps { padding: 0; gap: 14px; }
+  .rm-step { padding: 22px; }
+  .rm-badge { max-width: 100%; padding: 6px 13px; font-size: 12px; white-space: nowrap; }
+  .rm-h1 { font-size: 32px; text-wrap: balance; }
+  .rm-h1-accent { font-size: 34px; }
+  .rm-hero-sub { text-wrap: pretty; }
+}
+
+/* Very small phones: the app icon stands in for the wordmark. */
+@media (max-width: 460px) {
+  .rm-brand-text { display: none; }
+}
+
+/* ------------------------------------------------------------------ 15. Reduced motion */
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .rm-motion .rm-hero-box > * { opacity: 1; }
+  .rm-hero-box::before { animation: none; }
+  .rm-btn-dark { transition: none; }
+  .rm-btn-dark:hover::before,
+  .rm-btn-dark:focus-visible::before { animation: none; }
+  .rm-nav-pill { transition: none; }
+  .rm-nav-bars,
+  .rm-nav-bars::before,
+  .rm-nav-bars::after,
+  .rm-nav-pill .rm-nav-links { transition: none; }
+  .rm-cta-box.rm-cta-live::after { animation: none; }
+      :is(.rm-card, .rm-plan, .rm-includes, .rm-tile, .rm-testi)::after,
+  :is(.rm-card, .rm-plan, .rm-includes, .rm-tile, .rm-testi)::before { transition: none; }
+}
