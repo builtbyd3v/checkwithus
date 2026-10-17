@@ -7,9 +7,8 @@
  * header is the classic way a forged `none` or HS256 token gets through.
  */
 import 'server-only';
-import { createRemoteJWKSet, errors, jwtVerify, type JWTPayload } from 'jose';
+import { createRemoteJWKSet, errors, jwtVerify } from 'jose';
 import { auth0Env } from '@/lib/env';
-import { HttpError } from '@/lib/http';
 import { AuthError, AuthUnavailableError, bearerToken } from './http-auth';
 
 let jwks: ReturnType<typeof createRemoteJWKSet> | undefined;
@@ -22,20 +21,11 @@ function keys() {
   ));
 }
 
-export type FamilyUser = {
-  sub: string;
-  name: string | null;
-  authTime?: number;
-  /** Auth0 RBAC `permissions` claim; [] when AUTH0_RBAC=true and the token has none. */
-  permissions?: string[];
-};
+export type FamilyUser = { sub: string; name: string | null; authTime?: number };
 
-/**
- * Verifies an Auth0 access token for our API (RS256, issuer, audience) and
- * returns its claims. AuthError (401) for a bad token, AuthUnavailableError
- * (503) when Auth0's keys cannot be fetched. Shared with lib/auth/agent.ts.
- */
-export async function verifyApiToken(token: string): Promise<JWTPayload> {
+/** The signed-in family member, or AuthError (401). */
+export async function requireFamilyUser(request: Request): Promise<FamilyUser> {
+  const token = bearerToken(request);
   const { AUTH0_DOMAIN, AUTH0_AUDIENCE } = auth0Env();
   try {
     const { payload } = await jwtVerify(token, keys(), {
@@ -43,8 +33,11 @@ export async function verifyApiToken(token: string): Promise<JWTPayload> {
       audience: AUTH0_AUDIENCE,
       algorithms: ['RS256'],
     });
-    return payload;
+    if (!payload.sub) throw new AuthError('Token has no subject');
+    const name = typeof payload.name === 'string' ? payload.name : null;
+    return { sub: payload.sub, name, ...(typeof payload.auth_time === 'number' ? { authTime: payload.auth_time } : {}) };
   } catch (error) {
+    if (error instanceof AuthError) throw error;
     if (error instanceof errors.JWTExpired) throw new AuthError('Sign-in expired');
     if (error instanceof errors.JOSEError && TOKEN_REJECTED.has(error.code)) {
       // Never echo why verification failed beyond this; it helps an attacker.
@@ -52,36 +45,9 @@ export async function verifyApiToken(token: string): Promise<JWTPayload> {
     }
     // Anything else means we could not check the token at all (Auth0's keys
     // unreachable, timed out, malformed). That is not the person's fault.
-    console.error('[auth] could not verify Auth0 token:', error instanceof Error ? error.message : error);
+    console.error('[auth] could not verify family token:', error instanceof Error ? error.message : error);
     throw new AuthUnavailableError();
   }
-}
-
-/** A Machine-to-Machine (client credentials) token: the bill-pay agent, never a person. */
-export function isMachineToken(payload: JWTPayload): boolean {
-  return payload.gty === 'client-credentials' || (payload.sub?.endsWith('@clients') ?? false);
-}
-
-/** The signed-in family member, or AuthError (401). */
-export async function requireFamilyUser(request: Request): Promise<FamilyUser> {
-  const payload = await verifyApiToken(bearerToken(request));
-  // The agent has its own identity and only the agent route accepts it. It can
-  // never approve, deny, freeze, unfreeze, grant allowances or change policy.
-  if (isMachineToken(payload)) {
-    throw new HttpError(403, 'agent_not_allowed', 'Only a family member can do this, not the bill-pay agent.');
-  }
-  if (!payload.sub) throw new AuthError('Token has no subject');
-  const name = typeof payload.name === 'string' ? payload.name : null;
-  const { permissions } = payload;
-  return {
-    sub: payload.sub,
-    name,
-    ...(typeof payload.auth_time === 'number' ? { authTime: payload.auth_time } : {}),
-    // A malformed claim must not read as "no claim": it yields no permissions.
-    ...(permissions !== undefined
-      ? { permissions: Array.isArray(permissions) ? permissions.filter((p): p is string => typeof p === 'string') : [] }
-      : auth0Env().AUTH0_RBAC === 'true' ? { permissions: [] } : {}),
-  };
 }
 
 /** jose error codes that mean "this token is bad", as opposed to "we could not check it". */

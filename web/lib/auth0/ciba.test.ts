@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { toCents } from '@/lib/money';
 import { createFakeAuth0, FAKE_AUTH0, type FakeAuth0 } from '@/test/fake-auth0';
-import { bindingMessage, CibaError, createCibaClient, paymentAuthorizationDetails } from './ciba';
+import { bindingMessage, CibaError, createCibaClient } from './ciba';
 
 describe('bindingMessage', () => {
   it('says who, how much and to whom, in characters Auth0 accepts', () => {
@@ -76,124 +76,21 @@ describe('createCibaClient', () => {
     expect(auth0.calls[0]!.fields.requested_expiry).toBe('300');
   });
 
-  const AUDIENCE = 'https://api.checkwith.us/';
-  const payment = {
-    amountCents: toCents(150_000),
-    payee: 'QuickGift Cards',
-    reasons: ['Gift card purchase', 'Paid while on a phone call'],
-    approvalsRequired: 2,
-  };
-
-  it('sends the API audience and, with RAR on, one Guardian display object with the payment', async () => {
-    const detailed = createCibaClient({
-      ...FAKE_AUTH0, audience: AUDIENCE, richAuthorizationDetails: true, fetch: auth0.fetch, keys: auth0.keys,
-    });
-    await detailed.start({ sub: 'auth0|maria', bindingMessage: 'Rosa: 1,500.00 USD to QuickGift Cards', expirySeconds: 300, payment });
+  it('sends the API audience and Guardian display schema with payment details', async () => {
+    const detailed = createCibaClient({ ...FAKE_AUTH0, audience: 'https://api.checkwith.us/', fetch: auth0.fetch, keys: auth0.keys });
+    await detailed.start({ sub: 'auth0|maria', bindingMessage: 'Payment', expirySeconds: 300,
+      payment: { amountCents: toCents(12345), payee: 'City Power', reasons: ['over_limit'] } });
     const fields = auth0.calls[0]!.fields;
-    expect(fields.audience).toBe(AUDIENCE);
-    expect(fields.binding_message).toBe('Rosa: 1,500.00 USD to QuickGift Cards');
+    expect(fields.audience).toBe('https://api.checkwith.us/');
     expect(JSON.parse(fields.authorization_details!)).toEqual([{
       type: 'urn:auth0:schemas:authorization-details:v1:payment',
       instruction: 'Approve or deny this held payment.',
       properties: {
-        amount: { display: true, name: 'Amount (USD)', display_order: 1, value: '$1,500.00' },
-        payee: { display: true, name: 'Payee', display_order: 2, value: 'QuickGift Cards' },
-        reason: { display: true, name: 'Why it paused', display_order: 3, value: 'Gift card purchase, Paid while on a phone call' },
-        approvals: { display: true, name: 'Approvals needed', display_order: 4, value: '2 family approvers' },
-        amount_cents: { display: false, value: 150_000 },
+        amount: { display: true, name: 'Amount (USD)', display_order: 1, value: '$123.45' },
+        payee: { display: true, name: 'Payee', display_order: 2, value: 'City Power' },
+        reason: { display: true, name: 'Why it paused', display_order: 3, value: 'over_limit' },
       },
     }]);
-  });
-
-  it('leaves out "Approvals needed" when one approval is enough', () => {
-    const [details] = paymentAuthorizationDetails({ ...payment, approvalsRequired: 1 });
-    expect(details!.properties).not.toHaveProperty('approvals');
-  });
-
-  it('with RAR off (the default), sends neither audience nor details, as the tenant accepts today', async () => {
-    const plain = createCibaClient({ ...FAKE_AUTH0, audience: AUDIENCE, fetch: auth0.fetch, keys: auth0.keys });
-    await plain.start({ sub: 'auth0|maria', bindingMessage: 'Payment', expirySeconds: 300, payment });
-    expect(auth0.calls[0]!.fields).not.toHaveProperty('audience');
-    expect(auth0.calls[0]!.fields).not.toHaveProperty('authorization_details');
-  });
-
-  it('falls back to the binding message alone when the tenant refuses the details', async () => {
-    auth0.settings.rarRegistered = false;
-    const detailed = createCibaClient({
-      ...FAKE_AUTH0, audience: AUDIENCE, richAuthorizationDetails: true, fetch: auth0.fetch, keys: auth0.keys,
-    });
-    await expect(
-      detailed.start({ sub: 'auth0|maria', bindingMessage: 'Payment', expirySeconds: 300, payment }),
-    ).resolves.toMatchObject({ authReqId: expect.any(String) });
-    expect(auth0.calls.map((c) => ['audience' in c.fields, 'authorization_details' in c.fields])).toEqual([
-      [true, true],
-      [false, false],
-    ]);
-    expect(auth0.pushes.size).toBe(1);
-  });
-
-  it('reads the RBAC permissions of the verified access token on approval', async () => {
-    const withApi = createCibaClient({
-      ...FAKE_AUTH0, audience: AUDIENCE, richAuthorizationDetails: true, fetch: auth0.fetch, keys: auth0.keys,
-    });
-    const { authReqId } = await withApi.start({ sub: 'auth0|maria', bindingMessage: 'x', expirySeconds: 300 });
-    auth0.answer('auth0|maria', 'approve', { permissions: ['read:payments'] });
-    await expect(withApi.poll(authReqId)).resolves.toEqual({
-      kind: 'approved', sub: 'auth0|maria', permissions: ['read:payments'],
-    });
-  });
-
-  describe('the API access token fails closed', () => {
-    const approveWith = async (
-      options: Parameters<FakeAuth0['answer']>[2],
-      client = createCibaClient({
-        ...FAKE_AUTH0, audience: AUDIENCE, richAuthorizationDetails: true, fetch: auth0.fetch, keys: auth0.keys,
-      }),
-    ) => {
-      const { authReqId } = await client.start({ sub: 'auth0|maria', bindingMessage: 'x', expirySeconds: 300 });
-      auth0.answer('auth0|maria', 'approve', options);
-      return client.poll(authReqId);
-    };
-
-    it('a token for our API that does not verify grants nothing', async () => {
-      await expect(approveWith({ permissions: ['approve:payments'], accessForged: true })).resolves.toMatchObject({ permissions: [] });
-    });
-
-    it('a token for our API naming someone else grants nothing', async () => {
-      await expect(approveWith({ permissions: ['approve:payments'], accessSub: 'auth0|intruder' })).resolves.toMatchObject({ permissions: [] });
-    });
-
-    it('with AUTH0_RBAC, a token for our API without the claim grants nothing', async () => {
-      const strict = createCibaClient({
-        ...FAKE_AUTH0, audience: AUDIENCE, richAuthorizationDetails: true, requirePermissionsClaim: true,
-        fetch: auth0.fetch, keys: auth0.keys,
-      });
-      await expect(approveWith({ apiToken: true }, strict)).resolves.toMatchObject({ permissions: [] });
-    });
-
-    it('without AUTH0_RBAC, a token without the claim leaves it to the circle role', async () => {
-      await expect(approveWith({ apiToken: true })).resolves.toEqual({ kind: 'approved', sub: 'auth0|maria' });
-    });
-  });
-
-  it('keeps payee and reasons in the binding message charset, and short', () => {
-    const [details] = paymentAuthorizationDetails({
-      ...payment, payee: `Tom & Jerry's "Gift" <Shop>? ${'x'.repeat(100)}`, reasons: ['Gift card; $$$', 'R'.repeat(300)],
-    });
-    const { payee, reason } = details!.properties;
-    expect(payee.value).toMatch(/^Tom Jerrys Gift Shop x+$/);
-    expect(String(payee.value).length).toBeLessThanOrEqual(64);
-    expect(reason.value).toMatch(/^[A-Za-z0-9\s+\-_.,:#]*$/);
-    expect(String(reason.value).length).toBeLessThanOrEqual(200);
-  });
-
-  it('reports no permissions when the access token is opaque (RBAC off)', async () => {
-    const withApi = createCibaClient({
-      ...FAKE_AUTH0, audience: AUDIENCE, richAuthorizationDetails: true, fetch: auth0.fetch, keys: auth0.keys,
-    });
-    const { authReqId } = await withApi.start({ sub: 'auth0|maria', bindingMessage: 'x', expirySeconds: 300 });
-    auth0.answer('auth0|maria', 'approve');
-    await expect(withApi.poll(authReqId)).resolves.toEqual({ kind: 'approved', sub: 'auth0|maria' });
   });
 
   it('reports a member who is not enrolled in Guardian', async () => {

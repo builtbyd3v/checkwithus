@@ -65,7 +65,6 @@ const PAYMENT_ERROR_STATUS: Record<PaymentErrorCode, number> = {
   already_decided: 409,
   idempotency_conflict: 409,
   whole_dollars_only: 422,
-  frozen: 409,
 };
 
 export function errorResponse(error: unknown): Response {

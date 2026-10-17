@@ -65,27 +65,6 @@ struct API {
         let _: Created = try await send("POST", "device/alerts", body: ["kind": "ask_family"], token: token)
     }
 
-    /// Nessie ATMs and branches. Only entries with coordinates can be watched.
-    struct BankLocation: Decodable {
-        struct Coordinates: Decodable { let latitude: Double; let longitude: Double }
-        let id: String
-        /// atm or branch
-        let kind: String
-        let name: String
-        let coordinates: Coordinates?
-    }
-
-    static func bankLocations(token: String) async throws -> [BankLocation] {
-        struct List: Decodable { let locations: [BankLocation] }
-        let list: List = try await send("GET", "device/bank-locations", body: Optional<String>.none, token: token)
-        return list.locations
-    }
-
-    static func bankAlert(detail: String, token: String) async throws {
-        struct Created: Decodable { let id: String }
-        let _: Created = try await send("POST", "device/alerts", body: ["kind": "bank_during_call", "detail": detail], token: token)
-    }
-
     static func pay(_ request: PaymentRequest, token: String) async throws -> Payment {
         try await send("POST", "payments", body: request, token: token)
     }
@@ -133,32 +112,20 @@ func dollars(_ cents: Int) -> String {
     cents % 100 == 0 ? "$\(cents / 100)" : String(format: "$%d.%02d", cents / 100, cents % 100)
 }
 
-/// The device token is a credential, so it lives in the Keychain, not UserDefaults. The family app keeps its
-/// Auth0 tokens here too, under its own service name.
+/// The device token is a credential, so it lives in the Keychain, not UserDefaults.
 enum TokenStore {
-    private static func query(_ service: String) -> [String: Any] {
-        [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service]
-    }
+    private static let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "us.checkwith.device"]
 
-    static func load(service: String = "us.checkwith.device") -> String? {
-        #if DEBUG
-        // Simulator tests: launch with `-deviceToken <token>` from a curl pairing instead of typing the code.
-        // Device token only, so a debug family build never reads it as the family sign-in.
-        if service == "us.checkwith.device", let token = UserDefaults.standard.string(forKey: "deviceToken") { return token }
-        #endif
+    static func load() -> String? {
         var item: CFTypeRef?
-        let q = query(service).merging([kSecReturnData as String: true]) { $1 }
+        let q = query.merging([kSecReturnData as String: true]) { $1 }
         guard SecItemCopyMatching(q as CFDictionary, &item) == errSecSuccess, let data = item as? Data else { return nil }
         return String(data: data, encoding: .utf8)
     }
 
-    static func save(_ token: String, service: String = "us.checkwith.device", accessible: CFString = kSecAttrAccessibleAfterFirstUnlock) {
-        delete(service: service)
-        let q = query(service).merging([kSecValueData as String: Data(token.utf8), kSecAttrAccessible as String: accessible]) { $1 }
+    static func save(_ token: String) {
+        SecItemDelete(query as CFDictionary)
+        let q = query.merging([kSecValueData as String: Data(token.utf8), kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock]) { $1 }
         SecItemAdd(q as CFDictionary, nil)
-    }
-
-    static func delete(service: String) {
-        SecItemDelete(query(service) as CFDictionary)
     }
 }

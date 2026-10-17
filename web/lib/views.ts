@@ -71,7 +71,6 @@ export function familyPaymentView(
     approvalsRequired: payment.approvalsRequired ?? 1,
     allowanceId: payment.allowanceId ?? null,
     billDueDate: payment.billDueDate ?? null,
-    initiatedBy: payment.initiatedBy ?? 'device',
     decidedByName: context.decidedByName,
     failure: payment.status === 'failed' ? payment.failure : null,
   };

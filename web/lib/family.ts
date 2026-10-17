@@ -158,8 +158,7 @@ export async function rotateInviteCode(pool: pg.Pool, sub: string, circleId: str
   return issueInviteCode(pool, circleId);
 }
 
-/** Newest first. With `circleId`, only that circle's (the dashboard shows one circle at a time). */
-export async function familyAlerts(pool: pg.Pool, sub: string, circleId?: string) {
+export async function familyAlerts(pool: pg.Pool, sub: string) {
   const { rows } = await pool.query<{
     id: string;
     circle_id: string;
@@ -172,10 +171,9 @@ export async function familyAlerts(pool: pg.Pool, sub: string, circleId?: string
        from alerts a
        join circles c on c.id = a.circle_id
        join circle_members m on m.circle_id = a.circle_id and m.auth0_sub = $1
-      where $2::uuid is null or a.circle_id = $2
       order by a.created_at desc
       limit 20`,
-    [sub, circleId ?? null],
+    [sub],
   );
   return rows.map((r) => ({
     id: r.id,

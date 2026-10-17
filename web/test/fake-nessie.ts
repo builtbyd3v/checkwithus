@@ -7,30 +7,26 @@
  * `{ objectCreated: { _id } }`, amounts are stored as sent, and lists answer
  * 200 []. `failNext` simulates the failures payments must survive.
  */
-type Stored = { kind: 'purchases' | 'withdrawals' | 'deposits' | 'bills' | 'transfers'; accountId: string; body: Record<string, unknown> & { _id: string } };
+type Stored = { kind: 'purchases' | 'withdrawals' | 'deposits' | 'bills'; accountId: string; body: Record<string, unknown> & { _id: string } };
 
 export type FakeNessie = ReturnType<typeof createFakeNessie>;
 
 export function createFakeNessie() {
+  let nextId = 1;
   const merchants: Array<Record<string, unknown> & { _id: string }> = [];
-  const accounts: Array<Record<string, unknown> & { _id: string; customer_id: string }> = [];
-  const customers: Array<Record<string, unknown> & { _id: string }> = [];
   const records: Stored[] = [];
   const calls: Array<{ method: string; path: string; body: unknown }> = [];
   /**
    * The next matching write fails this way. `recordedThen500` stores the
    * record and still answers 500: the "did it go through?" case.
    */
-  let pendingFailure: { pathIncludes: string; mode: 'recordedThen500' | 'lostThen500' | 'timeout' | 'rejected400' } | null =
+  let pendingFailure: { pathIncludes: string; mode: 'recordedThen500' | 'lostThen500' | 'timeout' } | null =
     null;
 
   /** Runs once, in the middle of the next account list read: for staging races. */
   let listHook: (() => Promise<void>) | null = null;
 
-  // Nessie ids are globally unique, and spending_nessie_records keys on them
-  // across circles. A counter restarting at 1 per fake made `fake-1` collide
-  // with any other run on the same database, and the payment lost its ledger row.
-  const id = () => `fake-${crypto.randomUUID()}`;
+  const id = () => `fake-${nextId++}`;
 
   const json = (status: number, body: unknown) =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -47,8 +43,6 @@ export function createFakeNessie() {
         : null;
     if (failure) pendingFailure = null;
     if (failure?.mode === 'timeout') throw new Error('The operation was aborted due to timeout');
-    // A definite refusal: nothing stored.
-    if (failure?.mode === 'rejected400') return json(400, 'Invalid request');
 
     if (method === 'POST' && pathname === '/merchants') {
       const merchant = { ...body, _id: id() };
@@ -56,33 +50,7 @@ export function createFakeNessie() {
       return json(201, { code: 201, message: 'Merchant created', objectCreated: merchant });
     }
 
-    if (pathname === '/customers') {
-      if (method === 'GET') return json(200, customers);
-      const customer = { ...body, _id: id() };
-      customers.push(customer);
-      return json(201, { code: 201, message: 'Customer created', objectCreated: customer });
-    }
-
-    const customerAccounts = pathname.match(/^\/customers\/([^/]+)\/accounts$/);
-    if (customerAccounts) {
-      const customerId = customerAccounts[1]!;
-      if (method === 'POST') {
-        // Account ids are unique columns in our database, so never reuse one across fakes.
-        const account = { ...body, _id: `fake-account-${crypto.randomUUID()}`, customer_id: customerId };
-        if (failure?.mode !== 'lostThen500') accounts.push(account);
-        if (failure) return json(500, { message: 'Internal server error' });
-        return json(201, { code: 201, message: 'Account created', objectCreated: account });
-      }
-      return json(200, accounts.filter((a) => a.customer_id === customerId));
-    }
-
-    const oneAccount = pathname.match(/^\/accounts\/([^/]+)$/);
-    if (method === 'GET' && oneAccount) {
-      const account = accounts.find((a) => a._id === oneAccount[1]);
-      return account ? json(200, account) : json(404, { message: 'Account not found' });
-    }
-
-    const accountRoute = pathname.match(/^\/accounts\/([^/]+)\/(purchases|withdrawals|deposits|bills|transfers)$/);
+    const accountRoute = pathname.match(/^\/accounts\/([^/]+)\/(purchases|withdrawals|deposits|bills)$/);
     if (accountRoute) {
       const [, accountId, kind] = accountRoute as [string, string, Stored['kind']];
       if (method === 'GET' && listHook) {
@@ -110,11 +78,10 @@ export function createFakeNessie() {
     fetch,
     calls,
     records,
-    accounts,
     /** Writes that reached the fake (not merchant creation). */
     paymentWrites: () =>
       calls.filter((c) => c.method === 'POST' && c.path !== '/merchants'),
-    failNext(pathIncludes: string, mode: 'recordedThen500' | 'lostThen500' | 'timeout' | 'rejected400') {
+    failNext(pathIncludes: string, mode: 'recordedThen500' | 'lostThen500' | 'timeout') {
       pendingFailure = { pathIncludes, mode };
     },
     /** Run `hook` while the next lookup of an account's records is in flight. */
