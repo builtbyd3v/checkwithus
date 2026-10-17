@@ -1,0 +1,27 @@
+1
+00:00:01,401 --> 00:00:05,912
+Local dashboard backup demo. Synthetic family and simulated decisions; no money is sent.
+
+2
+00:00:05,912 --> 00:00:10,713
+A gift-card request pauses after ATM cash. The family sees both steps and the times.
+
+3
+00:00:10,713 --> 00:00:15,308
+Deny stops the request and announces the result.
+
+4
+00:00:15,308 --> 00:00:20,125
+A payment requiring two approvers stays waiting after the first yes.
+
+5
+00:00:20,125 --> 00:00:24,792
+This simulated single-approval request changes to Approved.
+
+6
+00:00:24,792 --> 00:00:29,405
+An unanswered request expires and is blocked.
+
+7
+00:00:29,405 --> 00:00:34,040
+When Guardian is required, the dashboard offers Deny and directs approval to the enrolled phone.

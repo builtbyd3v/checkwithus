@@ -173,9 +173,9 @@ The screens below are iPhone simulator screenshots of the real app. They are not
 | 6. Family: why we paused it | [06-family-why-we-paused.png](gallery/06-family-why-we-paused.png) | Amount, payee, every reason, the phone's note, Deny and Approve | `PaymentDetailView`, `FamilyViews.swift` (PR #30) |
 
 - TODO(Dev): capture the "Paused, waiting for family" screen, the "We told your family" screen and the lock-screen card on a device, and add them here.
-- TODO(Dev): add early sketches or Figma frames if they exist (issue #15 asks for sketch, mid-fi, final). We did not make any up.
+- New design assets: [SVG handoff and design boards](design/handoff.md), including new exploratory sketches, wireframes and visual specifications. They were created after implementation and are labelled accordingly; they are not historical process evidence. Import the SVG frames into Figma when a team workspace is available.
 
 ## Limits
 
 - All fraud numbers are reports people chose to file. The FTC says losses reported to it are the "tip of the iceberg".
-- We did not run a usability test with older adults this weekend (out of scope in `docs/PLAN.md`). The design rests on the published research above and the parent interview.
+- We did not run a usability test with older adults this weekend (out of scope in `docs/PLAN.md`). The design rests on the published research above. Parent-interview quotes and evidence of changes from those quotes are still pending.

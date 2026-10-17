@@ -6,8 +6,8 @@ Hard limit: 3 minutes, then 1 minute of judge questions ([RULES.md](RULES.md)).
 
 | Who | Device | Shows |
 | --- | --- | --- |
-| Rosa, the older adult | iPhone A: older adult role, built from merged `main` | Home, Pay a bill, held screen, lock-screen card |
-| Her family | iPhone B: family app (family role), same `main` build, signed in with Auth0 | Approvals, Alerts, Money (Freeze) |
+| Rosa, the older adult | iPhone A: older adult role, built from the reviewed demo commit | Home, Pay a bill, held screen, lock-screen card |
+| Her family | iPhone B: family app (family role), same reviewed demo build, signed in with Auth0 | Approvals, Alerts, Money (Freeze) |
 | Backup for the family | MacBook: checkwith.us/dashboard | Waiting payments, spending chart |
 | The scammer | Google Voice (laptop or a third phone) | One scam text, one call |
 
@@ -16,7 +16,7 @@ Rosa is synthetic ("Rosa CheckWith (synthetic)"). Never use a real person's name
 ## Pre-demo checklist (do 15 minutes before)
 
 One build for everything
-- [ ] One build: every demo PR (#30 to #44) is merged to `main`. Both iPhones are built from that `main`, and that `main` is deployed to checkwith.us. Never mix feature branches.
+- [ ] One build: choose a reviewed commit (development work is currently on rishon, PR #54) and use that exact code for both iPhones and the server. Do not merge to main without the user's explicit instruction. Verify migrations and live settings before deploying. Never mix feature branches.
 - [ ] `curl https://checkwith.us/api/health` prints `{"ok":true,"database":"reachable"}`. Freeze must not 404: the deployed build is the merged one.
 - [ ] Migrations on the live database: `cd web && npm run db:migrate` (014 freeze, 015 ATM cash, 016 weekly and per-payee aggregates, 017 ledger credits, and 020 payment initiator if #46 is merged).
 - [ ] `DEMO_BANK_LOCATIONS` is set on Vercel to a spot at the expo table, for example `[{"name":"SwampHacks Demo Bank","lat":29.6463,"lng":-82.3478}]`. TODO(Dev): confirm the coordinates on site, redeploy after changing it, then relaunch the app on iPhone A.
@@ -27,7 +27,7 @@ One build for everything
 - [ ] `APPROVAL_MODE=app` on Vercel (the default). The family approves in the family app, which asks for Face ID first. The Guardian push (`ciba`) is implemented but not verified live, so do not use it in the demo.
 
 iPhone A (Rosa)
-- [ ] The merged `main` build installed. A debug build also has the "Make this spot a test bank" and "Pretend I'm on a call" backups.
+- [ ] The selected reviewed demo build installed. A debug build also has the "Make this spot a test bank" and "Pretend I'm on a call" backups.
 - [ ] Paired: dashboard, make a pairing code, type it on the phone. Home says "You're safe".
 - [ ] Message Filter on: Settings, Apps, Messages, Unknown and Spam, "Check With Us".
 - [ ] Call labels on: Settings, Apps, Phone, Call Blocking and Identification, "Check With Us".
@@ -147,3 +147,7 @@ Unfreeze first if step 7 ran, and make sure no call is active (a call adds a hol
 2. MacBook: `npm run demo:reset -- --live`. It clears holds, unfreezes, clears ATM cash and re-grants the allowance.
 3. iPhone B: pull down to refresh. Money tab says not frozen; Allowances shows utilities up to $400.
 4. Send the next scam text from a Google Voice number that has not texted iPhone A before, or accept that step 1 may show it in Spam already.
+
+## Dashboard-only backup footage
+
+[38-second synthetic UI clip](gallery/dashboard-backup.webm) and [captions](gallery/dashboard-backup.srt). This records the local dashboard fixture, not a live payment or Guardian push. It can cover the dashboard portion if devices are unavailable; use real-phone footage for the text/call and older adult flows. Re-recording instructions: [dashboard-backup.md](gallery/dashboard-backup.md).

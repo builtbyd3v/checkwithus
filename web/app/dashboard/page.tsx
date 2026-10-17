@@ -15,6 +15,11 @@ import { herUsual, usualLabel, type UsualRow } from '@/lib/usual';
 import { Countdown, DecisionButtons, DecisionStatus, FreezeControl, JoinForm, SettingsForms } from './controls';
 import { alertHeadline, timeAgo } from './format';
 import { PaymentCard, StateBadge } from './payment-card';
+import { scamSequences, type SequenceEvidence } from '@/lib/scam-sequence';
+import recordedBenchmark from '@/lib/perf-benchmark.json';
+import { benchmarkSummary, perfReportSchema } from '@/lib/perf-report';
+
+const benchmark = perfReportSchema.parse(recordedBenchmark);
 
 type SpendRow = { day: Date; category: Category; total_cents: string };
 type CircleRow = { hold_over_cents: string; protected_name: string; frozen: boolean; vault_cents: number };
@@ -55,7 +60,7 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
   await cibaApprovals()?.pollCircles([active.circleId]);
   // Query holds independently: newer completed payments must not hide them.
   const heldQuery = familyPayments(db(), payments(), session.user.sub, { heldOnly: true, circleId: active.circleId });
-  const [recent, held, spendResult, weekResult, circleResult, memberResult, payeeResult, alerts, speed, usualRows] = await Promise.all([
+  const [recent, held, spendResult, weekResult, circleResult, memberResult, payeeResult, alerts, speed, usualRows, sequences] = await Promise.all([
     familyPayments(db(), payments(), session.user.sub, { heldOnly: false, circleId: active.circleId }),
     heldQuery,
     db().query<SpendRow>(
@@ -73,6 +78,10 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
     cachedSpeed(db(), active.circleId),
     // Display only, so a failure just hides the line.
     heldQuery.then((rows) => herUsual(db(), active.circleId, rows.map((payment) => payment.id))).catch((): UsualRow[] => []),
+    // Reconstruct supporting ATM history; the stored hold reason remains authoritative.
+    heldQuery.then((rows) => scamSequences(db(), active.circleId,
+      rows.filter((payment) => payment.holdReasons.some((reason) => reason.code === 'cash_then_gift_card')).map((payment) => payment.id)))
+      .catch(() => new Map<string, SequenceEvidence>()),
   ]);
   const usual = new Map(usualRows.map((row) => [row.payment_id, row]));
   const circle = circleResult.rows[0]!;
@@ -124,7 +133,7 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
             : active.role !== 'approver' ? 'An approver in your family decides these.'
             : canApproveHere ? 'Approve or deny here, or from the family app.' : 'Deny here. Approve from the Guardian notification on your phone.'}</p></div>
         <DecisionStatus key={active.circleId} />
-        {held.length > 0 && <ul role="list" className="mt-6 grid gap-4 lg:grid-cols-2">{held.map((payment) => { const usualLine = usualLabel(usual.get(payment.id), payment.payee.name, firstName); return <li key={payment.id} className="min-w-0"><PaymentCard payment={payment} usualLine={usualLine} deadline={payment.expiresAt ? <Countdown expiresAt={payment.expiresAt} /> : null}>
+        {held.length > 0 && <ul role="list" className="mt-6 grid gap-4 lg:grid-cols-2">{held.map((payment) => { const usualLine = usualLabel(usual.get(payment.id), payment.payee.name, firstName); return <li key={payment.id} className="min-w-0"><PaymentCard payment={payment} usualLine={usualLine} sequence={sequences.get(payment.id)} deadline={payment.expiresAt ? <Countdown expiresAt={payment.expiresAt} /> : null}>
           {active.role === 'approver' && <DecisionButtons paymentId={payment.id} canApproveHere={canApproveHere} expiresAt={payment.expiresAt} />}
         </PaymentCard></li>; })}</ul>}
         {decided.length > 0 && <div className="mt-6"><h3 id="decided-title" tabIndex={-1} className="text-sm font-bold uppercase tracking-widest text-teal-900 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal-800">Recently decided</h3>
@@ -188,8 +197,7 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
             <div><dt className="text-sm text-stone-600">Compressed history, all families</dt><dd className="mt-1 text-2xl font-semibold tabular-nums">{speed.compression
               ? `${(speed.compression.beforeBytes / speed.compression.afterBytes).toFixed(1)}x smaller` : <span className="text-base font-medium text-stone-700">Nothing compressed yet</span>}</dd></div>
           </dl>
-          {/* ponytail: copied from docs/perf.md (npm run bench:perf, Oct 17); update by hand if the benchmark is rerun. */}
-          <p className="mt-4 text-sm text-stone-600">Benchmark on 1,000,000 synthetic payments: weekly totals for all circles 13.8x faster from the aggregate (150 ms vs 2,077 ms), history 3.2x smaller compressed.</p>
+          <p className="mt-4 text-sm text-stone-600">{benchmarkSummary(benchmark)}</p>
         </div>}
       </section>
 

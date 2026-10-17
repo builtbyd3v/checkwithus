@@ -38,6 +38,17 @@ test('Guardian and viewer modes expose only the permitted controls', async ({ pa
   await expect(page.getByRole('article').getByRole('button')).toHaveCount(0);
 });
 
+test('shows the cash and gift-card sequence on a phone-width held card', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('checkbox', { name: 'ATM sequence' }).check();
+  const timeline = page.getByRole('region', { name: 'Cash then gift card sequence' });
+  await expect(timeline).toContainText('$200.00 cash');
+  await expect(timeline).toContainText('$500.00 gift card request');
+  await expect(timeline).toContainText('Demo ATM (synthetic)');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.locator('section[aria-labelledby="preview-title"]').screenshot({ path: path.resolve('../docs/gallery/dashboard-sequence-390.png'), style: 'nextjs-portal { display: none; }' });
+});
+
 test('expiry disables stale decisions and refreshes server state once', async ({ page }) => {
   await page.clock.install();
   let refreshes = 0;

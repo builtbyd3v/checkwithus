@@ -2,12 +2,12 @@
 
 Copy each section into the matching Devpost field. Check every `TODO(Dev):` before submitting. Due **Sun Oct 18, 8:00 AM ET**.
 
-TODO(Dev): this draft describes `main` with #30 to #44 merged and deployed. Use the PR checklist at the top of the README: for each PR not merged by submission, cut the claims it lists here too. Delete the "Bill-pay agent" section and the agent lines unless #46 (needs #40) merges.
+Build scope: this draft describes the development branch rishon (draft PR #54), not the currently deployed main branch. Before publishing, verify the same reviewed build on devices and the server, and remove any feature that is not demonstrated. Auth0 Guardian and the bill agent are implemented but remain unverified on the live tenant here.
 
 - **Project name:** checkwith.us
 - **Elevator pitch (max 200 characters):** Scam protection where the older adult does nothing and the family does the work. Scam texts filtered on the phone, scam calls labeled, risky payments paused for family approval.
 - **Links:** https://checkwith.us and https://github.com/builtbyd3v/checkwithus
-- **Video (max 2 minutes):** TODO(Dev): add the backup demo video link.
+- **Video (max 2 minutes):** [38-second synthetic dashboard backup clip](gallery/dashboard-backup.webm), with [captions](gallery/dashboard-backup.srt). This is UI-only backup footage; upload the complete team/device demo and add its public link before submission.
 - **Opt in to all 7 (exact names):** Best Use of AI/ML; Capital One - The Best Use of Nessie!; MLH Prize: Best Domain Name from GoDaddy Registry; MLH Prize: Best Use of Auth0; MLH Prize: Best Use of Tiger Data; Easy On the Eyes Award - Best UI/UX Design; MLH - DEV Writing Challenge.
 - **Specialized track:** Best Use of AI/ML only (at most one is allowed).
 
@@ -133,7 +133,7 @@ Nessie is the bank in every step. Each endpoint has a job:
 - Stopping money is one tap; approving asks for Face ID first.
 - Accessibility pass at the largest text size: pinned buttons on an opaque bar, no mid-word breaks, VoiceOver announces the real outcome, darker colors for contrast, 56 pt tap targets, Reduce Motion.
 - Six design principles, each tied to a cited finding and a real screen: `docs/design-principles.md` and `docs/research.md`.
-- TODO(Dev): upload 3 or 4 shots from `docs/gallery/` (for example 03-older-adult-home-safe, 05-family-approvals, 06-family-why-we-paused, dashboard-full) with one sentence each on the design choice.
+- Gallery upload candidates: actual app captures `03-older-adult-home-safe`, `05-family-approvals`, `06-family-why-we-paused`, plus `dashboard-sequence-390`. New design boards `design-sketch`, `design-wireframe`, `design-final` are explicitly post-implementation explorations, not earlier process evidence. See `docs/design/handoff.md` and `docs/gallery/dashboard-review.md`. Upload selected assets with a sentence on the design choice.
 
 ### MLH: Best Domain Name from GoDaddy Registry
 checkwith.us is the product name, the brand and the live site. The name is the promise: before money moves, it checks with us, the family. TODO(Dev): confirm the MLH GoDaddy Registry code was used (whois shows registrar Porkbun; .us is run by GoDaddy Registry), then write one sentence on how it was registered.

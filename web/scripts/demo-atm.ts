@@ -9,10 +9,13 @@ import { dbEnv, nessieEnv } from '@/lib/env';
 import { toCents } from '@/lib/money';
 import { createNessieClient } from '@/lib/nessie/client';
 import { withdrawalBody } from '@/lib/nessie/format';
+import { createPaymentService } from '@/lib/payments';
 
 const AMOUNT_CENTS = toCents(20_000);
 
 async function main() {
+  const args = process.argv.slice(2);
+  if (args.some((arg) => arg !== '--with-gift-card')) throw new Error('Only --with-gift-card is supported');
   const nessie = createNessieClient({ key: nessieEnv().NESSIE_API_KEY });
   const pool = new pg.Pool({ connectionString: dbEnv().DATABASE_URL, max: 2 });
   try {
@@ -45,6 +48,19 @@ async function main() {
       client.release();
     }
     console.log(`ATM cash $200 at ${atm.name}, ${at.toISOString()}. A gift card before ${new Date(at.getTime() + 7_200_000).toISOString()} is held as a scam sequence.`);
+    if (args.includes('--with-gift-card')) {
+      // Seed a held request through fixed rules. No gift-card purchase is sent
+      // to Nessie and no Guardian push is seeded by this standalone helper.
+      const payment = await createPaymentService({ pool, nessie }).createPayment(circle.id, {
+        idempotencyKey: `demo-sequence-${nessieId}`, amountCents: toCents(50000),
+        payeeName: 'Demo Gift Cards (synthetic)', payeeKind: 'merchant', category: 'gift_cards',
+        onCall: false, guard: null, explanation: null,
+      });
+      if (payment.status !== 'held' || !payment.holdReasons.includes('cash_then_gift_card')) {
+        throw new Error('Expected the synthetic gift-card request to be held as cash then gift cards');
+      }
+      console.log(`Synthetic sequence ready: held payment ${payment.id}. Review or deny it from the family dashboard.`);
+    }
   } finally {
     await pool.end();
   }

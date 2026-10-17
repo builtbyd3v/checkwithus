@@ -8,22 +8,9 @@ on the phone, so the older adult's texts and bills never leave the device.
 
 Live at [checkwith.us](https://checkwith.us). Built at SwampHacks XII (Oct 16 to 18, 2026).
 
-> **TODO(Dev): before submission.** This README describes `main` after the PRs below are merged and deployed. For each line that is not merged by submission, cut the claims it lists.
-> - [ ] #30 family iPhone app: role picker, Auth0 login on the phone, Approvals (approve asks for Face ID), Alerts, Money (Freeze), Allowances screens
-> - [ ] #31 `spending_weekly` and `spending_payee_daily` aggregates, the 1M-row benchmark and the Tiger Data performance table
-> - [ ] #32 Freeze, the vault account, Nessie transfers, the "cash then gift card" hold, `npm run demo:atm`
-> - [ ] Landing page with the "Try a payment" widget: the one Dev picks of #33, #36, #37, #39, #42
-> - [ ] #34 bank-while-on-a-call alert
-> - [ ] #35 these docs
-> - [ ] #38 design principles, research and the iPhone gallery shots (`docs/design-principles.md`, `docs/research.md`)
-> - [ ] #40 Guardian push audience fix, opt-in payment details (`AUTH0_CIBA_RAR`), opt-in `approve:payments` RBAC (`AUTH0_RBAC`)
-> - [ ] #41 demo bank locations (`DEMO_BANK_LOCATIONS`), ledger balance fix, family top-up, pension deposits, migration 017
-> - [ ] #43 dashboard alerts list, "Nx usual" line, live Tiger Data speed card, dashboard gallery shots
-> - [ ] #44 iPhone accessibility pass
-> - [ ] The no-passcode fix (a phone with no passcode cannot approve). Until it merges, keep the caveat under "The family does the work".
-> - [ ] #45 test-only fix (flaky bill test); no claims depend on it
-> - [ ] #46 bill-pay agent (needs #40 first): the "Bill-pay agent" section, `npm run agent:bills`, migration 020. Until it merges, delete that section and the agent lines in Auth0 below.
-> - [ ] Merged `main` deployed to checkwith.us, migrations 014 to 017 (and 020 with #46) applied to the live database.
+> **Build scope:** This README describes the development code preserved on `rishon` in draft PR #54. Main was intentionally restored through #53. The branch is not claimed to be deployed or live-verified.
+>
+> Before submission, verify the same reviewed build on real iPhones and the server, apply its migrations, confirm the live Auth0/Nessie setup, check dataset licenses, and publish the video, DEV post and Devpost entry. Guardian and the bill agent have additional tenant setup; their live behavior remains unverified here.
 
 ## How it works
 
@@ -129,7 +116,9 @@ Sources: [`ml/models/ngram_eval.json`](ml/models/ngram_eval.json), [`ml/models/g
 
 ## Tiger Data performance
 
-Measured on Oct 17, 2026 on Tiger Cloud (TimescaleDB 2.30.2, PostgreSQL 18.6) with 1,000,000 synthetic rows in `spending` (200 circles, 40 payees each, 3 years). Server time from `explain (analyze, timing off)`, median of 21 warm runs after 3 warm-ups. Continuous aggregates fully materialized first.
+<!-- PERF:START -->
+Measured 2026-10-17 on Tiger Cloud (TimescaleDB 2.30.2, PostgreSQL 18.6) with 1,000,000 synthetic rows in `spending` (200 circles, 40 payees each, 3 years).
+Method: server time (planning + execution) from `explain (analyze, timing off)`, median of 21 warm runs after 3 warm-ups; continuous aggregates fully materialized first.
 
 | Query | Raw, row store (ms) | Raw, columnstore (ms) | Continuous aggregate (ms) | Aggregate vs row store |
 | --- | ---: | ---: | ---: | ---: |
@@ -138,9 +127,14 @@ Measured on Oct 17, 2026 on Tiger Cloud (TimescaleDB 2.30.2, PostgreSQL 18.6) wi
 | "Her usual" at one payee (1 circle, 1 year) | 7.92 | 8.55 | 2.65 | 3.0x faster |
 | Weekly totals, all 200 circles, 3 years | 2077.43 | 1517.67 | 150.23 | 13.8x faster |
 
-Compression (columnstore, segment by circle): 163.3 MB to 50.3 MB, **3.2x smaller** (158 of 158 chunks).
+Compression (columnstore, segment by circle): 163.3 MiB to 50.3 MiB, **3.2x smaller** (158 of 158 chunks).
 
-Aggregate times are a best case: everything was materialized, while in production the current week is computed live from raw rows. The queries are simplified versions of the dashboard and rules queries. Full method: [`docs/perf.md`](docs/perf.md). Reproduce with `npm run bench:perf` in `web/`, against a throwaway `wt_*` schema only.
+Aggregate times are a best case: everything was materialized, while in production the current week is computed live from raw rows. The queries are simplified versions of the dashboard and rules queries.
+
+Data source: `web/lib/perf-benchmark.json`. Recorded run previously published in docs/perf.md; values transcribed without rerunning the live benchmark.
+Reproduce measurements: `npm run bench:perf` in `web/`, against a migrated throwaway `wt_*` schema only. Re-render these recorded results without a database: `npm run perf:report`.
+
+<!-- PERF:END -->
 
 ## Setup
 
@@ -205,7 +199,7 @@ Required by SwampHacks and MLH rules, and disclosed on Devpost. Each PR also nam
 | OpenAI Codex CLI | Continued the `web/` backend: approval and reconciliation fixes, the synthetic demo seed, and the family dashboard. |
 | OpenAI Codex CLI (read-only review) | Second-opinion review of changed files through a `Stop` hook, and review panels on the `ml/` dataset and the iPhone app. It found near-duplicate data leaks, label conflicts and several race conditions, which were then fixed. It reviews; a human and the authoring agent decide. |
 | Apple Foundation Models (inside the product) | Runs on the phone and rewrites true facts into a short note for the family. It never decides anything. |
-| Codex | Dashboard accessibility fixes, decision UI tests, and synthetic gallery captures for issue #16. |
+| Codex | Dashboard accessibility, scam-sequence evidence, benchmark report generation, local PostgreSQL tests, original SVG design handoff, and synthetic gallery/video captures. |
 
 All code in this repository was written during the event window. The scam models
 are trained by us; the project is not a reskin of an existing AI tool.
@@ -243,6 +237,7 @@ license. Required by Devpost rule 10 and [`docs/RULES.md`](docs/RULES.md).
 | [eslint](https://github.com/eslint/eslint) | 9.39.5 | MIT |
 | [eslint-config-next](https://github.com/vercel/next.js) | 16.4.2 | MIT |
 | [vitest](https://github.com/vitest-dev/vitest) | 5.0.5 | MIT |
+| [@electric-sql/pglite](https://github.com/electric-sql/pglite) | 0.5.10 | Apache-2.0 |
 | [@playwright/test](https://github.com/microsoft/playwright) | 1.64.1 | Apache-2.0 |
 | [tsx](https://github.com/privatenumber/tsx) | 4.23.15 | MIT |
 

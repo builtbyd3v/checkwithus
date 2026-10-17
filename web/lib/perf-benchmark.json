@@ -1,0 +1,52 @@
+{
+  "measuredAt": "2026-10-17",
+  "version": "2.30.2, PostgreSQL 18.6",
+  "provenance": "Recorded run previously published in docs/perf.md; values transcribed without rerunning the live benchmark.",
+  "rows": 1000000,
+  "circles": 200,
+  "payees": 40,
+  "years": 3,
+  "warmup": 3,
+  "runs": 21,
+  "queries": [
+    {
+      "key": "dashboard",
+      "name": "Dashboard weekly chart (1 circle, 13 weeks)",
+      "rawMs": 2.61,
+      "columnstoreMs": 2.75,
+      "aggregateMs": 1.1,
+      "speedup": 2.4
+    },
+    {
+      "key": "baseline",
+      "name": "Unusual-spending baseline (1 circle, 1 category, 90 days)",
+      "rawMs": 2.57,
+      "columnstoreMs": 3,
+      "aggregateMs": 1.18,
+      "speedup": 2.2
+    },
+    {
+      "key": "payee",
+      "name": "\"Her usual\" at one payee (1 circle, 1 year)",
+      "rawMs": 7.92,
+      "columnstoreMs": 8.55,
+      "aggregateMs": 2.65,
+      "speedup": 3
+    },
+    {
+      "key": "all_circles",
+      "name": "Weekly totals, all 200 circles, 3 years",
+      "rawMs": 2077.43,
+      "columnstoreMs": 1517.67,
+      "aggregateMs": 150.23,
+      "speedup": 13.8
+    }
+  ],
+  "compression": {
+    "beforeMiB": 163.3,
+    "afterMiB": 50.3,
+    "ratio": 3.2,
+    "compressedChunks": 158,
+    "totalChunks": 158
+  }
+}

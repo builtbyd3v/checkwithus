@@ -16,6 +16,7 @@ calls a payment service and `/dashboard/preview` returns not-found in production
 | Denied | [Phone](dashboard-review-390-denied.png) | [Desktop](dashboard-review-1440-denied.png) |
 | Expired, blocked | [Phone](dashboard-review-390-expired.png) | [Desktop](dashboard-review-1440-expired.png) |
 | Keyboard focus and long payee | [Phone](dashboard-review-390-keyboard-long-name.png) | [Desktop](dashboard-review-1440-keyboard-long-name.png) |
+| Cash then gift-card evidence (#17) | [Phone](dashboard-sequence-390.png) | See [sequence notes](../scam-sequence.md) |
 
 From `web/`, run:
 

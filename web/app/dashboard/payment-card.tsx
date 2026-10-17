@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { formatCents } from '@/lib/money';
 import type { familyPaymentView } from '@/lib/views';
+import type { SequenceEvidence } from '@/lib/scam-sequence';
 
 /** Words accompany every colour so a decision is understandable without colour. */
 const STATES: Record<string, { label: string; className: string }> = {
@@ -22,8 +23,8 @@ export type ReviewPayment = Pick<ReturnType<typeof familyPaymentView>,
   'status' | 'protectedName' | 'payee' | 'amountCents' | 'explanation' | 'holdReasons' | 'approvalsRequired'>;
 
 /** Shared with the local gallery so screenshots exercise the production layout. */
-export function PaymentCard({ payment, deadline, usualLine, children }: {
-  payment: ReviewPayment; deadline?: ReactNode; usualLine?: string | null; children?: ReactNode;
+export function PaymentCard({ payment, deadline, usualLine, sequence, children }: {
+  payment: ReviewPayment; deadline?: ReactNode; usualLine?: string | null; sequence?: SequenceEvidence; children?: ReactNode;
 }) {
   return <article className="min-w-0 rounded-xl border border-teal-900/10 bg-white p-5">
     <div className="flex flex-wrap items-center justify-between gap-2"><StateBadge status={payment.status} />
@@ -35,6 +36,16 @@ export function PaymentCard({ payment, deadline, usualLine, children }: {
     {usualLine && <p className="mt-3 text-base font-semibold text-rose-900">{usualLine}</p>}
     <p className="mt-3 text-sm leading-6 text-stone-700">{payment.explanation || 'This payment triggered a safety rule and needs a family decision.'}</p>
     <ul className="mt-4 flex flex-wrap gap-2" aria-label="Reasons for hold">{payment.holdReasons.map((reason) => <li key={reason.code} className="max-w-full rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-700 [overflow-wrap:anywhere]">{reason.label}</li>)}</ul>
+    {sequence && <section aria-label="Cash then gift card sequence" className="mt-4 rounded-lg border border-amber-900/20 bg-amber-50 p-4 text-sm text-amber-950">
+      <h4 className="font-semibold">Cash, then a gift card</h4>
+      <ol className="mt-2 list-decimal space-y-2 pl-5">
+        <li><strong>{formatCents(sequence.cashCents)} cash</strong> at <span className="[overflow-wrap:anywhere]">{sequence.atmName}</span><br />
+          <time dateTime={sequence.cashAt}>{new Date(sequence.cashAt).toUTCString()}</time></li>
+        <li><strong>{formatCents(payment.amountCents)} gift card request</strong><br />
+          <time dateTime={sequence.paymentAt}>{new Date(sequence.paymentAt).toUTCString()}</time></li>
+      </ol>
+      <p className="mt-3">These happened within two hours. Call {payment.protectedName} before deciding.</p>
+    </section>}
     {payment.status === 'held' && payment.approvalsRequired > 1 && <p className="mt-4 text-sm font-semibold text-stone-700">This payment needs {payment.approvalsRequired} different family approvers.</p>}
     {children}
   </article>;
