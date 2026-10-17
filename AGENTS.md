@@ -31,6 +31,12 @@ members approve risky payments with Face ID. All scam detection runs on the phon
 3. **Never send the older adult's texts or bills to a cloud AI model.** Scam
    detection runs on the phone.
 
+## Hackathon rules
+
+Read [docs/RULES.md](docs/RULES.md) before you build, submit, or write Devpost text.
+It holds the SwampHacks, Devpost and MLH rules and every judging criterion. If a task
+would break a rule there, stop and ask the team.
+
 ## Before you start: read the live state
 
 This file goes stale. The repo does not. Always begin by checking what has actually
