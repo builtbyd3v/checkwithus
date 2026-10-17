@@ -72,8 +72,9 @@ public struct ScamRules {
         Rule("withdraw_fee", "Asks you to pay a fee or deposit before you can get your money out",
              #"\b(pay|deposit|top ?up|send)\b.{0,60}\b(to|before you can|so you can)\s+(withdraw|unfreeze|claim|(unlock|release|access)\s+(the |your )?(funds|profits?|money|withdrawal|earnings|balance|assets))\b"#
                  + #"|\b(withdraw\w*|unlock|release)\b.{0,60}\b(must|need to|needs?|required|first)\b.{0,40}\b(fee|tax|deposit|pay)\b"#
-                 + #"|\b(before|to)\s+(withdraw\w*|unlock|release)\b.{0,60}\b(fee|deposit)\b"#,
-             unless: never + #"(pay|send|deposit|ask)\b|\bpenalty\b"#),
+                 + #"|\b(before|to)\s+(withdraw\w*|unlock|release)\b.{0,60}\b(fee|deposit)\b"#
+                 + #"|\b(fee|deposit|tax)\b.{0,40}\b(to|before you can|so you can)\s+(unlock|release|access)\b.{0,40}\b(withdraw\w*|profits?|funds|earnings)\b"#,
+             unless: never + #"(pay|send|deposit|ask)\b|\b(tax|withdrawal) penalty\b|\bpenalty (may |will )?apply\b|\b(401\(?k\)?|ira|hsa|403\(?b\)?|retirement)\b"#),
         Rule("toll_link", "Unpaid toll notice with a payment link",
              #"\btolls?\b(?![- ]?free).{0,120}"# + link,
              #"\b(unpaid|overdue|due|pay|payment|balance|outstanding|fee|fine|penalty|settle|final notice)\b"#),

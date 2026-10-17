@@ -26,6 +26,8 @@ final class RulesTests: XCTestCase {
             ("Your withdrawal of $88000 is on hold for a tax review. Pay $500 to release the funds.", "withdraw_fee"),
             ("Before withdrawal a security deposit of $49 is required.", "withdraw_fee"),
             ("Your crypto account shows $42000 profit. To withdraw you must first pay a $980 tax fee.", "withdraw_fee"),
+            ("Withdrawal frozen. You must pay the $3,950 clearing fee first to avoid a penalty.", "withdraw_fee"),
+            ("Pay the 15% fee to unlock your account and withdraw your profit.", "withdraw_fee"),
         ]
         for (text, rule) in cases {
             XCTAssertTrue(fired(text).contains(rule), "\(rule) did not fire on: \(text)")
@@ -68,6 +70,8 @@ final class RulesTests: XCTestCase {
             "Library: pay your $3 late fee to unlock your account and borrow again.",
             "I need to pay the parking fine to release the car from the impound lot",
             "HSA reminder: to withdraw for non-medical expenses you must pay a 20% tax penalty.",
+            "Fidelity: To withdraw from your 401(k) before 59 1/2 you may need to pay income tax.",
+            "Early withdrawal penalty may apply if you close your CD before it matures.",
         ]
         for text in legit {
             XCTAssertEqual(fired(text), [], "false hold on: \(text)")
