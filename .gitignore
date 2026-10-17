@@ -1,0 +1,27 @@
+# Team AI rules are shared in this repo (overrides personal global ignores)
+!AGENTS.md
+!CLAUDE.md
+
+# Secrets
+.env*
+!.env.example
+
+# Node / Next.js
+node_modules/
+.next/
+.vercel/
+
+# Python / ML
+.venv/
+__pycache__/
+ml/data/raw/
+*.safetensors
+*.gguf
+
+# Xcode
+xcuserdata/
+DerivedData/
+*.xcuserstate
+
+# OS
+.DS_Store
