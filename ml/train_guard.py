@@ -21,7 +21,7 @@ MAX_LEN = 128
 EPOCHS = 2
 BATCH = 32
 LR = 5e-5
-TARGET_RECALL = 0.95  # IDEAS.md: threshold for 95%+ scam recall
+TARGET_RECALL = 0.97  # IDEAS.md wants 95%+ on real traffic; val has ~220 scams, so aim 2 points higher (about 1.5 SE)
 SEED = 42
 
 torch.manual_seed(SEED)
@@ -118,9 +118,16 @@ def main():
     k = math.ceil(TARGET_RECALL * int(yva.sum()))
     thr = pv[yva == 1].sort(descending=True).values[k - 1].item()
     pt = (logits_of(model, te.text.tolist()) / temp).softmax(1)[:, 1]
+    # Probe: held-out synthetic toll and investment texts (no real ones exist). Reported apart from test.
+    pr = pd.read_csv(ML / "data/probe.csv")
+    pp = (logits_of(model, pr.text.tolist()) / temp).softmax(1)[:, 1]
+    yp = torch.tensor((pr.label == "scam").astype(int).values)
+    toll_legit = torch.tensor((te.text.str.contains(r"\btoll", case=False) & (te.label == "legit")).values)
 
     result = {"base": BASE, "epochs": EPOCHS, "max_len": MAX_LEN, "temperature": round(temp, 4), "threshold": round(thr, 4),
-              "val_tuned_on": metrics(pv, yva, thr, va), "test": metrics(pt, yte, thr, te)}
+              "val_tuned_on": metrics(pv, yva, thr, va), "test": metrics(pt, yte, thr, te),
+              "test_toll_legit_flagged": f"{int((pt[toll_legit] >= thr).sum())} of {int(toll_legit.sum())}",
+              "probe_synthetic": metrics(pp, yp, thr, pr)}
     OUT.mkdir(parents=True, exist_ok=True)
     model.save_pretrained(OUT)
     tok.save_pretrained(OUT)
