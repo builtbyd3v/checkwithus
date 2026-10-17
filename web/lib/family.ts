@@ -6,6 +6,7 @@
  */
 import 'server-only';
 import type pg from 'pg';
+import { transaction } from '@/lib/db';
 import { PAIRING_CODE_MINUTES } from '@/lib/auth/device';
 import { hashShortCode, newShortCode, normalizeShortCode } from '@/lib/auth/tokens';
 import { codeHashKey } from '@/lib/env';
@@ -14,12 +15,14 @@ import { issueInviteCode } from '@/lib/invites';
 export { issueInviteCode } from '@/lib/invites';
 import type { PaymentService } from '@/lib/payments';
 import { familyPaymentView } from '@/lib/views';
+import { requirePermission } from '@/lib/permissions';
 
 export type Membership = {
   circleId: string;
   memberId: string;
   protectedName: string;
   displayName: string;
+  role: 'approver' | 'viewer';
 };
 
 export async function memberships(pool: pg.Pool, sub: string): Promise<Membership[]> {
@@ -28,8 +31,9 @@ export async function memberships(pool: pg.Pool, sub: string): Promise<Membershi
     member_id: string;
     protected_name: string;
     display_name: string;
+    role: 'approver' | 'viewer';
   }>(
-    `select m.circle_id, m.id as member_id, c.protected_name, m.display_name
+    `select m.circle_id, m.id as member_id, c.protected_name, m.display_name, m.role
        from circle_members m join circles c on c.id = m.circle_id
       where m.auth0_sub = $1
       order by m.created_at`,
@@ -40,6 +44,7 @@ export async function memberships(pool: pg.Pool, sub: string): Promise<Membershi
     memberId: r.member_id,
     protectedName: r.protected_name,
     displayName: r.display_name,
+    role: r.role,
   }));
 }
 
@@ -115,11 +120,16 @@ export async function joinCircle(
   if (existing) return existing;
 
   try {
-    await pool.query(
-      `insert into circle_members (circle_id, auth0_sub, display_name) values ($1, $2, $3)
-       on conflict (circle_id, auth0_sub) do nothing`,
-      [circleId, sub, input.displayName],
-    );
+    await transaction(pool, async q => {
+      await q.query('select id from circles where id = $1 for update', [circleId]);
+      await q.query(
+        `insert into circle_members (circle_id, auth0_sub, display_name, role)
+         values ($1, $2, $3, case when exists (select 1 from circle_members where circle_id = $1)
+           then 'viewer' else 'approver' end)
+         on conflict (circle_id, auth0_sub) do nothing`,
+        [circleId, sub, input.displayName],
+      );
+    });
   } catch (error) {
     if (error instanceof Error && error.message === 'circle_full') {
       throw new HttpError(409, 'circle_full', 'This family circle already has three people');
@@ -131,7 +141,7 @@ export async function joinCircle(
 
 /** A one-time code to pair the older adult's phone. Shown once; stored hashed. */
 export async function createPairingCode(pool: pg.Pool, sub: string, circleId: string) {
-  await requireMembership(pool, sub, circleId);
+  await requirePermission(pool, sub, circleId, 'approve:payments');
   const code = newShortCode();
   const { rows } = await pool.query<{ expires_at: Date }>(
     `insert into pairing_codes (code_hash, circle_id, expires_at)
@@ -144,7 +154,7 @@ export async function createPairingCode(pool: pg.Pool, sub: string, circleId: st
 
 /** A fresh invite code for the circle; the old one stops working. */
 export async function rotateInviteCode(pool: pg.Pool, sub: string, circleId: string) {
-  await requireMembership(pool, sub, circleId);
+  await requirePermission(pool, sub, circleId, 'approve:payments');
   return issueInviteCode(pool, circleId);
 }
 

@@ -68,6 +68,9 @@ export function familyPaymentView(
     expiresAt: iso(payment.expiresAt),
     decidedAt: iso(payment.decidedAt),
     decidedVia: payment.decidedVia,
+    approvalsRequired: payment.approvalsRequired ?? 1,
+    allowanceId: payment.allowanceId ?? null,
+    billDueDate: payment.billDueDate ?? null,
     decidedByName: context.decidedByName,
     failure: payment.status === 'failed' ? payment.failure : null,
   };

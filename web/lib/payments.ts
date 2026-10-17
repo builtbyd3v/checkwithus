@@ -66,9 +66,13 @@ export type Payment = {
   nessieId: string | null;
   failure: string | null;
   createdAt: Date;
+  approvalsRequired?: number;
+  allowanceId?: string | null;
+  billDueDate?: string | null;
 };
 
 export type NewPayment = {
+  billDueDate?: string | null;
   /** Chosen by the phone; a retry with the same key returns the same payment. */
   idempotencyKey: string;
   amountCents: Cents;
@@ -112,7 +116,7 @@ const COLUMNS = `
   id, circle_id, amount_cents, payee_name, payee_kind, category, on_call,
   payee_known, guard_score, guard_model_version, explanation, hold_reasons,
   status, expires_at, decided_by, decided_via, decided_at, nessie_kind,
-  nessie_id, failure, created_at`;
+  nessie_id, failure, created_at, approvals_required, allowance_id, bill_due_date`;
 
 type PaymentRow = {
   id: string;
@@ -136,6 +140,9 @@ type PaymentRow = {
   nessie_id: string | null;
   failure: string | null;
   created_at: Date;
+  approvals_required: number;
+  allowance_id: string | null;
+  bill_due_date: Date | string | null;
 };
 
 function toPayment(row: PaymentRow): Payment {
@@ -161,6 +168,11 @@ function toPayment(row: PaymentRow): Payment {
     nessieId: row.nessie_id,
     failure: row.failure,
     createdAt: row.created_at,
+    approvalsRequired: row.approvals_required,
+    allowanceId: row.allowance_id,
+    billDueDate: row.bill_due_date instanceof Date
+      ? `${row.bill_due_date.getFullYear()}-${String(row.bill_due_date.getMonth()+1).padStart(2,'0')}-${String(row.bill_due_date.getDate()).padStart(2,'0')}`
+      : row.bill_due_date,
   };
 }
 
@@ -273,7 +285,20 @@ export function createPaymentService(deps: PaymentServiceDeps) {
       baselineFor(circle.id, input.category),
     ]);
 
-    const decision = decideHold({
+    const inserted = await transaction(pool, async q => {
+    const policy = await q.query<{ two_approvals_over_cents: number; hold_over_cents: number }>(
+      'select two_approvals_over_cents, hold_over_cents from circles where id = $1 for update', [circle.id],
+    );
+    const allowance = await q.query<{ id: string }>(
+      `select a.id from allowances a join circle_members m on m.id = a.granted_by
+       left join payees p on p.id = a.payee_id
+       where a.circle_id = $1 and a.revoked_at is null and a.expires_at > clock_timestamp()
+         and m.role = 'approver' and a.max_amount_cents >= $2
+         and ((p.kind = $3 and p.normalized_name = $4) or a.category = $5)
+       order by a.expires_at, a.id limit 1`,
+      [circle.id, input.amountCents, input.payeeKind, normalizeName(input.payeeName), input.category],
+    );
+    let decision = decideHold({
       payment: {
         amountCents: input.amountCents,
         category: input.category,
@@ -281,21 +306,32 @@ export function createPaymentService(deps: PaymentServiceDeps) {
         payeeKnown,
         onCall: input.onCall,
       },
-      holdOverCents: circle.holdOverCents,
+      holdOverCents: toCents(policy.rows[0]!.hold_over_cents),
       baseline,
       guard: input.guard ? { score: input.guard.score } : null,
     });
+    // A family allowance only lifts routine amount/baseline limits for a known
+    // payee. It never overrides scam categories, calls, Guard, or new payees.
+    const allowanceId = payeeKnown ? allowance.rows[0]?.id ?? null : null;
+    if (allowanceId && decision.action === 'hold') {
+      const reasons = decision.reasons.filter(r => r !== 'over_limit' && r !== 'unusual_spending');
+      decision = reasons.length ? { action: 'hold', reasons } : { action: 'allow' };
+    }
+    if (input.amountCents > policy.rows[0]!.two_approvals_over_cents) {
+      const reasons = decision.action === 'hold' ? decision.reasons : [];
+      decision = { action: 'hold', reasons: reasons.includes('over_limit') ? reasons : [...reasons, 'over_limit'] };
+    }
     const held = decision.action === 'hold';
 
-    const inserted = await pool.query<PaymentRow>(
+    return q.query<PaymentRow>(
       `insert into payments (
          circle_id, idempotency_key, amount_cents, payee_name, payee_kind, category,
          on_call, payee_known, guard_score, guard_model_version, explanation,
-         hold_reasons, status, expires_at, decided_via, decided_at)
+         hold_reasons, status, expires_at, decided_via, decided_at, approvals_required, allowance_id, bill_due_date)
        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
          case when $14 then now() + make_interval(secs => $15) end,
          case when $14 then null else 'rules' end,
-         case when $14 then null else now() end)
+         case when $14 then null else now() end, $16, $17, $18)
        on conflict (circle_id, idempotency_key) do nothing
        returning ${COLUMNS}`,
       [
@@ -310,12 +346,16 @@ export function createPaymentService(deps: PaymentServiceDeps) {
         input.guard?.score ?? null,
         input.guard?.modelVersion ?? null,
         input.explanation,
-        held ? decision.reasons : [],
+        decision.action === 'hold' ? decision.reasons : [],
         held ? 'held' : 'approved',
         held,
         circle.approvalTimeoutSeconds,
+        input.amountCents > policy.rows[0]!.two_approvals_over_cents ? 2 : 1,
+        !held ? allowanceId : null,
+        input.billDueDate ?? null,
       ],
     );
+    });
 
     if (!inserted.rows[0]) return replay(circle.id, input);
 
@@ -352,7 +392,8 @@ export function createPaymentService(deps: PaymentServiceDeps) {
       existing.onCall === input.onCall &&
       existing.guardScore === (input.guard?.score ?? null) &&
       existing.guardModelVersion === (input.guard?.modelVersion ?? null) &&
-      existing.explanation === input.explanation;
+      existing.explanation === input.explanation &&
+      existing.billDueDate === (input.billDueDate ?? null);
     if (!same) {
       throw new PaymentError(
         'idempotency_conflict',
@@ -376,24 +417,49 @@ export function createPaymentService(deps: PaymentServiceDeps) {
     const bySub = 'auth0Sub' in input.member ? input.member.auth0Sub : null;
     const byId = 'memberId' in input.member ? input.member.memberId : null;
 
-    const { rows } = await pool.query<PaymentRow>(
-      `update payments p
-          set status = $2, decided_by = m.id, decided_via = $3,
-              decided_at = now(), updated_at = now()
-         from circle_members m
-        where p.id = $1
-          and m.circle_id = p.circle_id
-          and (m.auth0_sub = $4 or m.id = $5)
-          and p.status = 'held'
-          and p.expires_at > now()
-       returning ${COLUMNS.replace(/(\w+)/g, 'p.$1')}`,
-      [input.paymentId, input.decision === 'approve' ? 'approved' : 'denied', input.via, bySub, byId],
-    );
-
-    if (rows[0]) {
-      const decided = toPayment(rows[0]);
-      return decided.status === 'approved' ? executePayment(decided.id) : decided;
-    }
+    const decided = await transaction(pool, async (client) => {
+      const locked = await client.query<PaymentRow>(
+        `select ${COLUMNS.replace(/(\w+)/g, 'p.$1')} from payments p
+         where p.id = $1 and exists (select 1 from circle_members m
+           where m.circle_id = p.circle_id and (m.auth0_sub = $2 or m.id = $3)
+             and m.role = 'approver') for update`,
+        [input.paymentId, bySub, byId],
+      );
+      const row = locked.rows[0];
+      if (!row) throw new PaymentError('not_found', 'Payment not found or approval permission missing');
+      if (row.status !== 'held') return null;
+      const member = await client.query<{ id: string }>(
+        `select id from circle_members where circle_id = $1 and role = 'approver'
+         and (auth0_sub = $2 or id = $3) for share`, [row.circle_id, bySub, byId],
+      );
+      if (!member.rows[0]) throw new PaymentError('not_found', 'Approval permission missing');
+      const voted = await client.query(
+        `insert into payment_votes(payment_id, member_id, decision, via)
+         select $1, $2, $3, $4 where exists
+           (select 1 from payments where id = $1 and expires_at > clock_timestamp())
+         on conflict do nothing`,
+        [row.id, member.rows[0].id, input.decision, input.via],
+      );
+      if (!voted.rowCount) {
+        const live = await client.query('select 1 from payments where id = $1 and expires_at > clock_timestamp()', [row.id]);
+        return live.rowCount ? toPayment(row) : null;
+      }
+      const tally = await client.query<{ denied: boolean; approvals: number }>(
+        `select coalesce(bool_or(v.decision = 'deny'), false) as denied,
+           count(*) filter(where v.decision = 'approve')::int as approvals
+         from payment_votes v join circle_members m on m.id = v.member_id
+         where v.payment_id = $1 and m.role = 'approver'`, [row.id],
+      );
+      if (!tally.rows[0]!.denied && tally.rows[0]!.approvals < row.approvals_required) return toPayment(row);
+      const updated = await client.query<PaymentRow>(
+        `update payments set status = $2, decided_by = $3, decided_via = $4,
+          decided_at = clock_timestamp(), updated_at = clock_timestamp()
+         where id = $1 and status = 'held' and expires_at > clock_timestamp() returning ${COLUMNS}`,
+        [row.id, tally.rows[0]!.denied ? 'denied' : 'approved', member.rows[0].id, input.via],
+      );
+      return updated.rows[0] ? toPayment(updated.rows[0]) : null;
+    });
+    if (decided) return decided.status === 'approved' ? executePayment(decided.id) : decided;
 
     // It did not win. Say why, without revealing payments in other circles.
     const { rows: visible } = await pool.query<PaymentRow>(
@@ -503,7 +569,8 @@ export function createPaymentService(deps: PaymentServiceDeps) {
           const body = paidBillBody({
             ...common,
             payee: payment.payeeName,
-            nickname: taggedDescription(CATEGORY_LABELS[payment.category], payment.id),
+            nickname: taggedDescription(`${CATEGORY_LABELS[payment.category]}${payment.billDueDate ? ` due ${payment.billDueDate}` : ''}`, payment.id),
+            dueDate: payment.billDueDate ?? undefined,
           });
           kind = 'bill';
           send = () => nessie.createBill(circle.nessieAccountId, body);

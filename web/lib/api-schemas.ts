@@ -27,7 +27,8 @@ export const createPaymentBody = z.strictObject({
     .default(null),
   /** checkwith-1's explanation for the family, written on the phone. */
   explanation: z.string().trim().max(2000).nullable().default(null),
-});
+  billDueDate: z.iso.date().nullable().default(null),
+}).refine(v => v.billDueDate === null || v.payee.kind === 'biller', 'Only bills have a due date');
 
 export const pairBody = z.strictObject({
   code: z.string().min(8).max(20),

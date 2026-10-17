@@ -76,6 +76,7 @@ export type CibaClientOptions = {
   domain: string;
   clientId: string;
   clientSecret: string;
+  audience?: string;
   fetch?: FetchLike;
   /** Key set for verifying ID tokens. Defaults to the tenant's published keys. */
   keys?: JWTVerifyGetKey;
@@ -103,11 +104,22 @@ export function createCibaClient(options: CibaClientOptions) {
   }
 
   /** Sends the push. Throws CibaError if Auth0 will not (e.g. member not enrolled). */
-  async function start(input: { sub: string; bindingMessage: string; expirySeconds: number }) {
+  async function start(input: { sub: string; bindingMessage: string; expirySeconds: number;
+    payment?: { amountCents: Cents; payee: string; reasons: string[] } }) {
     let result;
     try {
       result = await post('bc-authorize', {
         scope: 'openid',
+        ...(options.audience ? { audience: options.audience } : {}),
+        ...(input.payment ? { authorization_details: JSON.stringify([{
+          type: 'urn:auth0:schemas:authorization-details:v1:payment',
+          instruction: 'Approve or deny this held payment.',
+          properties: {
+            amount: { display: true, name: 'Amount (USD)', display_order: 1, value: formatCents(input.payment.amountCents) },
+            payee: { display: true, name: 'Payee', display_order: 2, value: input.payment.payee },
+            reason: { display: true, name: 'Why it paused', display_order: 3, value: input.payment.reasons.join(', ').slice(0, 255) },
+          },
+        }]) } : {}),
         binding_message: input.bindingMessage,
         // 300 or less is what makes Auth0 use mobile push rather than email.
         requested_expiry: String(Math.max(1, Math.min(300, Math.floor(input.expirySeconds)))),

@@ -21,6 +21,7 @@ export const POST = handle(async (request) => {
     onCall: body.onCall,
     guard: body.guard,
     explanation: body.explanation,
+    billDueDate: body.billDueDate,
   });
 
   // 201 when this request created it; a replayed idempotency key is still a success.
