@@ -28,6 +28,8 @@ body {
   --color-sage: #56654e;
   --color-sage-deep: #45523f;
   --color-screen: #fbfaf8;
+  --color-decline: #c4352b;
+  --color-answer: #3a7d44;
 }
 
 @theme inline {

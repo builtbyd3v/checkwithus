@@ -5,11 +5,12 @@ import type { ReactNode } from 'react';
 
 type PhoneScreenProps = { children: ReactNode; dark?: boolean; className?: string };
 
-export function PhoneScreen({ children, dark = false, className = '' }: PhoneScreenProps) {
+/** `className` replaces the default height, so pass one (for example h-[400px]) when overriding. */
+export function PhoneScreen({ children, dark = false, className = 'h-[600px]' }: PhoneScreenProps) {
   return (
     <div
       data-ui
-      className={`flex h-[600px] w-[340px] flex-col rounded-[44px] px-7 pt-5 pb-8 font-sans ${dark ? 'bg-ink text-paper' : 'bg-screen text-ink'} ${className}`}
+      className={`flex w-[340px] max-w-full flex-col rounded-[44px] px-7 pt-5 pb-8 font-sans ${dark ? 'bg-ink text-paper' : 'bg-screen text-ink'} ${className}`}
     >
       <div className="flex justify-between text-[15px] font-semibold">
         <span>9:41</span>
@@ -22,7 +23,7 @@ export function PhoneScreen({ children, dark = false, className = '' }: PhoneScr
 
 function AskButton() {
   return (
-    <span className="mt-auto flex h-16 items-center justify-center rounded-full bg-sage text-xl font-semibold text-white">
+    <span className="mt-auto flex h-16 shrink-0 items-center justify-center rounded-full bg-sage text-xl font-semibold text-white">
       Ask my family
     </span>
   );
@@ -77,13 +78,13 @@ export function CallScreen() {
       <p className="mt-4 text-center text-lg text-paper/80">This number is on a scam list.</p>
       <div className="mt-auto flex justify-between px-4 text-center text-[15px]">
         <span>
-          <span className="mb-2 flex size-[72px] items-center justify-center rounded-full bg-[#c4352b] text-white">
+          <span className="mb-2 flex size-[72px] items-center justify-center rounded-full bg-decline text-white">
             <svg viewBox="0 0 24 24" className="size-8 rotate-[135deg]" fill="currentColor" aria-hidden="true"><path d="M6.6 10.8a15 15 0 006.6 6.6l2.2-2.2a1 1 0 011-.25 11.4 11.4 0 003.6.57 1 1 0 011 1V20a1 1 0 01-1 1A17 17 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1c0 1.25.2 2.45.57 3.57a1 1 0 01-.25 1z" /></svg>
           </span>
           Decline
         </span>
         <span>
-          <span className="mb-2 flex size-[72px] items-center justify-center rounded-full bg-[#3a7d44] text-white">
+          <span className="mb-2 flex size-[72px] items-center justify-center rounded-full bg-answer text-white">
             <svg viewBox="0 0 24 24" className="size-8" fill="currentColor" aria-hidden="true"><path d="M6.6 10.8a15 15 0 006.6 6.6l2.2-2.2a1 1 0 011-.25 11.4 11.4 0 003.6.57 1 1 0 011 1V20a1 1 0 01-1 1A17 17 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1c0 1.25.2 2.45.57 3.57a1 1 0 01-.25 1z" /></svg>
           </span>
           Answer
@@ -110,3 +111,12 @@ export function PaymentScreen({ held, amount, payee, reasons, className }: Payme
     </PhoneScreen>
   );
 }
+
+/** One screen per story step: the hero, then each block in "What your parent sees". */
+export const SCREENS = [
+  <SafeScreen key="safe" />,
+  <TextsScreen key="texts" />,
+  <CallScreen key="call" />,
+  <PaymentScreen key="paused" held amount="$500.00" payee="Gift cards" reasons={['Gift card purchase', 'Paid while on a phone call']} />,
+  <SafeScreen key="safe-again" />,
+];

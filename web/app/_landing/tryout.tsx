@@ -39,14 +39,15 @@ function Toggle({ checked, onChange, children }: ToggleProps) {
     <label className="flex min-h-12 cursor-pointer items-center justify-between gap-4 text-lg has-focus-visible:outline-3 has-focus-visible:outline-offset-4 has-focus-visible:outline-paper">
       {children}
       <input type="checkbox" role="switch" checked={checked} onChange={(e) => onChange(e.target.checked)} className="sr-only" />
-      <span aria-hidden="true" className={`flex h-8 w-14 shrink-0 items-center rounded-full p-1 transition-colors duration-200 ${checked ? 'bg-sage' : 'bg-paper/25'}`}>
-        <span className={`size-6 rounded-full bg-paper transition-transform duration-200 ${checked ? 'translate-x-6' : ''}`} />
+      {/* Both track colours keep 3:1 or more against the ink field. */}
+      <span aria-hidden="true" className={`flex h-8 w-14 shrink-0 items-center rounded-full p-1 transition-colors duration-200 ${checked ? 'bg-paper' : 'bg-paper/50'}`}>
+        <span className={`size-6 rounded-full transition-transform duration-200 ${checked ? 'translate-x-6 bg-sage' : 'bg-ink'}`} />
       </span>
     </label>
   );
 }
 
-export function Tryout({ heading }: { heading: [string, string] }) {
+export function Tryout() {
   const [kindId, setKindId] = useState('gift');
   const [amount, setAmount] = useState(50_000);
   const [onCall, setOnCall] = useState(true);
@@ -65,63 +66,56 @@ export function Tryout({ heading }: { heading: [string, string] }) {
 
   return (
     <section id="try" aria-labelledby="try-heading" className="grid scroll-mt-4 lg:grid-cols-2">
-      <div className="flex flex-col bg-ink px-5 pt-16 pb-8 text-paper sm:px-12 lg:min-h-[90svh] lg:pt-[12svh]">
+      <div className="bg-ink px-5 pt-16 pb-10 text-paper sm:px-12 lg:py-24">
         <div className="max-w-[34rem]">
-          <p className="rise text-[clamp(1.375rem,1.1rem+0.8vw,1.75rem)] leading-snug">
-            Build a payment. The rules the app runs decide what happens. AI can add a reason to pause, and nothing lets it remove one.
+          <h2 id="try-heading" className="rise font-display text-[clamp(2.75rem,1.6rem+4vw,5.5rem)] leading-none tracking-[-0.02em]">Try a payment.</h2>
+          <p className="rise-late mt-6 text-[clamp(1.375rem,1.1rem+0.8vw,1.75rem)] leading-snug">
+            The rules the app runs decide what happens. AI can add a reason to pause, and nothing lets it remove one.
           </p>
-          <fieldset className="rise-late mt-10">
-            <legend className="text-[15px] text-paper/80">What is it for?</legend>
+          <fieldset className="mt-10">
+            <legend className="text-lg text-paper/85">What is it for?</legend>
             <div className="mt-3 flex flex-wrap gap-2">
               {KINDS.map((k) => (
                 <Choice key={k.id} name="kind" checked={k.id === kindId} onChange={() => setKindId(k.id)}>{k.label}</Choice>
               ))}
             </div>
           </fieldset>
-          <fieldset className="rise-late mt-7">
-            <legend className="text-[15px] text-paper/80">How much?</legend>
+          <fieldset className="mt-7">
+            <legend className="text-lg text-paper/85">How much?</legend>
             <div className="mt-3 flex flex-wrap gap-2">
               {AMOUNTS.map((a) => (
                 <Choice key={a} name="amount" checked={a === amount} onChange={() => setAmount(a)}>{formatCents(toCents(a))}</Choice>
               ))}
             </div>
           </fieldset>
-          <div className="rise-late mt-7 max-w-[26rem] space-y-1">
+          <div className="mt-7 max-w-[26rem] space-y-1">
             <Toggle checked={onCall} onChange={setOnCall}>On a phone call right now</Toggle>
-            <Toggle checked={known} onChange={setKnown}>Paid this payee before</Toggle>
+            <Toggle checked={known} onChange={setKnown}>On the family&rsquo;s approved list</Toggle>
           </div>
         </div>
-        <h2 id="try-heading" className="mt-16 font-display text-[clamp(2.75rem,1.6rem+4vw,5.5rem)] leading-none tracking-[-0.02em] lg:mt-auto">
-          {heading[0]}
-        </h2>
       </div>
 
-      <div className="flex flex-col bg-paper px-5 pt-10 pb-16 sm:px-12 lg:min-h-[90svh] lg:px-8 lg:pt-[12svh] lg:pb-8">
-        <p aria-hidden="true" className="font-display text-[clamp(2.75rem,1.6rem+4vw,5.5rem)] leading-none tracking-[-0.02em] lg:order-last lg:mt-auto lg:text-right">
-          {heading[1]}
-        </p>
-        <div className="mt-10 flex flex-wrap items-start gap-5 lg:mt-0">
-          <PaymentScreen held={held} amount={money} payee={kind.payee} reasons={reasons} className="h-[460px] max-w-full lg:h-[540px]" />
-          <div data-ui className="w-[340px] max-w-full rounded-[28px] bg-panel p-6 xl:w-[296px]">
-            <p className="text-[15px] text-soft">What the family gets</p>
-            <div aria-live="polite">
-              {held ? (
-                <>
-                  <p className="mt-3 text-[22px] leading-snug font-semibold">Approve {money} to {kind.payee}?</p>
-                  <ul className="mt-4 space-y-2 text-lg leading-snug">
-                    {reasons.map((r) => (
-                      <li key={r} className="flex gap-3"><span aria-hidden="true" className="mt-2.5 size-2 shrink-0 rounded-full bg-sage" />{r}</li>
-                    ))}
-                  </ul>
-                  <p className="mt-5 text-[17px] text-soft">{amount > TWO_APPROVALS_OVER ? 'Over $1,000, so two of three approvers must say yes.' : 'One approver can decide.'} No answer means no payment.</p>
-                </>
-              ) : (
-                <>
-                  <p className="mt-3 text-[22px] leading-snug font-semibold">Nothing. It paid.</p>
-                  <p className="mt-4 text-lg leading-snug">No rule fired, so nobody gets a push. It shows in the family&rsquo;s spending history.</p>
-                </>
-              )}
-            </div>
+      <div className="flex flex-wrap content-start items-start gap-5 bg-paper px-5 pt-8 pb-16 sm:px-12 lg:px-8 lg:py-24">
+        <PaymentScreen held={held} amount={money} payee={kind.payee} reasons={reasons} className="h-[480px] max-w-full lg:h-[540px]" />
+        <div data-ui className="w-[340px] max-w-full rounded-[28px] bg-panel p-6 xl:w-[296px]">
+          <p className="text-lg text-soft">What the family gets</p>
+          <div aria-live="polite">
+            {held ? (
+              <>
+                <p className="mt-3 text-[22px] leading-snug font-semibold">Approve {money} to {kind.payee}?</p>
+                <ul className="mt-4 space-y-2 text-lg leading-snug">
+                  {reasons.map((r) => (
+                    <li key={r} className="flex gap-3"><span aria-hidden="true" className="mt-2.5 size-2 shrink-0 rounded-full bg-sage" />{r}</li>
+                  ))}
+                </ul>
+                <p className="mt-5 text-lg text-soft">{amount > TWO_APPROVALS_OVER ? 'Over $1,000, two approvers must say yes. One no stops it.' : 'One approver can decide.'} No answer means no payment.</p>
+              </>
+            ) : (
+              <>
+                <p className="mt-3 text-[22px] leading-snug font-semibold">Nothing. It paid.</p>
+                <p className="mt-4 text-lg leading-snug">No rule fired, so nobody gets a push. It shows in the family&rsquo;s spending history.</p>
+              </>
+            )}
           </div>
         </div>
       </div>

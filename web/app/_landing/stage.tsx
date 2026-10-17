@@ -1,15 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { CallScreen, PaymentScreen, SafeScreen, TextsScreen } from './screens';
+import { SCREENS } from './screens';
 
-const SCREENS = [
-  <SafeScreen key="safe" />,
-  <TextsScreen key="texts" />,
-  <CallScreen key="call" />,
-  <PaymentScreen key="paused" held amount="$500.00" payee="Gift cards" reasons={['Gift card purchase', 'Paid while on a phone call']} />,
-  <SafeScreen key="safe-again" />,
-];
 
 /** The still half of the page: her iPhone screen, which changes as each story block reaches the reading line. */
 export function Stage({ className }: { className: string }) {
