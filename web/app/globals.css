@@ -17,3 +17,114 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
+
+/* Landing page, "warm and human" option (app/_landing-airbnb). White canvas, warm ink, one coral voltage. */
+@theme {
+  --color-cw-ink: #222222;
+  --color-cw-body: #3f3f3f;
+  --color-cw-muted: #5c5c5c;
+  --color-cw-soft: #f7f7f7;
+  --color-cw-warm: #fff4ef;
+  --color-cw-blush: #ffe4dc;
+  --color-cw-coral: #d23f3a;
+  --color-cw-coral-deep: #b3312d;
+  --color-cw-safe: #1d7a4e;
+  --color-cw-safe-tint: #e3f3ea;
+  --color-cw-sky: #dcedf6;
+
+  --animate-cw-in: cw-in 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-cw-pop: cw-pop 0.7s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  --animate-cw-float: cw-float 6s ease-in-out infinite;
+  --animate-cw-buzz: cw-buzz 2.4s ease-in-out infinite;
+  --animate-cw-ring: cw-ring 2s ease-out infinite;
+  --animate-cw-steam: cw-steam 3.2s ease-in-out infinite;
+  --animate-cw-sway: cw-sway 3.6s ease-in-out infinite;
+  --animate-cw-coin: cw-coin 2.8s cubic-bezier(0.5, 0, 0.3, 1) infinite;
+  --animate-cw-beat: cw-beat 2.4s ease-in-out infinite;
+}
+
+@theme inline {
+  --font-warm: var(--font-figtree);
+}
+
+@keyframes cw-in {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes cw-pop {
+  from { opacity: 0; transform: translateY(12px) scale(0.92); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes cw-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes cw-buzz {
+  0%, 60%, 100% { transform: rotate(0); }
+  64% { transform: rotate(-7deg); }
+  68% { transform: rotate(7deg); }
+  72% { transform: rotate(-6deg); }
+  76% { transform: rotate(6deg); }
+  80% { transform: rotate(0); }
+}
+@keyframes cw-ring {
+  from { opacity: 0.7; transform: scale(0.7); }
+  to { opacity: 0; transform: scale(1.5); }
+}
+@keyframes cw-steam {
+  0% { opacity: 0; transform: translateY(6px); }
+  40% { opacity: 0.8; }
+  100% { opacity: 0; transform: translateY(-14px); }
+}
+@keyframes cw-sway {
+  0%, 100% { transform: rotate(-8deg); }
+  50% { transform: rotate(10deg); }
+}
+@keyframes cw-coin {
+  0% { opacity: 0; transform: translateX(0) translateY(0); }
+  15% { opacity: 1; }
+  50% { transform: translateX(60px) translateY(-26px); }
+  85% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(120px) translateY(0); }
+}
+@keyframes cw-beat {
+  0%, 100% { transform: scale(1); }
+  15% { transform: scale(1.14); }
+  30% { transform: scale(1); }
+}
+
+/* SVG parts rotate and scale around their own middle. */
+@utility cw-origin {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* Scroll-linked entrance over the first 200 to 320px of travel, so tall blocks finish early.
+   No support or reduced motion: content shows as is. */
+@utility cw-reveal {
+  @media (prefers-reduced-motion: no-preference) {
+    @supports (animation-timeline: view()) {
+      animation: cw-in linear both;
+      animation-timeline: view();
+      animation-range: entry 0px entry 200px;
+    }
+  }
+}
+@utility cw-reveal-2 {
+  @media (prefers-reduced-motion: no-preference) {
+    @supports (animation-timeline: view()) {
+      animation: cw-in linear both;
+      animation-timeline: view();
+      animation-range: entry 40px entry 260px;
+    }
+  }
+}
+@utility cw-reveal-3 {
+  @media (prefers-reduced-motion: no-preference) {
+    @supports (animation-timeline: view()) {
+      animation: cw-in linear both;
+      animation-timeline: view();
+      animation-range: entry 80px entry 320px;
+    }
+  }
+}
