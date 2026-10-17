@@ -121,13 +121,19 @@ enum Screen: Equatable {
         guard let token else { return }
         // ponytail: the Guard scores the payment's own words (payee + category). There is no text here to read;
         // the server treats the score as advisory and its fixed rules decide.
-        let verdict = try? Self.guardModel?.check("\(payee.name) \(payee.category.replacingOccurrences(of: "_", with: " "))")
-        let request = attempt ?? API.PaymentRequest(
-            idempotencyKey: UUID().uuidString, amountCents: cents,
-            payee: .init(name: payee.name, kind: payee.kind), category: payee.category, onCall: isOnCall,
-            guard: verdict.map { .init(score: $0.probability, modelVersion: "guard-ngram-1") }, explanation: nil)
-        attempt = request
+        let onCall = isOnCall
         await run {
+            if self.attempt == nil {
+                let verdict = try? Self.guardModel?.check("\(payee.name) \(payee.category.replacingOccurrences(of: "_", with: " "))")
+                let explanation = await Explainer.explain(.init(
+                    name: self.config?.protectedName ?? "They", amount: dollars(cents), payee: payee.name,
+                    category: payee.category, onCall: onCall))
+                self.attempt = API.PaymentRequest(
+                    idempotencyKey: UUID().uuidString, amountCents: cents,
+                    payee: .init(name: payee.name, kind: payee.kind), category: payee.category, onCall: onCall,
+                    guard: verdict.map { .init(score: $0.probability, modelVersion: "guard-ngram-1") }, explanation: explanation)
+            }
+            guard let request = self.attempt else { return }
             let payment = try await API.pay(request, token: token)
             self.payment = payment
             self.go(.status)

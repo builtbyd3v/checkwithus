@@ -48,6 +48,6 @@ Setup: one iPhone as the older adult, the MacBook dashboard as the family, Googl
 - Screen Time app lock
 - Usability test with older adults (later, not this weekend)
 
-## Open decisions (ask Dev)
-- Bank-while-on-a-call alert on the phone (needs #13's bank/ATM list)
-- An AI agent using Apple's on-device model to explain holds and request approval
+## Decided (Oct 17)
+- Bank-while-on-a-call alert: build it once #13 lands the ATM and branch list. #25
+- On-device AI: explanation only, not a full agent. Code picks the true facts; Apple's on-device model rewrites them into a short note for the family. #26
