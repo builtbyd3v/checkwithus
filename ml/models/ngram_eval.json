@@ -1,0 +1,96 @@
+{
+  "bits": 18,
+  "char_ns": [
+    3,
+    4,
+    5
+  ],
+  "threshold": 0.649731,
+  "val_tuned_on": {
+    "n": 854,
+    "accuracy": 0.9766,
+    "scam_recall": 0.9726,
+    "precision": 0.9383,
+    "false_hold_rate": 0.022,
+    "recall_by_type": {
+      "bank_alert": {
+        "n": 34,
+        "recall": 1.0
+      },
+      "delivery": {
+        "n": 36,
+        "recall": 1.0
+      },
+      "impostor": {
+        "n": 2,
+        "recall": 1.0
+      },
+      "investment": {
+        "n": 6,
+        "recall": 1.0
+      },
+      "other": {
+        "n": 108,
+        "recall": 0.944
+      },
+      "prize": {
+        "n": 33,
+        "recall": 1.0
+      }
+    }
+  },
+  "test": {
+    "n": 884,
+    "accuracy": 0.9717,
+    "scam_recall": 0.9597,
+    "precision": 0.9407,
+    "false_hold_rate": 0.0236,
+    "recall_by_type": {
+      "bank_alert": {
+        "n": 34,
+        "recall": 1.0
+      },
+      "delivery": {
+        "n": 35,
+        "recall": 1.0
+      },
+      "gift_card": {
+        "n": 2,
+        "recall": 1.0
+      },
+      "impostor": {
+        "n": 32,
+        "recall": 0.969
+      },
+      "investment": {
+        "n": 6,
+        "recall": 1.0
+      },
+      "other": {
+        "n": 105,
+        "recall": 0.914
+      },
+      "prize": {
+        "n": 34,
+        "recall": 1.0
+      }
+    }
+  },
+  "probe_synthetic": {
+    "n": 40,
+    "accuracy": 0.65,
+    "scam_recall": 0.5667,
+    "precision": 0.9444,
+    "false_hold_rate": 0.1,
+    "recall_by_type": {
+      "delivery": {
+        "n": 15,
+        "recall": 1.0
+      },
+      "investment": {
+        "n": 15,
+        "recall": 0.133
+      }
+    }
+  }
+}
