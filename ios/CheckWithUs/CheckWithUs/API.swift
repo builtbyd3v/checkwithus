@@ -69,6 +69,8 @@ struct API {
     struct BankLocation: Decodable {
         struct Coordinates: Decodable { let latitude: Double; let longitude: Double }
         let id: String
+        /// atm or branch
+        let kind: String
         let name: String
         let coordinates: Coordinates?
     }

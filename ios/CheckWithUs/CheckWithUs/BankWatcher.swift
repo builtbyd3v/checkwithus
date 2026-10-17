@@ -2,16 +2,19 @@ import CallKit
 import CoreLocation
 import SwiftUI
 import UIKit
+import os
 
-/// Bank-while-on-a-call alert (#25). Watches the nearest Nessie ATMs and branches with region monitoring. When the
-/// phone is at one while a call is active, the family gets one alert per visit. Only the bank's name is sent, never
-/// the phone's location.
+/// Bank-while-on-a-call alert (#25). Watches the nearest Nessie ATMs and branches with CLMonitor. When the phone is
+/// at one while a call is active, the family gets one alert per visit. Only the bank's name is sent, never the
+/// phone's location.
 @Observable final class BankWatcher: NSObject, CLLocationManagerDelegate, CXCallObserverDelegate {
     static let shared = BankWatcher()
 
     struct Bank: Codable {
         let id: String
         let name: String
+        /// atm or branch
+        let kind: String
         let latitude: Double
         let longitude: Double
     }
@@ -27,23 +30,27 @@ import UIKit
     #if DEBUG
     /// The simulator cannot place a call: toggle on Home, or launch with `-pretendCall YES`.
     var pretendCall = UserDefaults.standard.bool(forKey: "pretendCall") {
-        didSet { UserDefaults.standard.set(pretendCall, forKey: "pretendCall"); checkAll() }
+        didSet { UserDefaults.standard.set(pretendCall, forKey: "pretendCall"); if pretendCall { callStarted() } }
     }
     #endif
 
     @ObservationIgnored private let manager = CLLocationManager()
     @ObservationIgnored private let calls = CXCallObserver()
+    @ObservationIgnored private var monitor: CLMonitor?
+    /// iOS 18+ only monitors for an app that holds a service session.
+    @ObservationIgnored private var session: CLServiceSession?
     @ObservationIgnored private var banks = UserDefaults.standard.data(forKey: "banks")
         .flatMap { try? JSONDecoder().decode([Bank].self, from: $0) } ?? [] {
         didSet { UserDefaults.standard.set(try? JSONEncoder().encode(banks), forKey: "banks") }
     }
-    /// Regions already alerted for this visit; cleared when the phone leaves. Saved, so a relaunch does not repeat.
+    /// Banks already alerted for this visit; cleared when the phone leaves. Saved, so a relaunch does not repeat.
     @ObservationIgnored private var alerted = Set(UserDefaults.standard.stringArray(forKey: "bankAlerted") ?? []) {
         didSet { UserDefaults.standard.set(Array(alerted), forKey: "bankAlerted") }
     }
     /// iOS monitors at most 20 regions per app.
     private static let maxRegions = 20
     private static let radius: CLLocationDistance = 150
+    private static let log = Logger(subsystem: "us.checkwith.app", category: "Bank")
 
     private var isOnCall: Bool {
         #if DEBUG
@@ -54,11 +61,11 @@ import UIKit
 
     override init() {
         super.init()
-        // Created at launch (MyApp.init), so a background relaunch for a region event finds its delegate.
         manager.delegate = self
         calls.setDelegate(self, queue: nil)
         status = manager.authorizationStatus
-        watching = manager.monitoredRegions.count
+        // Created at launch (MyApp.init): a background relaunch for a bank event must read the events right away.
+        Task { await listen() }
     }
 
     /// When In Use first; the Always prompt follows in locationManagerDidChangeAuthorization, as Apple requires.
@@ -69,7 +76,7 @@ import UIKit
         guard status == .authorizedAlways || status == .authorizedWhenInUse, let token = TokenStore.load(),
               let list = try? await API.bankLocations(token: token) else { return }
         // Only entries with coordinates can be a region (web/INTEGRATION.md).
-        banks = list.compactMap { b in b.coordinates.map { Bank(id: b.id, name: b.name, latitude: $0.latitude, longitude: $0.longitude) } }
+        banks = list.compactMap { b in b.coordinates.map { Bank(id: b.id, name: b.name, kind: b.kind, latitude: $0.latitude, longitude: $0.longitude) } }
         manager.requestLocation()
     }
 
@@ -77,6 +84,7 @@ import UIKit
         status = manager.authorizationStatus
         if status == .authorizedWhenInUse { manager.requestAlwaysAuthorization() }
         guard status == .authorizedAlways || status == .authorizedWhenInUse else { return }
+        if session == nil { session = CLServiceSession(authorization: .always) }
         // Wakes the app after about 500 m of travel, to re-pick the nearest 20.
         manager.startMonitoringSignificantLocationChanges()
         Task { await refresh() }
@@ -84,55 +92,83 @@ import UIKit
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let here = locations.last else { return }
-        let distance = { (b: Bank) in here.distance(from: CLLocation(latitude: b.latitude, longitude: b.longitude)) }
-        let nearest = allBanks.sorted { distance($0) < distance($1) }.prefix(Self.maxRegions)
-        let wanted = Set(nearest.map(\.id))
-        for region in manager.monitoredRegions where !wanted.contains(region.identifier) {
-            manager.stopMonitoring(for: region)
-            alerted.remove(region.identifier)
-        }
-        let have = Set(manager.monitoredRegions.map(\.identifier))
-        for bank in nearest where !have.contains(bank.id) {
-            let center = CLLocationCoordinate2D(latitude: bank.latitude, longitude: bank.longitude)
-            manager.startMonitoring(for: CLCircularRegion(center: center, radius: Self.radius, identifier: bank.id))
-        }
-        watching = nearest.count
+        Task { await pick(near: here) }
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: any Error) {}
 
-    /// Covers "already inside when monitoring starts".
-    func locationManager(_ manager: CLLocationManager, didStartMonitoringFor region: CLRegion) {
-        manager.requestState(for: region)
+    /// Covers "already inside when the call starts".
+    func callObserver(_ callObserver: CXCallObserver, callChanged call: CXCall) {
+        if !call.hasEnded { callStarted() }
     }
 
-    /// iOS calls this on every boundary crossing as well as for requestState.
-    func locationManager(_ manager: CLLocationManager, didDetermineState state: CLRegionState, for region: CLRegion) {
-        if state == .outside { alerted.remove(region.identifier) }
-        guard state == .inside, isOnCall, !alerted.contains(region.identifier),
-              let bank = allBanks.first(where: { $0.id == region.identifier }),
-              let token = TokenStore.load() else { return }
-        alerted.insert(region.identifier)
-        // A region event gives a backgrounded app a few seconds; ask for enough to finish the request.
+    private func callStarted() {
+        Task { await checkAll() }
+        // A fresh fix also runs the distance backup in pick(near:).
+        manager.requestLocation()
+    }
+
+    private func listen() async {
+        let monitor = await CLMonitor("banks")
+        self.monitor = monitor
+        watching = await monitor.identifiers.count
+        do {
+            for try await event in await monitor.events { handle(event.identifier, event.state) }
+        } catch {
+            Self.log.error("Bank monitor: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    private func pick(near here: CLLocation) async {
+        guard let monitor else { return }
+        let distance = { (b: Bank) in here.distance(from: CLLocation(latitude: b.latitude, longitude: b.longitude)) }
+        let nearest = allBanks.sorted { distance($0) < distance($1) }.prefix(Self.maxRegions)
+        let wanted = Set(nearest.map(\.id))
+        for id in await monitor.identifiers where !wanted.contains(id) {
+            await monitor.remove(id)
+            alerted.remove(id)
+        }
+        let have = Set(await monitor.identifiers)
+        for bank in nearest where !have.contains(bank.id) {
+            let center = CLLocationCoordinate2D(latitude: bank.latitude, longitude: bank.longitude)
+            // No assumed state: an assumed "outside" is echoed back as an event and would clear the dedupe.
+            await monitor.add(CLMonitor.CircularGeographicCondition(center: center, radius: Self.radius), identifier: bank.id)
+        }
+        watching = nearest.count
+        // Backup from the fix itself: simulators report CLMonitor geofences as unsupported, and a wakeup fix may
+        // land inside before the geofence fires. Undecided while the fix is too rough to tell.
+        for bank in nearest {
+            if distance(bank) <= Self.radius { handle(bank.id, .satisfied) }
+            if distance(bank) - here.horizontalAccuracy > Self.radius { handle(bank.id, .unsatisfied) }
+        }
+        // Covers "app opened (or woken) while already inside during a call".
+        await checkAll()
+    }
+
+    private func checkAll() async {
+        guard let monitor else { return }
+        for id in await monitor.identifiers {
+            if let state = await monitor.record(for: id)?.lastEvent.state { handle(id, state) }
+        }
+    }
+
+    private func handle(_ id: String, _ state: CLMonitor.Event.State) {
+        Self.log.info("Bank \(id, privacy: .public): \(String(describing: state), privacy: .public), on call \(self.isOnCall)")
+        if state == .unsatisfied { alerted.remove(id) }
+        guard state == .satisfied, isOnCall, !alerted.contains(id),
+              let bank = allBanks.first(where: { $0.id == id }), let token = TokenStore.load() else { return }
+        alerted.insert(id)
+        // A bank event gives a backgrounded app a few seconds; ask for enough to finish the request.
         let task = UIApplication.shared.beginBackgroundTask()
         Task {
             defer { UIApplication.shared.endBackgroundTask(task) }
             do {
-                try await API.bankAlert(detail: "At \(bank.name) while on a phone call.", token: token)
+                try await API.bankAlert(detail: "At a bank (\(bank.name) \(bank.kind == "atm" ? "ATM" : "branch")) while on a phone call.", token: token)
             } catch {
                 // Not sent: let the next check try again.
-                alerted.remove(region.identifier)
+                alerted.remove(id)
             }
         }
-    }
-
-    /// Covers "already inside when the call starts".
-    func callObserver(_ callObserver: CXCallObserver, callChanged call: CXCall) {
-        if !call.hasEnded { checkAll() }
-    }
-
-    private func checkAll() {
-        for region in manager.monitoredRegions { manager.requestState(for: region) }
     }
 
     private var allBanks: [Bank] { banks + [testBank].compactMap { $0 } }
@@ -142,7 +178,7 @@ import UIKit
         #if DEBUG
         // "lat,lng", from "Make this spot a test bank" or `-testBank 29.6436,-82.3549`.
         let parts = (UserDefaults.standard.string(forKey: "testBank") ?? "").split(separator: ",").compactMap { Double($0) }
-        if parts.count == 2 { return Bank(id: "test-bank", name: "the test bank", latitude: parts[0], longitude: parts[1]) }
+        if parts.count == 2 { return Bank(id: "test-bank", name: "Test", kind: "branch", latitude: parts[0], longitude: parts[1]) }
         #endif
         return nil
     }
@@ -151,7 +187,11 @@ import UIKit
     func markTestBank() {
         guard let here = manager.location?.coordinate else { return }
         UserDefaults.standard.set("\(here.latitude),\(here.longitude)", forKey: "testBank")
-        manager.requestLocation()
+        // Drop the old spot's geofence; the next fix re-adds it at the new spot.
+        Task {
+            await monitor?.remove("test-bank")
+            manager.requestLocation()
+        }
     }
     #endif
 }
