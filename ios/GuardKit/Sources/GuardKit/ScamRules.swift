@@ -65,7 +65,24 @@ public struct ScamRules {
                  + #"|\b(buy|purchase|pick up|get)\b.{0,30}"# + card + #".{0,80}\b(fee|fine|bail|codes?|text me|send me|pay)\b"#,
              card),
         Rule("crypto_payment", "Asks you to send cryptocurrency",
-             #"\b(send|deposit|transfer|pay|buy|put)\b.{0,40}\b(bitcoin|btc|usdt|tether|crypto|ethereum)\b|\b(bitcoin|crypto) (atm|kiosk|machine)\b"#),
+             #"\b(send|deposit|transfer|pay|buy|put)\b.{0,40}\b(bitcoin|btc|usdt|tether|crypto|ethereum)\b|\b(bitcoin|crypto) (atm|kiosk|machine)\b"#,
+             unless: never + #"(send|deposit|transfer|pay|buy|put)\b"#),
+        // Investment scams (pig butchering): the pitch, the promised returns, and the fee to "withdraw" fake profit.
+        // The "wrong number" opener has no rule on purpose: alone it reads like a real wrong number.
+        Rule("withdraw_fee", "Asks you to pay a fee or deposit before you can get your money out",
+             #"\b(pay|deposit|top ?up|send)\b.{0,60}\b(to|before you can|so you can)\s+(withdraw|unlock|release|unfreeze|access|claim)\b"#
+                 + #"|\b(withdraw\w*|unlock|release)\b.{0,60}\b(must|need to|needs?|required|first)\b.{0,40}\b(fee|tax|deposit|pay)\b"#
+                 + #"|\b(before|to)\s+(withdraw\w*|unlock|release)\b.{0,60}\b(fee|deposit)\b"#,
+             unless: never + #"(pay|send|deposit|ask)\b"#),
+        Rule("trading_pitch", "Pushes you to join a trading, crypto or investment app",
+             #"\b(trading|trade|crypto|coins?|forex|stocks?|(trading|stock|crypto|gold) signals?|mining|gold (contract|futures)|invest\w*)\b"#,
+             #"\b(i mentioned|i told you about|i recommended|walk you through|guide you|teach you|show you how|i (will|can|'ll) help you|"#
+                 + #"your first trade|add you to (the|our|my) group|private group|vip (members?|group|club))\b"#,
+             unless: never + #"(download|install|join|invest|trade|deposit|send|share|ask)\b"#),
+        Rule("high_returns", "Promises guaranteed or very high investment returns",
+             #"\b(guaranteed|steady)\b.{0,20}\b(returns?|profits?)\b"#
+                 + #"|\b(pays?|earn\w*|make|making|returns?|profits?)\b.{0,20}\b\d+% (a |per )?(day|daily|week|weekly)\b"#
+                 + #"|\b\d+% (daily|weekly|monthly) (returns?|profits?|interest)\b"#),
         Rule("toll_link", "Unpaid toll notice with a payment link",
              #"\btolls?\b(?![- ]?free).{0,120}"# + link,
              #"\b(unpaid|overdue|due|pay|payment|balance|outstanding|fee|fine|penalty|settle|final notice)\b"#),

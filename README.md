@@ -23,7 +23,7 @@ Contributors and agents: read [AGENTS.md](AGENTS.md) first, then
 
 ## Model evaluation
 
-Test set: real texts only (Mendeley, NCSU, UCI), no near-duplicates of training rows. Threshold set on val. The 97% val target (v2 and tiny) was picked after seeing one test result ([DECISIONS 26](ml/data/DECISIONS.md)), so those test numbers are slightly optimistic. Probe: 40 held-out synthetic toll and investment texts (no real ones exist). Data: `ml/data/REPORT.md`.
+Test set: real texts only (Mendeley, NCSU, UCI), no near-duplicates of training rows. Threshold set on val. The 97% val target (v2 and tiny) was picked after seeing one test result ([DECISIONS 26](ml/data/DECISIONS.md)), so those test numbers are slightly optimistic. Probe in this table: the first 40-row probe of synthetic toll and investment texts (no real ones exist); the current 85-row probe is under "Investment scams" below. Data: `ml/data/REPORT.md`.
 
 | Model | Test n | Accuracy | Scam recall | False holds | ECE | Delivery + toll recall (test / probe) | Investment recall (test / probe) | iPhone latency |
 |---|---|---|---|---|---|---|---|---|
@@ -35,6 +35,21 @@ Test set: real texts only (Mendeley, NCSU, UCI), no near-duplicates of training 
 | **Guard tiny: char + word n-grams, logistic regression, 1 MB (runs in the Message Filter)** | 884 | | 96.0% | 2.4% | | 100% / 100% | 100% (6) / 13% | **11 ms, 2.6 MB on iPhone 18 Pro Max** |
 
 v1 and v2 use slightly different test sets (the data changed), so compare with care. Legit "Toll Free" texts in test held by v2: 0 of 3. Rules hold 0 of 6,382 legit texts across train, val and test. The Message Filter extension is killed above roughly 25-30 MB (measured with a probe on iOS 26), so DistilBERT (67 MB) runs only in the main app; the tiny model runs in the filter.
+
+### Investment scams (probe v2, Oct 17)
+
+Pig-butchering scams start as a friendly "wrong number" text, build trust, then pitch a trading app and finally ask for a "fee" to withdraw fake profit. The probe now scores those stages apart: 10 openers, 30 pitch and fee texts, and 30 legit texts (brokerage alerts, money talk, real wrong numbers). The test set's 6 "investment" rows are mostly fake Binance login-code texts, not this scam. 3 new rules (`withdraw_fee`, `trading_pitch`, `high_returns`; 12 in all) target the pitch and fee stages.
+
+| | Opener (10) | Pitch + fee (30) | Probe legit held (30) | Test scam recall | Test false holds |
+|---|---|---|---|---|---|
+| Tiny model alone | 0% | 26.7% | 6.7% | 96.0% | 2.4% |
+| 12 rules alone | 0% | 90.0% | 0% | 3.6% | 0.0% |
+| **Rules + tiny model (the Message Filter)** | 0% | **96.7%** | 6.7% | 96.0% | 2.4% |
+
+- **The opener is let through on purpose.** On its own it reads like a real wrong number, so holding it would hold real texts. The payment hold (crypto, new payee, unusual amount) is the catch for the money step.
+- **These pitch numbers are optimistic.** The same person (with Claude Code) wrote the probe texts and the rules, in one session, with the probe in view. A fair number needs new texts written by someone who has not seen `synth.py` or `ScamRules.swift`.
+- The 12 rules hold 0 legit texts across train, val, test, synthetic and probe. Measured with a Python copy of the Swift rules and scorer, which reproduces the tiny model's README numbers exactly; confirm with `swift run guard-eval`.
+- The tiny model is not retrained yet. `synthetic.csv` has 17 investment pitch templates (40 rows) and 30 investment-themed legit rows waiting for `build.py` + `train_ngram.py`.
 
 ## AI tool disclosure
 

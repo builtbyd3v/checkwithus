@@ -23,6 +23,13 @@ final class RulesTests: XCTestCase {
             ("USPS: package on hold, update address at usps-redeliver.info/r1", "lookalike_domain"),
             ("Account locked. Verify at https://secure.paypalsecurity.net/login", "lookalike_domain"),
             ("Photos from Sunday are ready! https://apple.com.example.com/view", "lookalike_domain"),
+            ("Your withdrawal of $88000 is on hold for a tax review. Pay $500 to release the funds.", "withdraw_fee"),
+            ("Before withdrawal a security deposit of $49 is required.", "withdraw_fee"),
+            ("Your crypto account shows $42000 profit. To withdraw you must first pay a $980 tax fee.", "withdraw_fee"),
+            ("Hi Noah, it's Kevin from the yoga class. Did you get a chance to look at the trading app I mentioned?", "trading_pitch"),
+            ("Kevin here :) I just closed my position, +9% today. Download Lumacoin and I'll walk you through your first trade.", "trading_pitch"),
+            ("Guaranteed 18% weekly returns with our Bitcoin trading signals.", "high_returns"),
+            ("Liquidity mining pays 9% a day. Connect your wallet here and start earning", "high_returns"),
         ]
         for (text, rule) in cases {
             XCTAssertTrue(fired(text).contains(rule), "\(rule) did not fire on: \(text)")
@@ -51,6 +58,14 @@ final class RulesTests: XCTestCase {
             "Chase fraud alert: Never install AnyDesk or share your screen with a caller.",
             "Your toll statement is ready at https://www.sunpass.com",
             "Thanks for calling. Our toll-free support line is listed at https://example.com/help",
+            "Fidelity: We will never ask you to send crypto or pay a fee to withdraw your money.",
+            "ATM withdrawal fee of $3.00 was charged to your account ending 4421.",
+            "To withdraw early from your 401(k), a 10% tax penalty may apply. Talk to your advisor.",
+            "Fidelity: Your withdrawal of $500 was sent to your checking account.",
+            "Get 15% daily cashback at Publix this week!",
+            "Weekly returns are due Friday, bring the library books",
+            "Robinhood: Your order to buy 2 shares of AAPL was filled.",
+            "Sorry, wrong number! I was trying to reach my sister.",
         ]
         for text in legit {
             XCTAssertEqual(fired(text), [], "false hold on: \(text)")

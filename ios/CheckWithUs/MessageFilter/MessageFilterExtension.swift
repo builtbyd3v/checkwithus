@@ -2,7 +2,7 @@
 //  MessageFilterExtension.swift
 //  MessageFilter
 //
-//  Screens texts from unknown senders with GuardKit (9 rules + tiny n-gram model), all on the phone.
+//  Screens texts from unknown senders with GuardKit (12 rules + tiny n-gram model), all on the phone.
 //  The extension is killed above roughly 25-30 MB (measured on iOS 26), so DistilBERT (67 MB) cannot run here.
 //
 

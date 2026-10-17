@@ -1,6 +1,6 @@
 # Scam dataset report (2026-10-16)
 
-- **9,346 rows** in `scams.csv`: 6,382 legit, 2,964 scam. Splits: train 7,608 / val 854 / test 884. Plus `probe.csv`: 40 held-out synthetic rows.
+- **9,346 rows** in `scams.csv`: 6,382 legit, 2,964 scam. Splits: train 7,608 / val 854 / test 884. Plus `probe.csv`: 85 held-out synthetic rows (probe v2, DECISIONS 29).
 - **Val and test are 100% real text** (Mendeley, NCSU, UCI). Generated sources (our synthetic, AI-in-the-Loop, CloveAI) all go to train. Val sets the threshold, so it must look like real traffic.
 - **No near-duplicates across splits:** rows are clustered (character 5-gram Jaccard >= 0.75) and whole clusters go to one split; `check.py` re-tests with its own search at 0.8 and finds 0.
 - **Biggest gap:** no real, openly licensed grandparent, romance or tech-support texts exist. Those types are generated only, so test has 0 of them.
@@ -73,7 +73,7 @@ v2 (current). Threshold set on val for 97% scam recall; test scored once. Full n
 |---|---|---|---|---|---|
 | val (threshold tuned here) | 854 | 97.3% | 94.3% | 2.1% | 0.019 |
 | test | 884 | 93.9% | 96.7% | 1.3% | 0.014 |
-| probe (synthetic, held-out templates) | 40 | toll 100%, investment 13% | 100% | 0% | |
+| probe v1 (synthetic, held-out templates) | 40 | toll 100%, investment 13% | 100% | 0% | |
 
 - Misses the 95% test target by about 1 point. The weakest types are `delivery` (88.6%) and `prize` (91.2%).
 - Investment: real crypto texts in test are caught (6 of 6), but pig-butchering openers ("sorry, wrong number") are not (2 of 15 probe rows caught). Pitch limit: the text filter will miss many of these; the payment hold and the crypto app lock are the real catch.
