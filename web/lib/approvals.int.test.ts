@@ -374,6 +374,110 @@ describe('answers from Guardian', () => {
   });
 });
 
+describe('over the two-approval limit, through Guardian', () => {
+  const AUDIENCE = 'https://api.checkwith.us/';
+  /** $1,500: over the default $1,000 limit, so two approvers must say yes. */
+  const holdLarge = () =>
+    service.createPayment(circleId, { ...scam, amountCents: toCents(150_000), idempotencyKey: `ciba2-${crypto.randomUUID()}` });
+
+  beforeEach(() => {
+    // The production wiring: API audience and payment details in the push.
+    approvals = createCibaApprovals({
+      pool,
+      ciba: createCibaClient({
+        ...FAKE_AUTH0, audience: AUDIENCE, richAuthorizationDetails: true, fetch: auth0.fetch, keys: auth0.keys,
+      }),
+      payments: () => service,
+    });
+  });
+
+  const votes = async (paymentId: string) =>
+    (await pool.query('select 1 from payment_votes where payment_id = $1', [paymentId])).rowCount;
+
+  /** Maria approves in Guardian; once Leo's open push is checked, her vote counts, and it is still held. */
+  const firstApprovalCounted = async (paymentId: string) => {
+    auth0.answer(MARIA, 'approve');
+    await makeDue(paymentId);
+    await approvals.pollPayment(paymentId, circleId);
+    await makeDueFor(paymentId, LEO);
+    await approvals.pollPayment(paymentId, circleId);
+    expect(await votes(paymentId)).toBe(1);
+    expect((await service.getPayment(paymentId))!.status).toBe('held');
+    expect(nessieFake.paymentWrites()).toHaveLength(0);
+  };
+
+  it('the push shows the amount, payee, plain-words reasons and that two approvals are needed', async () => {
+    const payment = await holdLarge();
+    expect(payment.approvalsRequired).toBe(2);
+    const push = [...auth0.pushes.values()].find((p) => p.sub === MARIA)!;
+    expect(push.audience).toBe(AUDIENCE);
+    expect(push.message).toBe('Rosa: 1,500.00 USD to QuickGift Cards');
+    expect(push.details).toMatchObject([{
+      properties: {
+        amount: { value: '$1,500.00' },
+        payee: { value: 'QuickGift Cards' },
+        reason: { value: expect.stringContaining('Gift card purchase') },
+        approvals: { value: '2 family approvers' },
+        amount_cents: { display: false, value: 150_000 },
+      },
+    }]);
+  });
+
+  it('one Guardian approval is not enough; the second approver releases it, once', async () => {
+    const payment = await holdLarge();
+    await firstApprovalCounted(payment.id);
+
+    auth0.answer(LEO, 'approve');
+    await makeDue(payment.id);
+    await approvals.pollPayment(payment.id, circleId);
+
+    expect(await service.getPayment(payment.id)).toMatchObject({ status: 'paid', decidedVia: 'ciba' });
+    expect(nessieFake.paymentWrites()).toHaveLength(1);
+    expect(await votes(payment.id)).toBe(2);
+  });
+
+  it('one approval, then one Deny: the Deny stops it', async () => {
+    const payment = await holdLarge();
+    await firstApprovalCounted(payment.id);
+
+    auth0.answer(LEO, 'deny');
+    await makeDue(payment.id);
+    await approvals.pollPayment(payment.id, circleId);
+
+    expect(await service.getPayment(payment.id)).toMatchObject({ status: 'denied', decidedVia: 'ciba' });
+    expect(nessieFake.paymentWrites()).toHaveLength(0);
+  });
+
+  it('an approval mixing Guardian and the app counts both, from distinct approvers', async () => {
+    const payment = await holdLarge();
+    await service.decidePayment({ paymentId: payment.id, member: { auth0Sub: LEO }, decision: 'approve', via: 'app' });
+    expect((await service.getPayment(payment.id))!.status).toBe('held');
+
+    auth0.answer(MARIA, 'approve');
+    await makeDue(payment.id);
+    await approvals.pollPayment(payment.id, circleId);
+    await makeDueFor(payment.id, LEO);
+    await approvals.pollPayment(payment.id, circleId);
+
+    expect((await service.getPayment(payment.id))!.status).toBe('paid');
+    expect(nessieFake.paymentWrites()).toHaveLength(1);
+  });
+
+  it('a Guardian approval whose Auth0 token lacks approve:payments does not count', async () => {
+    const payment = await holdLarge();
+    auth0.answer(MARIA, 'approve', { permissions: ['read:payments'] });
+    auth0.answer(LEO, 'approve', { permissions: ['approve:payments'] });
+    await makeDue(payment.id);
+    await approvals.pollPayment(payment.id, circleId);
+
+    expect((await service.getPayment(payment.id))!.status).toBe('held');
+    expect((await requestsFor(payment.id)).find((s) => s.sub === MARIA)).toMatchObject({
+      state: 'failed', last_error: expect.stringMatching(/approve:payments/),
+    });
+    expect(nessieFake.paymentWrites()).toHaveLength(0);
+  });
+});
+
 describe('asking Auth0 politely (rule 8)', () => {
   it('does not poll before the interval Auth0 asked for', async () => {
     const payment = await hold();
@@ -407,5 +511,29 @@ describe('asking Auth0 politely (rule 8)', () => {
 
     expect(auth0.tokenPolls()).toHaveLength(0);
     expect((await requestsFor(payment.id)).filter((s) => s.state === 'pending')).toHaveLength(0);
+  });
+});
+
+describe('a member demoted after their push went out', () => {
+  it('cannot decide, and does not jam the payment for the rest of the family', async () => {
+    const payment = await hold();
+    auth0.answer(MARIA, 'deny');
+    auth0.answer(LEO, 'approve');
+    // Maria is made a viewer after the push reached her phone.
+    await pool.query(`update circle_members set role = 'viewer' where circle_id = $1 and auth0_sub = $2`, [circleId, MARIA]);
+    try {
+      await makeDue(payment.id);
+
+      // Polling must keep working: it is the older adult's "Waiting for family" screen.
+      await approvals.pollPayment(payment.id, circleId);
+
+      // Her recorded answer no longer counts: it is superseded, never retried...
+      expect((await requestsFor(payment.id)).find((s) => s.sub === MARIA)).toMatchObject({ state: 'superseded' });
+      // ...and Leo, still an approver, decides.
+      expect((await service.getPayment(payment.id))!.status).toBe('paid');
+      expect(nessieFake.paymentWrites()).toHaveLength(1);
+    } finally {
+      await pool.query(`update circle_members set role = 'approver' where circle_id = $1 and auth0_sub = $2`, [circleId, MARIA]);
+    }
   });
 });

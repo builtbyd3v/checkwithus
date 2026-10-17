@@ -2,69 +2,228 @@
 
 Scam protection where the older adult does nothing and the family does the work.
 
-Scam texts are filtered before they are read, scam calls ring as "Possible scam,"
-and risky payments pause until a family member approves them with Face ID. All
-scam detection runs on the phone — the older adult's texts and bills never leave
-the device.
+Scam texts are filtered before they are read. Scam calls ring as "Possible scam".
+Risky payments pause until a family member approves them. All scam detection runs
+on the phone, so the older adult's texts and bills never leave the device.
 
-Built at SwampHacks XII (Oct 16–18, 2026).
+Live at [checkwith.us](https://checkwith.us). Built at SwampHacks XII (Oct 16 to 18, 2026).
+
+> **TODO(Dev): before submission.** This README describes `main` after the PRs below are merged and deployed. For each line that is not merged by submission, cut the claims it lists.
+> - [ ] #30 family iPhone app: role picker, Auth0 login on the phone, Approvals (approve asks for Face ID), Alerts, Money (Freeze), Allowances screens
+> - [ ] #31 `spending_weekly` and `spending_payee_daily` aggregates, the 1M-row benchmark and the Tiger Data performance table
+> - [ ] #32 Freeze, the vault account, Nessie transfers, the "cash then gift card" hold, `npm run demo:atm`
+> - [ ] Landing page with the "Try a payment" widget: the one Dev picks of #33, #36, #37, #39, #42
+> - [ ] #34 bank-while-on-a-call alert
+> - [ ] #35 these docs
+> - [ ] #38 design principles, research and the iPhone gallery shots (`docs/design-principles.md`, `docs/research.md`)
+> - [ ] #40 Guardian push audience fix, opt-in payment details (`AUTH0_CIBA_RAR`), opt-in `approve:payments` RBAC (`AUTH0_RBAC`)
+> - [ ] #41 demo bank locations (`DEMO_BANK_LOCATIONS`), ledger balance fix, family top-up, pension deposits, migration 017
+> - [ ] #43 dashboard alerts list, "Nx usual" line, live Tiger Data speed card, dashboard gallery shots
+> - [ ] #44 iPhone accessibility pass
+> - [ ] The no-passcode fix (a phone with no passcode cannot approve). Until it merges, keep the caveat under "The family does the work".
+> - [ ] #45 test-only fix (flaky bill test); no claims depend on it
+> - [ ] #46 bill-pay agent (needs #40 first): the "Bill-pay agent" section, `npm run agent:bills`, migration 020. Until it merges, delete that section and the agent lines in Auth0 below.
+> - [ ] Merged `main` deployed to checkwith.us, migrations 014 to 017 (and 020 with #46) applied to the live database.
+
+## How it works
+
+One iPhone app serves both roles. On first launch it asks "I'm the one being
+protected" or "I'm family". The web at checkwith.us is the landing page and the
+family dashboard.
+
+**The older adult does nothing new.**
+- **Texts.** An iOS Message Filter extension runs our own on-device scam model (Guard tiny, 1 MB). Scam texts go to the Spam folder before they are read.
+- **Calls.** A Call Directory extension labels known scam numbers "Possible scam" on the incoming call screen.
+- **Payments.** The app has one big "Pay a bill" flow. Every payment goes to our server, which runs fixed code rules. A risky payment pauses, and the phone says the family will call. A lock-screen Live Activity shows the state; it updates while the app polls the server (in the foreground, or for a short time in the background), not by push.
+- **Help.** One big "Ask my family" button sends an alert to the family.
+- **Bank while on a call.** The phone watches the nearest bank and ATM locations from Nessie, plus any demo locations the server adds (`DEMO_BANK_LOCATIONS`). If the phone is inside one during a phone call, the family gets an alert with the bank's name, never the phone's location. Scammers often keep a victim on the line and send them to the bank.
+- **Accessibility.** Tested at the largest accessibility text size: pinned buttons on an opaque bar, no mid-word breaks, VoiceOver announces the real outcome, darker colors for contrast, 56 pt tap targets, and Reduce Motion stops the waiting pulse.
+
+**The family does the work.**
+- **Approve or deny** a held payment on the family iPhone app or the dashboard. The family sees the amount, the payee and each hold reason in plain words. On the phone, Approve first asks for Face ID or the passcode; that check runs on the phone. The server checks the approver's Auth0 token and circle role (and the `approve:payments` permission when `AUTH0_RBAC=true`). Deny needs no Face ID, because denying only stops money. TODO(Dev): today a phone with no passcode skips the check; keep this caveat until the no-passcode fix merges.
+- **Family circle.** Approvers decide; viewers only watch. Over a threshold (default $1,000), two approvers must say yes; one no stops it.
+- **Freeze.** One tap moves the whole spending balance to a vault account with one Nessie transfer, exactly once. New payments hold while frozen.
+- **Top up.** An approver adds money from their own Nessie account with one transfer ($1 to $10,000, whole dollars, fresh login, not while frozen). The API is built; the iPhone app has no top-up screen yet.
+- **Allowances.** Approvers grant a scoped, expiring permission, for example "utilities up to $400 until Nov 30". Inside it, a known payee can be paid over the usual limit with no approval. It never lifts gift card, crypto, wire, new payee, phone call or scam-check holds. The allowance is stored in our database (Tiger Data), granted after a fresh Auth0 login.
+- **Alerts.** "Ask my family" and "at a bank during a call" alerts show in the family app and on the dashboard, newest first. The family app polls every 10 seconds; there are no push notifications yet.
+- **Explanation.** Apple's on-device model (Foundation Models) rewrites the true facts about a held payment into a short, calm note for the family. Code picks the facts; the note is dropped if it loses one.
+- **Dashboard.** Waiting payments with "About Nx Rosa's usual at this payee", a weekly spending chart, the alerts list, and a "How fast this page is" card that times the real weekly query on the aggregate and on raw rows.
+
+**Hard rules.**
+1. AI suggests, code decides money. The Guard score can add a hold reason and can never remove one ([`web/lib/rules.ts`](web/lib/rules.ts)).
+2. Money is integer cents everywhere ([`web/lib/money.ts`](web/lib/money.ts)).
+3. The older adult's texts and bills never go to a cloud AI model.
+
+### What decides a hold
+
+[`decideHold`](web/lib/rules.ts) is a pure function. A payment holds if any of these is true:
+
+| Hold reason (as the family reads it) | Data behind it |
+| --- | --- |
+| Your family froze spending | The Freeze switch |
+| Gift card purchase, Crypto purchase, Wire transfer | Payment category |
+| Cash at an ATM, then a gift card. Scammers often ask for this. | Tiger Data time-window query: ATM cash in the last 2 hours |
+| Someone they have not paid before | The family's known payee list |
+| Over the limit you set | Circle limit (default: over $300) |
+| Much more than they usually spend on this | Tiger Data continuous aggregate `spending_daily`: more than 3x the typical day in that category |
+| Paid while on a phone call | The phone's call state (CallKit) |
+| Our scam check flagged it | On-device Guard score of 0.5 or more |
+
+The landing page has a "Try a payment" widget that runs this same `decideHold` function in the browser.
+
+### Bill-pay agent
+
+Rosa's bill-pay agent has its own Auth0 identity: a Machine-to-Machine app that signs in with the client credentials grant. Its token holds one scope, `pay:bills`.
+- **It can only ask.** `npm run agent:bills` calls `POST /api/v1/agent/bills/run`. For each known biller it proposes the next bill (due one month after the last one, for the last amount). That is a fixed rule with no AI model, and bill data never leaves our server except to Nessie.
+- **The same rules decide.** Every proposal goes through `createPayment`, the same path as the phone. Inside a live family allowance it pays with no push. Outside it, the payment is held and the family is asked once (family app, or a Guardian push with `APPROVAL_MODE=ciba`). It never pays a cycle twice and never asks again after a no.
+- **Least privilege.** It acts only in circles with a live allowance. The route checks RS256, our issuer and audience, `gty = client-credentials`, the agent's own `sub`, and `pay:bills`. Every family route rejects machine tokens (`403 agent_not_allowed`), so the agent can never approve, deny, freeze, unfreeze, grant allowances or change policy. Revoking the allowance stops it.
+- **Visible.** Each agent payment stores `initiated_by = 'agent'`; the dashboard shows "Paid by the bill agent under your Utilities allowance" or "Asked by the bill agent".
+
+TODO(Dev): the real M2M grant is not verified on the live Auth0 tenant yet. Create the M2M app with only `pay:bills`, set `AUTH0_AGENT_CLIENT_ID`, run `npm run agent:bills -- --within 14` once, then delete this line. Until then, say "tested against a fake Auth0".
+
+### Sponsor tech doing real work
+
+- **Capital One Nessie.** Each endpoint has a job. Customers and accounts: a spending account and a vault account. Merchants: payee categories. Purchases and bills: every allowed payment is sent to Nessie. Withdrawals and ATMs: the "cash then gift card" sequence. Transfers: Freeze, Unfreeze and the family top-up. Deposits: the seed writes Rosa's monthly pension as Nessie deposits, which add to her ledger balance. ATMs and branches: the bank-while-on-a-call alert. Nessie never updates its stored balance, so the available balance is our ledger minus reserved payments; Nessie's reported balance is shown for information. Client: [`web/lib/nessie/client.ts`](web/lib/nessie/client.ts).
+- **Auth0.** Login for the dashboard and native PKCE login in the family iPhone app. Signed API access tokens on every family route. Approver and viewer roles enforced on the server, plus an opt-in `approve:payments` RBAC permission (`AUTH0_RBAC=true`). A fresh login (no older than 5 minutes) before granting an allowance, changing roles, unfreezing or topping up. The bill-pay agent is its own Machine-to-Machine client with only `pay:bills`, and family routes reject machine tokens. Client-Initiated Backchannel Authentication (CIBA, part of Auth0 for AI Agents) is implemented: with `APPROVAL_MODE=ciba`, a held payment sends a Guardian push. With `AUTH0_CIBA_RAR=true` as well, the push carries the amount, payee and hold reasons as rich `authorization_details`. Both are off by default, tested only against a fake Auth0, and a live push is not verified. We fixed a bug where the push always sent `audience`, which the real tenant rejects. Code: [`web/lib/auth0/ciba.ts`](web/lib/auth0/ciba.ts), [`web/lib/auth/family.ts`](web/lib/auth/family.ts).
+- **Tiger Data.** `spending` is a hypertable with columnstore compression (segment by circle). Real-time continuous aggregates do the reading: `spending_daily` feeds the unusual-spending rule; `spending_weekly`, built on top of it, feeds the dashboard's weekly chart; `spending_payee_daily` feeds the dashboard's "About Nx usual" line (display only; it does not decide holds). A time-window query on the hypertable catches "ATM cash, then a gift card within 2 hours". The dashboard speed card times the weekly query live; the 1M-row numbers are below.
+- **GoDaddy Registry.** checkwith.us is our product name and our live domain.
+
+Design notes for the older adult screens: [`docs/design-principles.md`](docs/design-principles.md), with sources in [`docs/research.md`](docs/research.md) and screenshots in [`docs/gallery/`](docs/gallery/).
+
+Known limits: no push notifications (alerts and the lock-screen card update by polling). The allowance lives in our database, not in Auth0. No usability test with older adults yet.
+
+## Model evaluation
+
+Test set: 884 real texts (248 scam, 636 legit) from Mendeley, NCSU and UCI, with no near-duplicates of training rows. The threshold is set on the validation set. The 97% validation recall target (v2 and tiny) was picked after seeing one test result ([DECISIONS 26](ml/data/DECISIONS.md)), so those test numbers are slightly optimistic. "False holds" is the share of legit texts flagged as scam. Data report: [`ml/data/REPORT.md`](ml/data/REPORT.md).
+
+The app ships only Guard tiny (`NGramScorer`), in the Message Filter and in the app. Guard v2 (DistilBERT) is trained and evaluated but not shipped: at 67 MB it does not fit in the Message Filter.
+
+| Model | Shipped | Size | Test n | Accuracy | Scam recall | False holds | Mac speed per text |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| **Guard tiny: char + word n-grams, logistic regression** | **Yes** | 1 MB weights; 2.6 MB in the extension | 884 | 97.2% | 96.0% | 2.4% | 0.14 ms (Swift, with rules) |
+| Guard v2: DistilBERT, + toll and investment data (PyTorch) | No | | 884 | 97.4% | 94.0% | 1.3% | |
+| Guard v2, Core ML fp16 | No | 133.4 MB | 884 | | 93.5% | 1.3% | 1.3 ms |
+| Guard v2, Core ML 8-bit (`GuardInt8.mlpackage`) | No | 67 MB | 884 | | 94.0% | 1.1% | 1.50 ms (Swift, with rules) |
+| Rules only (`ios/GuardKit/ScamRules.swift`, 9 rules) | Yes, with Guard tiny | | 884 | | 2.4% | 0.0% | |
+| Guard v1: DistilBERT, val target 95% (older test set) | No | | 878 | 97.6% | 98.4% | 2.7% | |
+
+Adding the 9 rules to either model changes nothing on this test set (same recall and false holds in `guard-eval`).
+
+Probe set: 40 held-out synthetic texts (15 toll and delivery scams, 15 investment scams, 10 legit), because no real ones exist in open data.
+
+| Model | Scam recall (30) | Toll and delivery (15) | Investment (15) | False holds (10) |
+| --- | --- | --- | --- | --- |
+| Guard tiny | 56.7% | 100% | 13% | 10% |
+| Guard v2 (PyTorch) | 56.7% | 100% | 13% | 0% |
+| Rules only | 46.7% | | | 0% |
+| Rules + Guard v2 Core ML 8-bit, Swift | 56.7% | | | 0% |
+
+Notes:
+- v1 and v2 use slightly different test sets (the data changed), so compare with care.
+- The Message Filter extension is killed above roughly 25 to 30 MB (measured with a probe on iOS 26), so DistilBERT cannot run there ([DECISIONS 27](ml/data/DECISIONS.md)). The DistilBERT Core ML scorer stays in GuardKit (`CoreMLScorer`) for later.
+- The 9 rules hold 0 of 6,382 legit texts across train, val and test. Legit "Toll Free" texts in test held by v2: 0 of 3.
+- Weak spot: investment scams that open with "sorry, wrong number" (13% probe recall). The payment hold catches the money step instead.
+- Speeds are on an Apple M5 Pro Mac. We have no saved iPhone timing; the 2.6 MB extension memory was measured on one iPhone ([DECISIONS 27](ml/data/DECISIONS.md)).
+
+Sources: [`ml/models/ngram_eval.json`](ml/models/ngram_eval.json), [`ml/models/guard/eval.json`](ml/models/guard/eval.json), [`ml/models/coreml_eval.json`](ml/models/coreml_eval.json), [`ml/models/guard_eval_swift_test.txt`](ml/models/guard_eval_swift_test.txt) and [`ml/models/guard_eval_swift_probe.txt`](ml/models/guard_eval_swift_probe.txt) (output of `swift run -c release guard-eval <csv> GuardInt8.mlpackage` in `ios/GuardKit`), and [`ml/data/DECISIONS.md`](ml/data/DECISIONS.md). The v1 row is from `ml/models/guard/eval.json` at commit `07ecb35`.
+
+## Tiger Data performance
+
+Measured on Oct 17, 2026 on Tiger Cloud (TimescaleDB 2.30.2, PostgreSQL 18.6) with 1,000,000 synthetic rows in `spending` (200 circles, 40 payees each, 3 years). Server time from `explain (analyze, timing off)`, median of 21 warm runs after 3 warm-ups. Continuous aggregates fully materialized first.
+
+| Query | Raw, row store (ms) | Raw, columnstore (ms) | Continuous aggregate (ms) | Aggregate vs row store |
+| --- | ---: | ---: | ---: | ---: |
+| Dashboard weekly chart (1 circle, 13 weeks) | 2.61 | 2.75 | 1.10 | 2.4x faster |
+| Unusual-spending baseline (1 circle, 1 category, 90 days) | 2.57 | 3.00 | 1.18 | 2.2x faster |
+| "Her usual" at one payee (1 circle, 1 year) | 7.92 | 8.55 | 2.65 | 3.0x faster |
+| Weekly totals, all 200 circles, 3 years | 2077.43 | 1517.67 | 150.23 | 13.8x faster |
+
+Compression (columnstore, segment by circle): 163.3 MB to 50.3 MB, **3.2x smaller** (158 of 158 chunks).
+
+Aggregate times are a best case: everything was materialized, while in production the current week is computed live from raw rows. The queries are simplified versions of the dashboard and rules queries. Full method: [`docs/perf.md`](docs/perf.md). Reproduce with `npm run bench:perf` in `web/`, against a throwaway `wt_*` schema only.
+
+## Setup
+
+### Web (`web/`)
+
+Needs Node.js, npm, a Nessie key, an Auth0 tenant and a Tiger Cloud service.
+
+```bash
+cd web
+npm install
+cp .env.example .env.local     # fill in the values; only names are in the repo
+npm run check:auth0            # checks the Auth0 setup
+npm run db:migrate             # applies web/db/migrations to Tiger Data
+npm run seed:demo              # synthetic "Rosa" circle, payees, history, invite
+npm run dev                    # http://localhost:3000
+```
+
+Optional flags in `.env.example`: `APPROVAL_MODE` (`app` or `ciba`), `AUTH0_CIBA_RAR`, `AUTH0_RBAC`, `DEMO_BANK_LOCATIONS`. Demo helpers: `npm run demo:reset` (throwaway `wt_*` schema only, or `-- --live` for the real demo circle), `npm run demo:atm`, `npm run smoke:demo`, `npm run agent:bills` (needs `AUTH0_AGENT_CLIENT_ID` and `AUTH0_AGENT_CLIENT_SECRET`).
+
+Checks: `npm run typecheck && npm run build && npm test`. Database tests: `npm run test:db`. More detail: [`web/INTEGRATION.md`](web/INTEGRATION.md).
+
+### iPhone (`ios/`)
+
+1. Open `ios/CheckWithUs/CheckWithUs.xcodeproj` in Xcode.
+2. Set your signing team on the app and its three extensions (Message Filter, Call Directory, SafeCard).
+3. Optional: put the demo caller's number in `CheckWithUs/scam-numbers.local.json` (gitignored).
+4. Run on a real iPhone. The app shows as "Check With Us" in Settings. Turn on the filter in Settings, Apps, Messages, Unknown and Spam. Turn on the call labels in Settings, Apps, Phone, Call Blocking and Identification.
+5. Pair: make a pairing code in the dashboard, then type it on the older adult's phone.
+
+GuardKit tests: `cd ios/GuardKit && swift test`.
+
+### ML (`ml/`)
+
+Python 3.12. Raw datasets go in `ml/data/raw/` (gitignored); sources and licenses are in [`ml/data/SOURCES.md`](ml/data/SOURCES.md).
+
+```bash
+python3.12 -m venv ml/.venv && ml/.venv/bin/pip install -r ml/requirements.txt
+ml/.venv/bin/python -I ml/data/build.py && ml/.venv/bin/python -I ml/data/check.py
+ml/.venv/bin/python -I ml/train_ngram.py     # Guard tiny, writes ngram_eval.json
+ml/.venv/bin/python -I ml/train_guard.py     # Guard DistilBERT, writes guard/eval.json
+ml/.venv/bin/python -I ml/export_coreml.py   # Core ML export, writes coreml_eval.json
+```
 
 ## Repo layout
 
 ```
-ios/    older adult app, Message Filter + Call Directory extensions
-web/    Next.js backend + family dashboard (Vercel)
-ml/     datasets, training, eval scripts, exported models
-docs/   rules, Devpost write-up, demo script, research
+ios/    iPhone app (older adult and family), Message Filter, Call Directory, SafeCard Live Activity, GuardKit
+web/    Next.js backend, family dashboard and landing page (Vercel)
+ml/     datasets, training and eval scripts
+docs/   plan, rules, demo script, Devpost and DEV drafts, perf numbers
 ```
 
-Contributors and agents: read [AGENTS.md](AGENTS.md) first, then
-[docs/RULES.md](docs/RULES.md).
+Contributors and agents: read [AGENTS.md](AGENTS.md) first, then [docs/RULES.md](docs/RULES.md).
 
-## Model evaluation
+## AI tools used
 
-Test set: real texts only (Mendeley, NCSU, UCI), no near-duplicates of training rows. Threshold set on val. The 97% val target (v2 and tiny) was picked after seeing one test result ([DECISIONS 26](ml/data/DECISIONS.md)), so those test numbers are slightly optimistic. Probe: 40 held-out synthetic toll and investment texts (no real ones exist). Data: `ml/data/REPORT.md`.
-
-| Model | Test n | Accuracy | Scam recall | False holds | ECE | Delivery + toll recall (test / probe) | Investment recall (test / probe) | iPhone latency |
-|---|---|---|---|---|---|---|---|---|
-| Guard v1: DistilBERT, val target 95% | 878 | 97.6% | 98.4% | 2.7% | 0.029 | 100% / n/a | n/a | not measured |
-| Guard v2: + toll and investment data, val target 97% | 884 | 97.4% | 93.9% | 1.3% | 0.014 | 88.6% / 100% | 100% (6) / 13% | not measured |
-| Guard v2, Core ML 8-bit (`GuardInt8.mlpackage`, 67 MB) | 884 | | 94.0% | 1.1% | | | | not measured (Mac: 1.3 ms) |
-| Rules only (`ios/GuardKit/ScamRules.swift`, 9 rules) | 884 | | 2.4% | 0.0% | | | / 47% | |
-| Rules + Core ML model, Swift end to end (`swift run guard-eval`) | 884 | | 94.0% | 1.1% | | | / 57% | not measured (Mac: 1.4 ms) |
-| **Guard tiny: char + word n-grams, logistic regression, 1 MB (runs in the Message Filter)** | 884 | | 96.0% | 2.4% | | 100% / 100% | 100% (6) / 13% | **11 ms, 2.6 MB on iPhone 18 Pro Max** |
-
-v1 and v2 use slightly different test sets (the data changed), so compare with care. Legit "Toll Free" texts in test held by v2: 0 of 3. Rules hold 0 of 6,382 legit texts across train, val and test. The Message Filter extension is killed above roughly 25-30 MB (measured with a probe on iOS 26), so DistilBERT (67 MB) runs only in the main app; the tiny model runs in the filter.
-
-## AI tool disclosure
-
-Required by SwampHacks and MLH rules, and disclosed on Devpost.
+Required by SwampHacks and MLH rules, and disclosed on Devpost. Each PR also names the tools it used.
 
 | Tool | Used for |
 | --- | --- |
-| Claude Code (Opus 5) | `web/` backend and dashboard: scaffolding, Nessie and Auth0 integration, family-circle logic, Tiger Data schema. Each PR notes the tools used. |
-| Codex CLI | Independent second-opinion review of changed files via a `Stop` hook. Read-only; it reviews, a human and the authoring agent decide. |
-| Codex (GPT-6) | Continued the `web/` backend: approval and reconciliation fixes, synthetic demo seed, and family dashboard. |
-| Claude Code (Opus 5.5) | `ml/` and `ios/`: dataset pipeline, training and eval scripts, Core ML export, GuardKit Swift package, Message Filter extension. Haiku subagents searched for datasets; every license was then checked by hand. |
-| Codex CLI (review panel) | Read-only review of the `ml/` dataset; found near-duplicate leaks and label conflicts that were then fixed. |
+| Claude Code (Opus 5, Opus 5.5) | Most code in `web/`, `ios/` and `ml/`: backend, Nessie and Auth0 integration, Tiger Data schema and benchmark, family-circle logic, dataset pipeline, training and eval scripts, Core ML export, GuardKit, iPhone app and extensions, landing page, and these docs. Haiku subagents searched for datasets. TODO(Dev): confirm a human checked every dataset license by hand before keeping this claim. |
+| OpenAI Codex CLI | Continued the `web/` backend: approval and reconciliation fixes, the synthetic demo seed, and the family dashboard. |
+| OpenAI Codex CLI (read-only review) | Second-opinion review of changed files through a `Stop` hook, and review panels on the `ml/` dataset and the iPhone app. It found near-duplicate data leaks, label conflicts and several race conditions, which were then fixed. It reviews; a human and the authoring agent decide. |
+| Apple Foundation Models (inside the product) | Runs on the phone and rewrites true facts into a short note for the family. It never decides anything. |
+| Codex | Dashboard accessibility fixes, decision UI tests, and synthetic gallery captures for issue #16. |
 
-All code in this repository was written during the event window. The on-device
-models are fine-tuned by us; the project is not a reskin of an existing AI tool.
+All code in this repository was written during the event window. The scam models
+are trained by us; the project is not a reskin of an existing AI tool.
 
 ## Credits
 
-Every third-party framework, library, API, model and dataset we use, with its
-license. Required by Devpost rule 10 and `docs/RULES.md`.
+Every third-party framework, library, API, model, dataset and font we use, with its
+license. Required by Devpost rule 10 and [`docs/RULES.md`](docs/RULES.md).
 
 ### Services and APIs
 
 | Service | Used for | Terms |
 | --- | --- | --- |
-| [Capital One Nessie](http://api.nessieisreal.com/) | Mock accounts, merchants, bills, transfers | Capital One hackathon sandbox; mock data only |
-| [Auth0](https://auth0.com/) | Family member identity and payment approval | Auth0 free plan, developer terms |
-| [Tiger Data / Tiger Cloud](https://www.tigerdata.com/) | Spending history, continuous aggregates, dashboard | Tiger Cloud trial; TimescaleDB extension |
+| [Capital One Nessie](http://api.nessieisreal.com/) | Mock customers, accounts, merchants, purchases, bills, withdrawals, deposits, transfers, ATMs, branches | Capital One hackathon sandbox; mock data only |
+| [Auth0](https://auth0.com/) | Family login, API tokens, roles, optional RBAC; CIBA Guardian push implemented, off by default | Auth0 free plan, developer terms |
+| [Tiger Data / Tiger Cloud](https://www.tigerdata.com/) | Spending hypertable, compression, continuous aggregates | Tiger Cloud trial; TimescaleDB |
 | [Vercel](https://vercel.com/) | Hosting for `web/` | Vercel Hobby terms |
-| [GoDaddy Registry](https://registry.godaddy/) | `checkwith.us` domain | Registered via MLH hackathon offer |
+| [GoDaddy Registry](https://registry.godaddy/) | `checkwith.us` domain (.us registry) | TODO(Dev): confirm the MLH code was used (whois registrar: Porkbun) |
 
 ### `web/` dependencies
 
@@ -73,19 +232,35 @@ license. Required by Devpost rule 10 and `docs/RULES.md`.
 | [next](https://github.com/vercel/next.js) | 16.4.2 | MIT |
 | [react](https://github.com/facebook/react) | 19.3.0 | MIT |
 | [react-dom](https://github.com/facebook/react) | 19.3.0 | MIT |
-| [tailwindcss](https://github.com/tailwindlabs/tailwindcss) | 4.3.3 | MIT |
-| [typescript](https://github.com/microsoft/TypeScript) | 5.9.3 | Apache-2.0 |
-| [eslint](https://github.com/eslint/eslint) | 9.39.5 | MIT |
+| [@auth0/nextjs-auth0](https://github.com/auth0/nextjs-auth0) | 4.32.1 | MIT |
+| [jose](https://github.com/panva/jose) | 6.2.12 | MIT |
 | [node-postgres (`pg`)](https://github.com/brianc/node-postgres) | 8.23.1 | MIT |
 | [zod](https://github.com/colinhacks/zod) | 4.6.7 | MIT |
-| [jose](https://github.com/panva/jose) | 6.2.12 | MIT |
 | [server-only](https://www.npmjs.com/package/server-only) | 0.0.1 | MIT |
+| [tailwindcss](https://github.com/tailwindlabs/tailwindcss) | 4.3.3 | MIT |
+| [@tailwindcss/turbopack](https://github.com/tailwindlabs/tailwindcss) | 4.3.3 | MIT |
+| [typescript](https://github.com/microsoft/TypeScript) | 5.9.3 | Apache-2.0 |
+| [eslint](https://github.com/eslint/eslint) | 9.39.5 | MIT |
+| [eslint-config-next](https://github.com/vercel/next.js) | 16.4.2 | MIT |
 | [vitest](https://github.com/vitest-dev/vitest) | 5.0.5 | MIT |
-| [@auth0/nextjs-auth0](https://github.com/auth0/nextjs-auth0) | 4.32.1 | MIT |
+| [@playwright/test](https://github.com/microsoft/playwright) | 1.64.1 | Apache-2.0 |
 | [tsx](https://github.com/privatenumber/tsx) | 4.23.15 | MIT |
 
-Type definitions (`@types/*`) come from
+Type definitions (`@types/node`, `@types/pg`, `@types/react`, `@types/react-dom`) come from
 [DefinitelyTyped](https://github.com/DefinitelyTyped/DefinitelyTyped) (MIT).
+
+### Fonts
+
+| Font | Used for | License |
+| --- | --- | --- |
+| [Geist and Geist Mono](https://vercel.com/font) | Web body text | SIL Open Font License 1.1 |
+| [Newsreader](https://fonts.google.com/specimen/Newsreader) | Landing page headings | SIL Open Font License 1.1 |
+
+Both are loaded with `next/font/google`.
+
+### `ios/` frameworks
+
+No third-party Swift packages. `ios/GuardKit` is our own package (WordPiece tokenizer, rules, n-gram and Core ML scorers). Apple frameworks only: SwiftUI, UIKit, Foundation, Core ML, IdentityLookup (Message Filter), CallKit (Call Directory and call state), ActivityKit and WidgetKit (Live Activity), Core Location (bank watch), Foundation Models (on-device explanation), AuthenticationServices (Auth0 login), LocalAuthentication (Face ID), Security and CryptoKit (Keychain, PKCE), os (logging), XCTest.
 
 ### `ml/` models and datasets
 
@@ -93,12 +268,14 @@ Full details, row counts and rejected sources: [`ml/data/SOURCES.md`](ml/data/SO
 
 | Model or dataset | Used for | License |
 | --- | --- | --- |
-| [distilbert-base-uncased](https://huggingface.co/distilbert/distilbert-base-uncased) | Base model for the main-app Guard; its WordPiece vocab is bundled in GuardKit | Apache-2.0 |
-| [SMS Phishing Dataset (Mishra & Soni, Mendeley)](https://data.mendeley.com/datasets/f45bkkt8pr/1) | Training and test data | CC BY 4.0 |
+| [distilbert-base-uncased](https://huggingface.co/distilbert/distilbert-base-uncased) | Base model for Guard v1 and v2; its WordPiece vocab is bundled in GuardKit | Apache-2.0 |
+| [SMS Phishing Dataset (Mishra and Soni, Mendeley)](https://data.mendeley.com/datasets/f45bkkt8pr/1) | Training and test data | CC BY 4.0 |
 | [SMS phishing messages (NCSU WSPR lab)](https://github.com/wspr-ncsu/sms-phishing) | Training and test data | MIT |
 | [SMS Spam Collection (UCI)](https://archive.ics.uci.edu/dataset/228/sms+spam+collection) | Training and test data | CC BY 4.0 |
 | [AI-in-the-Loop SSD (SUPREME Lab)](https://github.com/supreme-lab/ai-in-the-loop) | Training data (scam call scripts) | MIT |
 | [CloveAI/india-spam-sms](https://huggingface.co/datasets/CloveAI/india-spam-sms) | Training data (hard negatives) | MIT |
+
+Guard tiny is trained from scratch on the same data; it has no base model.
 
 | Python package | Version | License |
 | --- | --- | --- |
@@ -107,15 +284,13 @@ Full details, row counts and rejected sources: [`ml/data/SOURCES.md`](ml/data/SO
 | [torch](https://github.com/pytorch/pytorch) | 2.4.1 | BSD-3-Clause |
 | [transformers](https://github.com/huggingface/transformers) | 4.46.3 | Apache-2.0 |
 | [coremltools](https://github.com/apple/coremltools) | 8.1 | BSD-3-Clause |
-
-### `ios/` dependencies
-
-No third-party Swift packages. `ios/GuardKit` is our own package (tokenizer, rules, scorers); Apple frameworks only (Core ML, IdentityLookup).
+| [numpy](https://github.com/numpy/numpy) | installed with pandas and torch | BSD-3-Clause |
 
 ## Demo data
 
 Demo data uses fake people only. No real person's name, phone number, bank
-details or messages appear in this repository or in the demo.
+details or messages appear in this repository or in the demo. The demo person is
+"Rosa CheckWith (synthetic)". Scam numbers in the repo are fictional 555-01xx numbers.
 
 Exception: `ml/data/` contains published, openly licensed research SMS datasets
 (listed in Credits) used to train and test the scam model. They are never shown
