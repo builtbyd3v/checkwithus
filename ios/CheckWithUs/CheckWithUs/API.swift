@@ -3,7 +3,13 @@ import Security
 
 /// The checkwith.us backend, as the older adult's phone sees it. Contract: web/INTEGRATION.md.
 struct API {
-    static let base = URL(string: "https://checkwith.us/api/v1")!
+    static let base: URL = {
+        #if DEBUG
+        // Simulator tests against a local mock: launch with `-apiBase http://127.0.0.1:8787/api/v1`.
+        if let override = UserDefaults.standard.string(forKey: "apiBase"), let url = URL(string: override) { return url }
+        #endif
+        return URL(string: "https://checkwith.us/api/v1")!
+    }()
 
     struct Failure: Error, LocalizedError {
         let message: String
