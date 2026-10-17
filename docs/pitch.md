@@ -122,8 +122,7 @@ Each sponsor block has a **20 s** version for the default order and a **60 s** v
 
 1. **Bill-pay agent:** the code is on main (PR #46 itself was closed unmerged), but the real Auth0 Machine-to-Machine grant is not tested on the live tenant. Ask Dev for one live `npm run agent:bills` run. If it does not run, say "tested against a fake Auth0".
 2. **CIBA Guardian push:** built and tested against a fake Auth0 (`web/test/fake-auth0.ts`), not verified live. Do not say "live". Mention it only if a judge asks.
-3. **GoDaddy:** the .us registry (RDAP, Oct 17) lists Porkbun as the registrar. Confirm with Dev that the MLH GoDaddy Registry code was used before claiming the prize.
-4. **`approve:payments`:** the server checks this Auth0 permission only when the token carries a `permissions` claim or `AUTH0_RBAC=true`. Otherwise the circle's approver role alone decides. Before saying "Auth0 RBAC", confirm RBAC is on for the live Auth0 API.
+3. **`approve:payments`:** the server checks this Auth0 permission only when the token carries a `permissions` claim or `AUTH0_RBAC=true`. Otherwise the circle's approver role alone decides. Before saying "Auth0 RBAC", confirm RBAC is on for the live Auth0 API.
 5. **Freeze on stage:** Freeze needs an Auth0 sign-in from the last 5 minutes. If iPhone B signed in earlier, tapping Freeze opens the Auth0 login sheet first. Sign in again on iPhone B just before a judge arrives.
 
 Checked against `main` on Oct 17 (Hitesh, with Claude Code): the 10 Nessie resource types, Freeze exactly once, `demo:atm`, PKCE, token checks, roles, the 2-approver rule, the agent's scope and machine-token rejection, the hypertable, compression, the three continuous aggregates, the 2-hour window, the [perf.md](perf.md) numbers, the speed card, the screen wording, the accessibility list and the model numbers in the README.
