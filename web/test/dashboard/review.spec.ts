@@ -103,6 +103,8 @@ for (const width of [390, 1440]) {
     await page.setViewportSize({ width, height: width < 600 ? 844 : 1000 });
     const gallery = path.resolve('../docs/gallery');
     await mkdir(gallery, { recursive: true });
+    await page.getByRole('button', { name: 'Show held', exact: true }).click();
+    await page.screenshot({ path: path.join(gallery, `dashboard-style-${width}.png`), fullPage: true, caret: 'initial', style: 'nextjs-portal { display: none; }' });
     for (const [state, label] of [['held', 'Waiting for family'], ['approved', 'Approved'], ['denied', 'Denied'], ['expired', 'Expired, blocked']] as const) {
       await page.getByRole('button', { name: `Show ${state}`, exact: true }).click();
       await expect(page.getByRole('article')).toContainText(label);
