@@ -208,6 +208,8 @@ export function createNessieClient(options: NessieClientOptions) {
     createDeposit: (accountId: string, body: unknown) =>
       create(`${account(accountId)}/deposits`, body),
     createBill: (accountId: string, body: unknown) => create(`${account(accountId)}/bills`, body),
+    createTransfer: (accountId: string, body: unknown) =>
+      create(`${account(accountId)}/transfers`, body),
 
     listRecords,
     findRecordForPayment,

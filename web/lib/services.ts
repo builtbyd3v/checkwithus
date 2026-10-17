@@ -4,11 +4,15 @@ import { createCibaApprovals, type CibaApprovals } from '@/lib/approvals';
 import { createCibaClient } from '@/lib/auth0/ciba';
 import { db } from '@/lib/db';
 import { appEnv, auth0Env } from '@/lib/env';
+import { createFreezeService, type FreezeService } from '@/lib/freeze';
 import { nessie } from '@/lib/nessie/client';
 import { createPaymentService, type PaymentService } from '@/lib/payments';
+import { createTopUpService, type TopUpService } from '@/lib/top-up';
 
 let paymentService: PaymentService | undefined;
 let approvals: CibaApprovals | null | undefined;
+let freezeService: FreezeService | undefined;
+let topUpService: TopUpService | undefined;
 
 export function payments(): PaymentService {
   return (paymentService ??= createPaymentService({
@@ -20,6 +24,14 @@ export function payments(): PaymentService {
   }));
 }
 
+export function freeze(): FreezeService {
+  return (freezeService ??= createFreezeService({ pool: db(), nessie: nessie() }));
+}
+
+export function topUp(): TopUpService {
+  return (topUpService ??= createTopUpService({ pool: db(), nessie: nessie() }));
+}
+
 /** True when approvals must come through Auth0 CIBA (Guardian push) rather than the app. */
 export function approvalsUseCiba(): boolean {
   return appEnv().APPROVAL_MODE === 'ciba';
@@ -29,7 +41,7 @@ export function approvalsUseCiba(): boolean {
 export function cibaApprovals(): CibaApprovals | null {
   if (approvals === undefined) {
     if (approvalsUseCiba()) {
-      const { AUTH0_DOMAIN, AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET, AUTH0_AUDIENCE } = auth0Env();
+      const { AUTH0_DOMAIN, AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET, AUTH0_AUDIENCE, AUTH0_CIBA_RAR, AUTH0_RBAC } = auth0Env();
       approvals = createCibaApprovals({
         pool: db(),
         ciba: createCibaClient({
@@ -37,6 +49,8 @@ export function cibaApprovals(): CibaApprovals | null {
           clientId: AUTH0_CLIENT_ID,
           clientSecret: AUTH0_CLIENT_SECRET,
           audience: AUTH0_AUDIENCE,
+          richAuthorizationDetails: AUTH0_CIBA_RAR === 'true',
+          requirePermissionsClaim: AUTH0_RBAC === 'true',
         }),
         payments,
       });

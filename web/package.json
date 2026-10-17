@@ -4,17 +4,26 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "preview:dashboard": "node scripts/preview-dashboard.mjs",
+    "demo:record-dashboard": "node scripts/record-dashboard-demo.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "check:db": "node --env-file=.env.local scripts/check-db.mjs",
     "check:nessie": "node --env-file=.env.local --conditions=react-server --import tsx scripts/check-nessie.ts",
     "test": "vitest run",
     "db:migrate": "node --env-file=.env.local scripts/migrate.mjs",
     "seed:demo": "node --env-file=.env.local --conditions=react-server --import tsx scripts/seed-demo.ts",
+    "demo:reset": "node --env-file=.env.local --conditions=react-server --import tsx scripts/demo-reset.ts",
+    "smoke:demo": "vitest run --config vitest.int.config.mts lib/demo.int.test.ts",
+    "demo:atm": "node --env-file=.env.local --conditions=react-server --import tsx scripts/demo-atm.ts",
+    "check:sequence": "node --env-file=.env.local --conditions=react-server --import tsx scripts/check-sequence.ts",
     "test:db": "vitest run --config vitest.int.config.mts",
-    "check:auth0": "node --env-file=.env.local scripts/check-auth0.mjs"
+    "check:auth0": "node --env-file=.env.local scripts/check-auth0.mjs",
+    "agent:bills": "node --env-file=.env.local --conditions=react-server --import tsx scripts/agent-bills.ts",
+    "bench:perf": "node --env-file=.env.local --import tsx scripts/perf-bench.ts",
+    "perf:report": "node --import tsx scripts/render-perf.ts"
   },
   "dependencies": {
     "@auth0/nextjs-auth0": "^4.32.1",
@@ -27,6 +36,8 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.10",
+    "@playwright/test": "1.64.1",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^24.19.2",
     "@types/pg": "^8.23.1",
