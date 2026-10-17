@@ -183,6 +183,15 @@ const DEMO_MERCHANT_LOCATION = {
  */
 const STUCK_PAYING_SECONDS = 30;
 
+/**
+ * A payment whose bank outcome is unknown is only declared failed this long
+ * after it was actually sent. Until then it is looked for at Nessie on every
+ * read and shown as "sending". Nessie has no idempotency keys, so "failed"
+ * followed by a retry (a new payment) while the first one commits late would
+ * pay twice; ten minutes is far beyond any plausible late commit.
+ */
+const UNKNOWN_OUTCOME_MINUTES = 10;
+
 export type PaymentServiceDeps = {
   pool: pg.Pool;
   nessie: NessieClient;
@@ -511,7 +520,7 @@ export function createPaymentService(deps: PaymentServiceDeps) {
     // If that touches no row, a concurrent read already concluded this payment
     // (preparation ran past the reconcile window), so it must not be sent.
     const stillPaying = await pool.query(
-      `update payments set updated_at = now() where id = $1 and status = 'paying'`,
+      `update payments set updated_at = now(), sent_at = now() where id = $1 and status = 'paying'`,
       [payment.id],
     );
     if (stillPaying.rowCount === 0) {
@@ -612,14 +621,23 @@ export function createPaymentService(deps: PaymentServiceDeps) {
    */
   async function reconcileIfStuck(payment: Payment): Promise<Payment> {
     if (payment.status !== 'paying') return payment;
-    const { rows } = await pool.query<{ observed: string }>(
-      `select updated_at::text as observed from payments
+    const { rows } = await pool.query<{ observed: string; long_enough: boolean }>(
+      `select updated_at::text as observed,
+              -- Never sent (died before the send): nothing can land, safe to fail.
+              (sent_at is null or sent_at < now() - make_interval(mins => $3)) as long_enough
+         from payments
         where id = $1 and status = 'paying'
           and updated_at < now() - make_interval(secs => $2)`,
-      [payment.id, STUCK_PAYING_SECONDS],
+      [payment.id, STUCK_PAYING_SECONDS, UNKNOWN_OUTCOME_MINUTES],
     );
     if (!rows[0]) return payment;
     const circle = await circleSettings(payment.circleId);
+    // Too soon after the send to call it failed: look, and if it is not at
+    // Nessie yet, keep showing "sending". Telling someone "failed" invites a
+    // second payment, and the first may still land.
+    if (!rows[0].long_enough) {
+      return reconcile(payment, circle.nessieAccountId, { mayConcludeFailed: false });
+    }
     return reconcile(payment, circle.nessieAccountId, {
       mayConcludeFailed: true,
       observedUpdatedAt: rows[0].observed,

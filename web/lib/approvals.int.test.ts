@@ -38,6 +38,17 @@ const hold = () => service.createPayment(circleId, { ...scam, idempotencyKey: `c
 const makeDue = (paymentId: string) =>
   pool.query(`update ciba_requests set poll_after = now() where payment_id = $1`, [paymentId]);
 
+/** Makes one member's push due (and the others not), to stage answer order. */
+const makeDueFor = async (paymentId: string, sub: string) => {
+  await pool.query(`update ciba_requests set poll_after = now() + interval '1 hour' where payment_id = $1`, [paymentId]);
+  await pool.query(
+    `update ciba_requests r set poll_after = now()
+       from circle_members m
+      where r.payment_id = $1 and m.id = r.member_id and m.auth0_sub = $2`,
+    [paymentId, sub],
+  );
+};
+
 const requestsFor = async (paymentId: string) =>
   (
     await pool.query<{ sub: string; state: string; last_error: string | null }>(
@@ -160,7 +171,7 @@ describe('answers from Guardian', () => {
     expect(nessieFake.paymentWrites()).toHaveLength(0);
   });
 
-  it('when both answer, the first one applied wins and money moves at most once', async () => {
+  it('when both answer in the same round, the Deny wins', async () => {
     const payment = await hold();
     auth0.answer(MARIA, 'approve');
     auth0.answer(LEO, 'deny');
@@ -168,9 +179,41 @@ describe('answers from Guardian', () => {
 
     await approvals.pollPayment(payment.id, circleId);
 
-    const final = await service.getPayment(payment.id);
-    expect(['paid', 'denied']).toContain(final!.status);
-    expect(nessieFake.paymentWrites()).toHaveLength(final!.status === 'paid' ? 1 : 0);
+    expect(await service.getPayment(payment.id)).toMatchObject({ status: 'denied', decidedVia: 'ciba' });
+    expect(nessieFake.paymentWrites()).toHaveLength(0);
+  });
+
+  it('an approval waits for the other open push to be checked, and an earlier Deny wins', async () => {
+    const payment = await hold();
+    // Leo tapped Deny first, but his push is not due for polling yet; Maria's is.
+    auth0.answer(LEO, 'deny');
+    auth0.answer(MARIA, 'approve');
+    await makeDueFor(payment.id, MARIA);
+
+    await approvals.pollPayment(payment.id, circleId);
+    // Maria's approval is recorded but not applied: Leo has not been checked since.
+    expect((await service.getPayment(payment.id))!.status).toBe('held');
+    expect(nessieFake.paymentWrites()).toHaveLength(0);
+
+    await makeDueFor(payment.id, LEO);
+    await approvals.pollPayment(payment.id, circleId);
+
+    expect(await service.getPayment(payment.id)).toMatchObject({ status: 'denied', decidedVia: 'ciba' });
+    expect(nessieFake.paymentWrites()).toHaveLength(0);
+  });
+
+  it('an approval goes through once the other open push is checked and still has no answer', async () => {
+    const payment = await hold();
+    auth0.answer(MARIA, 'approve');
+    await makeDueFor(payment.id, MARIA);
+    await approvals.pollPayment(payment.id, circleId);
+    expect((await service.getPayment(payment.id))!.status).toBe('held');
+
+    await makeDueFor(payment.id, LEO); // Leo has not answered
+    await approvals.pollPayment(payment.id, circleId);
+
+    expect((await service.getPayment(payment.id))!.status).toBe('paid');
+    expect(nessieFake.paymentWrites()).toHaveLength(1);
   });
 
   it('a deny at the very edge of expiry is recorded as no answer, not as a "no"', async () => {

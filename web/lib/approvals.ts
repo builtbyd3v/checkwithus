@@ -19,6 +19,7 @@
  */
 import 'server-only';
 import type pg from 'pg';
+import { transaction } from '@/lib/db';
 import { bindingMessage, CibaError, type CibaClient, type CibaPoll } from '@/lib/auth0/ciba';
 import { PaymentError, type Payment, type PaymentService } from '@/lib/payments';
 
@@ -98,16 +99,11 @@ export function createCibaApprovals(deps: CibaApprovalsDeps) {
   }
 
   /**
-   * Asks Auth0 about every due request for one payment, and applies any
-   * answer. Scoped to `circleId`, so a caller can only cause polling for its
-   * own circle's payments.
+   * Asks Auth0 about every due request for one payment, records what it
+   * says, then applies any decision. Scoped to `circleId`, so a caller can
+   * only cause polling for its own circle's payments.
    */
   async function pollPayment(paymentId: string, circleId: string): Promise<void> {
-    // Answers that arrived but whose decision did not land (e.g. a transient
-    // database error) come first. Auth0 hands an answer out only once, so a
-    // recorded answer is retried here until the payment is decided.
-    await applyRecordedAnswers(paymentId, circleId);
-
     const { rows: claimed } = await pool.query<{
       id: string;
       auth_req_id: string;
@@ -124,107 +120,130 @@ export function createCibaApprovals(deps: CibaApprovalsDeps) {
                  (p.status = 'held') as payment_held`,
       [paymentId, circleId],
     );
-    if (claimed.length === 0) return;
 
-    // Already decided some other way: nothing left to ask Auth0 about.
-    if (!claimed[0]!.payment_held) {
-      await supersede(paymentId);
-      return;
+    if (claimed.length > 0) {
+      // Already decided some other way: nothing left to ask Auth0 about.
+      if (!claimed[0]!.payment_held) {
+        await supersede(paymentId);
+        return;
+      }
+      // Ask about every due request first, then record all the answers in one
+      // transaction. Inside it now() is a single instant, after every answer
+      // came back, so "checked after that approval arrived" is judged on one
+      // clock rather than on the order this loop happened to run in.
+      const answers: Array<{ request: (typeof claimed)[number]; result: CibaPoll }> = [];
+      for (const request of claimed) {
+        answers.push({ request, result: await ciba.poll(request.auth_req_id) });
+      }
+      await transaction(pool, async (client) => {
+        for (const { request, result } of answers) await record(client, request, result);
+      });
     }
 
-    for (const request of claimed) {
-      const result = await ciba.poll(request.auth_req_id);
-      await apply(paymentId, request, result);
-    }
+    // Also retries answers whose decision did not land last time (Auth0 hands
+    // an answer out only once, so a recorded one must never be dropped).
+    await applyRecordedAnswers(paymentId, circleId);
     await supersedeIfDecided(paymentId);
   }
 
   /**
-   * Re-applies recorded Guardian answers to a payment that is still held, in
-   * the order they arrived, so the first answer still wins. Once the payment
+   * Turns recorded Guardian answers into the payment's decision.
+   *
+   * Auth0 does not say when someone tapped Deny, so answers cannot be put in
+   * true answer order. The rule instead:
+   *  - a recorded Deny decides at once: it can only stop money;
+   *  - an approval decides only once every other member's still-open push has
+   *    been checked AFTER that approval arrived. If one of them had denied,
+   *    even a moment earlier, that check found it and the Deny won.
+   * That costs an approval at most one poll interval (~5s). Once the payment
    * is decided, decidePayment answers already_decided and these are no-ops.
    */
   async function applyRecordedAnswers(paymentId: string, circleId: string): Promise<void> {
-    const { rows } = await pool.query<{ member_id: string; state: 'approved' | 'denied' }>(
-      `select r.member_id, r.state
+    const { rows: denials } = await pool.query<{ member_id: string }>(
+      `select r.member_id
          from ciba_requests r join payments p on p.id = r.payment_id
         where r.payment_id = $1 and p.circle_id = $2 and p.status = 'held'
-          and r.state in ('approved', 'denied')
-        order by r.answered_at, r.id`,
+          and r.state = 'denied'
+        order by r.answered_at, r.id
+        limit 1`,
       [paymentId, circleId],
     );
-    for (const answer of rows) {
-      await decide(paymentId, answer.member_id, answer.state === 'approved' ? 'approve' : 'deny');
+    if (denials[0]) {
+      await decide(paymentId, denials[0].member_id, 'deny');
+      return;
     }
+
+    const { rows: approvals } = await pool.query<{ member_id: string }>(
+      `select r.member_id
+         from ciba_requests r join payments p on p.id = r.payment_id
+        where r.payment_id = $1 and p.circle_id = $2 and p.status = 'held'
+          and r.state = 'approved'
+          and not exists (
+            select 1 from ciba_requests other
+             where other.payment_id = r.payment_id and other.id <> r.id
+               and other.state = 'pending'
+               and (other.last_polled_at is null or other.last_polled_at < r.answered_at))
+        order by r.answered_at, r.id
+        limit 1`,
+      [paymentId, circleId],
+    );
+    if (approvals[0]) await decide(paymentId, approvals[0].member_id, 'approve');
   }
 
-  async function apply(
-    paymentId: string,
-    request: { id: string; member_id: string; sub: string },
+  /**
+   * Records what Auth0 said about one request. Never decides anything itself:
+   * an answer is stored (with when it arrived) before it is applied, so a
+   * failure while applying it cannot lose it.
+   */
+  async function record(
+    client: pg.PoolClient,
+    request: { id: string; sub: string },
     result: CibaPoll,
   ): Promise<void> {
-    const setState = (state: string, lastError: string | null = null) =>
-      pool.query(`update ciba_requests set state = $2, last_error = $3 where id = $1`, [
-        request.id,
-        state,
-        lastError?.slice(0, 500) ?? null,
-      ]);
-    // A member's answer is recorded, with when it arrived, BEFORE it is applied:
-    // if applying fails, applyRecordedAnswers retries it on the next poll.
-    const recordAnswer = (state: 'approved' | 'denied') =>
-      pool.query(`update ciba_requests set state = $2, answered_at = now(), last_error = null where id = $1`, [
-        request.id,
-        state,
-      ]);
+    const update = (sql: string, values: unknown[] = []) =>
+      client.query(`update ciba_requests set ${sql} where id = $1`, [request.id, ...values]);
 
     switch (result.kind) {
       case 'pending':
+        // Auth0 confirmed "no answer yet" as of now.
+        await update('last_polled_at = now(), last_error = null');
         return;
       case 'unavailable':
-        await pool.query(`update ciba_requests set last_error = $2 where id = $1`, [request.id, result.message]);
+        // We learned nothing, so last_polled_at stays as it was.
+        await update('last_error = $2', [result.message.slice(0, 500)]);
         return;
       case 'slow_down':
-        await pool.query(
-          // Explicit casts: $2 is both an integer column and make_interval's
-          // floating-point `secs`, and Postgres will not guess between them.
-          `update ciba_requests
-              set interval_seconds = $2::int, poll_after = now() + make_interval(secs => $2::int)
-            where id = $1`,
-          [request.id, clampInterval(result.intervalSeconds)],
-        );
+        // Explicit casts: $2 is both an integer column and make_interval's
+        // floating-point `secs`, and Postgres will not guess between them.
+        await update('interval_seconds = $2::int, poll_after = now() + make_interval(secs => $2::int)', [
+          clampInterval(result.intervalSeconds),
+        ]);
         return;
       case 'invalid':
-        await setState('failed', result.message);
+        await update(`state = 'failed', last_error = $2`, [result.message.slice(0, 500)]);
+        return;
+      case 'expired':
+        await update(`state = 'expired', last_polled_at = now()`);
         return;
       case 'approved':
         // The verified token must be the member this push went to.
         if (result.sub !== request.sub) {
-          await setState('failed', 'Auth0 returned a token for a different user');
+          await update(`state = 'failed', last_error = $2`, ['Auth0 returned a token for a different user']);
           return;
         }
-        await recordAnswer('approved');
-        await decide(paymentId, request.member_id, 'approve');
+        await update(`state = 'approved', answered_at = now(), last_polled_at = now(), last_error = null`);
         return;
-      case 'expired':
-        await setState('expired');
-        return;
-      case 'denied_or_expired': {
-        // Judge by when the answer ARRIVED, not when the poll started: the
-        // request can take seconds. If it came back well before expiry, Auth0
-        // evaluated it earlier still, so it was a real "Deny".
-        const { rows } = await pool.query<{ clearly_before_expiry: boolean }>(
-          `select expires_at - now() > make_interval(secs => $2) as clearly_before_expiry
-             from ciba_requests where id = $1`,
-          [request.id, EXPIRY_MARGIN_SECONDS],
+      case 'denied_or_expired':
+        // Judged as of when the answer arrived (this transaction started after
+        // it did): well before expiry, Auth0 evaluated it earlier still, so it
+        // was a real "Deny"; at the edge it may have been the timeout.
+        await update(
+          `state = case when expires_at - now() > make_interval(secs => $2) then 'denied' else 'expired' end,
+           answered_at = case when expires_at - now() > make_interval(secs => $2) then now() end,
+           last_polled_at = now(), last_error = null`,
+          [EXPIRY_MARGIN_SECONDS],
         );
-        if (!rows[0]?.clearly_before_expiry) {
-          await setState('expired');
-          return;
-        }
-        await recordAnswer('denied');
-        await decide(paymentId, request.member_id, 'deny');
         return;
-      }
     }
   }
 
