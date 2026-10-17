@@ -20,10 +20,10 @@ it('says how long ago', () => {
 });
 
 it('prefers the payee history, falls back to daily spending, hides small or missing ratios', () => {
-  expect(usualLabel({ payee_times: 6, daily_times: 9 }, 'Target')).toBe('About 6x her usual at Target');
-  expect(usualLabel({ payee_times: 1, daily_times: 9 }, 'Target')).toBeNull();
-  expect(usualLabel({ payee_times: null, daily_times: 4 }, 'Target')).toBe('About 4x her usual daily spending');
-  expect(usualLabel({ payee_times: null, daily_times: 1 }, 'Target')).toBeNull();
-  expect(usualLabel({ payee_times: null, daily_times: null }, 'Target')).toBeNull();
-  expect(usualLabel(undefined, 'Target')).toBeNull();
+  expect(usualLabel({ payee_times: 6, daily_times: 9 }, 'Target', 'Rosa')).toBe('About 6x Rosa’s usual at Target');
+  expect(usualLabel({ payee_times: 1, daily_times: 9 }, 'Target', 'Rosa')).toBeNull();
+  expect(usualLabel({ payee_times: null, daily_times: 4 }, 'Target', 'Rosa')).toBe('About 4x Rosa’s usual daily spending');
+  expect(usualLabel({ payee_times: null, daily_times: 1 }, 'Target', 'Rosa')).toBeNull();
+  expect(usualLabel({ payee_times: null, daily_times: null }, 'Target', 'Rosa')).toBeNull();
+  expect(usualLabel(undefined, 'Target', 'Rosa')).toBeNull();
 });

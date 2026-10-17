@@ -38,9 +38,33 @@ export function JoinForm() {
   </form>;
 }
 
+const DECIDED_EVENT = 'checkwith:decided';
+
+/**
+ * Always mounted above the held payments. A decided card leaves the list, so
+ * its own message would vanish unread: this live region says it instead and
+ * moves focus to "Recently decided", where the card now is.
+ */
+export function DecisionStatus() {
+  const [message, setMessage] = useState('');
+  useEffect(() => {
+    const show = (event: Event) => {
+      setMessage((event as CustomEvent<string>).detail);
+      requestAnimationFrame(() => (document.getElementById('decided-title') ?? document.getElementById('decision-status'))?.focus());
+    };
+    window.addEventListener(DECIDED_EVENT, show);
+    return () => window.removeEventListener(DECIDED_EVENT, show);
+  }, []);
+  return <p id="decision-status" role="status" tabIndex={-1} className={message ? 'mt-4 rounded-lg bg-white px-4 py-3 font-semibold text-teal-950 outline-none' : 'sr-only'}>{message}</p>;
+}
+
 /** Approve or deny one held payment. Under CIBA, approving happens in the Guardian push only. */
 export function DecisionButtons({ paymentId, canApproveHere }: { paymentId: string; canApproveHere: boolean }) {
-  const [state, decide, pending] = useActionState(decideAction, initial);
+  const [state, decide, pending] = useActionState(async (previous: FormState, form: FormData) => {
+    const result = await decideAction(previous, form);
+    if (result.decided) window.dispatchEvent(new CustomEvent(DECIDED_EVENT, { detail: result.message }));
+    return result;
+  }, initial);
   const base = 'inline-flex min-h-12 min-w-28 items-center justify-center rounded-lg px-5 text-base font-semibold text-white focus-visible:outline-3 focus-visible:outline-offset-2 disabled:opacity-60';
   return <form action={decide} className="mt-5 border-t border-stone-100 pt-4">
     <input type="hidden" name="paymentId" value={paymentId} />
@@ -51,7 +75,7 @@ export function DecisionButtons({ paymentId, canApproveHere }: { paymentId: stri
         className={`${base} bg-rose-800 hover:bg-rose-900 focus-visible:outline-rose-800`}>{pending ? 'Sending…' : 'Deny'}</button>
     </div>
     {!canApproveHere && <p className="mt-2 text-sm text-stone-700">To approve, use the Guardian notification on your phone.</p>}
-    <Feedback state={state} />
+    {!state.decided && <Feedback state={state} />}
   </form>;
 }
 

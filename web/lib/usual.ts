@@ -1,7 +1,7 @@
 import type { Queryable } from '@/lib/db';
 
 /**
- * "About 6x her usual" for held payments, from the spending_payee_daily
+ * "About 6x Rosa's usual" for held payments, from the spending_payee_daily
  * continuous aggregate. Display only: the hold itself was already decided by
  * lib/rules.ts.
  *
@@ -46,11 +46,13 @@ export async function herUsual(db: Queryable, circleId: string, paymentIds: stri
 }
 
 /** One plain line for the family, or null. A payee with history never falls back to the daily comparison. */
-export function usualLabel(row: Pick<UsualRow, 'payee_times' | 'daily_times'> | undefined, payeeName: string): string | null {
+export function usualLabel(
+  row: Pick<UsualRow, 'payee_times' | 'daily_times'> | undefined, payeeName: string, firstName: string,
+): string | null {
   if (!row) return null;
   if (row.payee_times !== null) {
-    return row.payee_times >= USUAL.showFromTimes ? `About ${row.payee_times}x her usual at ${payeeName}` : null;
+    return row.payee_times >= USUAL.showFromTimes ? `About ${row.payee_times}x ${firstName}’s usual at ${payeeName}` : null;
   }
   return row.daily_times !== null && row.daily_times >= USUAL.showFromTimes
-    ? `About ${row.daily_times}x her usual daily spending` : null;
+    ? `About ${row.daily_times}x ${firstName}’s usual daily spending` : null;
 }

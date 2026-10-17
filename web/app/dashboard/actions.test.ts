@@ -62,7 +62,7 @@ it('with CIBA on, the dashboard can deny but never approve', async () => {
 
   mocks.decidePayment.mockResolvedValue({ status: 'denied' });
   await expect(decideAction({ message: '' }, form({ paymentId: circleId, decision: 'deny' })))
-    .resolves.toEqual({ message: 'Denied. The payment will not go through.' });
+    .resolves.toEqual({ message: 'Denied. The payment will not go through.', decided: true });
   expect(mocks.decidePayment).toHaveBeenCalledWith({
     paymentId: circleId, member: { auth0Sub: 'auth0|maria' }, decision: 'deny', via: 'dashboard',
   });

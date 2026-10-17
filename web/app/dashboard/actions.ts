@@ -14,7 +14,7 @@ import { allowanceBody, grantAllowance, revokeAllowance } from '@/lib/allowances
 import { PaymentError } from '@/lib/payments';
 import { approvalsUseCiba, freeze, payments } from '@/lib/services';
 
-export type FormState = { message: string; code?: string; expiresAt?: string };
+export type FormState = { message: string; code?: string; expiresAt?: string; decided?: boolean };
 const fail = (error: unknown): FormState => ({
   message: error instanceof Error ? error.message : 'Please try again.',
 });
@@ -115,11 +115,14 @@ export async function decideAction(_state: FormState, form: FormData): Promise<F
     });
     revalidatePath('/dashboard');
     if (payment.status === 'held') return { message: 'Your approval is in. It still needs another approver.' };
-    if (payment.status === 'denied') return { message: 'Denied. The payment will not go through.' };
-    if (payment.status === 'failed') return { message: 'Approved, but the bank could not send it.' };
-    return { message: 'Approved. The payment is on its way.' };
+    if (payment.status === 'denied') return { message: 'Denied. The payment will not go through.', decided: true };
+    if (payment.status === 'failed') return { message: 'Approved, but the bank could not send it.', decided: true };
+    return { message: 'Approved. The payment is on its way.', decided: true };
   } catch (error) {
-    if (error instanceof PaymentError && (error.code === 'expired' || error.code === 'already_decided')) revalidatePath('/dashboard');
+    if (error instanceof PaymentError && (error.code === 'expired' || error.code === 'already_decided')) {
+      revalidatePath('/dashboard');
+      return { ...fail(error), decided: true };
+    }
     return fail(error);
   }
 }

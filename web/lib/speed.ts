@@ -5,7 +5,8 @@
  * execution from `explain analyze`), one run each, cached 60 s per circle so
  * reloads do not hammer the database. Measured, never made up.
  */
-import type { Queryable } from '@/lib/db';
+import type pg from 'pg';
+import { transaction, type Queryable } from '@/lib/db';
 import { WEEKLY_SQL } from '@/lib/spending';
 
 /** The same answer as WEEKLY_SQL, bucketed from raw payments. The inner bound only lets Postgres skip old chunks. */
@@ -19,7 +20,7 @@ export const WEEKLY_RAW_SQL = `select round(extract(epoch from time_bucket(inter
 export type Speed = {
   aggregateMs: number;
   rawMs: number;
-  /** Null when no chunk is compressed yet. */
+  /** For the whole `spending` hypertable (every family), not this circle. Null when no chunk is compressed yet. */
   compression: { beforeBytes: number; afterBytes: number } | null;
   measuredAt: Date;
 };
@@ -45,13 +46,31 @@ export async function measureSpeed(db: Queryable, circleId: string, now = new Da
 }
 
 const TTL_MS = 60_000;
+/** The card is a bonus: past this, the page renders without it. */
+const BUDGET_MS = 500;
 // ponytail: per-instance cache; each serverless instance measures on its own.
-const cache = new Map<string, Speed>();
+const cache = new Map<string, { at: number; pending: Promise<Speed | null>; last: Speed | null }>();
 
-export async function cachedSpeed(db: Queryable, circleId: string): Promise<Speed> {
-  const hit = cache.get(circleId);
-  if (hit && Date.now() - hit.measuredAt.getTime() < TTL_MS) return hit;
-  const speed = await measureSpeed(db, circleId);
-  cache.set(circleId, speed);
-  return speed;
+/**
+ * At most one measurement per circle per minute. A page waits up to BUDGET_MS
+ * for it, then shows the previous measurement (labelled with its own time), or
+ * nothing on the very first load. A slow one finishes in the background, with
+ * statement_timeout capping each query.
+ */
+export async function cachedSpeed(pool: pg.Pool, circleId: string): Promise<Speed | null> {
+  let entry = cache.get(circleId);
+  if (!entry || Date.now() - entry.at >= TTL_MS) {
+    const pending = transaction(pool, async (client) => {
+      await client.query(`set local statement_timeout = ${BUDGET_MS}`);
+      return measureSpeed(client, circleId);
+    }).catch(() => null);
+    const next = { at: Date.now(), pending, last: entry?.last ?? null };
+    void pending.then((speed) => { if (speed) next.last = speed; });
+    cache.set(circleId, next);
+    entry = next;
+  }
+  let timer: NodeJS.Timeout | undefined;
+  const speed = await Promise.race([entry.pending, new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), BUDGET_MS); })]);
+  clearTimeout(timer);
+  return speed ?? entry.last;
 }

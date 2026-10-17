@@ -10,9 +10,9 @@ import { VAULT_CENTS_SQL } from '@/lib/vault';
 import { formatCents, toCents } from '@/lib/money';
 import { weeklySpending } from '@/lib/spending';
 import { cibaApprovals, approvalsUseCiba, payments } from '@/lib/services';
-import { cachedSpeed, type Speed } from '@/lib/speed';
-import { herUsual, usualLabel } from '@/lib/usual';
-import { Countdown, DecisionButtons, FreezeControl, JoinForm, SettingsForms } from './controls';
+import { cachedSpeed } from '@/lib/speed';
+import { herUsual, usualLabel, type UsualRow } from '@/lib/usual';
+import { Countdown, DecisionButtons, DecisionStatus, FreezeControl, JoinForm, SettingsForms } from './controls';
 import { alertHeadline, timeAgo } from './format';
 
 type SpendRow = { day: Date; category: Category; total_cents: string };
@@ -59,10 +59,11 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
   const requested = (await searchParams).circle;
   const active = circles.find((circle) => circle.circleId === requested) ?? circles[0]!;
   await cibaApprovals()?.pollCircles([active.circleId]);
-  const [recent, held, spendResult, weekResult, circleResult, memberResult, payeeResult, alerts, speed] = await Promise.all([
+  // Query holds independently: newer completed payments must not hide them.
+  const heldQuery = familyPayments(db(), payments(), session.user.sub, { heldOnly: true, circleId: active.circleId });
+  const [recent, held, spendResult, weekResult, circleResult, memberResult, payeeResult, alerts, speed, usualRows] = await Promise.all([
     familyPayments(db(), payments(), session.user.sub, { heldOnly: false, circleId: active.circleId }),
-    // Query holds independently: newer completed payments must not hide them.
-    familyPayments(db(), payments(), session.user.sub, { heldOnly: true, circleId: active.circleId }),
+    heldQuery,
     db().query<SpendRow>(
       `select day, category, total_cents::text
          from spending_daily where circle_id = $1 and day >= now() - interval '90 days'
@@ -75,9 +76,11 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
     db().query<PayeeRow>('select id, name, kind, category from payees where circle_id = $1 order by name', [active.circleId]),
     familyAlerts(db(), session.user.sub, active.circleId),
     // The card is a bonus: if timing fails, the dashboard still loads.
-    cachedSpeed(db(), active.circleId).catch((): Speed | null => null),
+    cachedSpeed(db(), active.circleId),
+    // Display only, so a failure just hides the line.
+    heldQuery.then((rows) => herUsual(db(), active.circleId, rows.map((payment) => payment.id))).catch((): UsualRow[] => []),
   ]);
-  const usual = new Map((await herUsual(db(), active.circleId, held.map((payment) => payment.id))).map((row) => [row.payment_id, row]));
+  const usual = new Map(usualRows.map((row) => [row.payment_id, row]));
   const circle = circleResult.rows[0]!;
   const firstName = circle.protected_name.split(' ')[0]!;
   const now = new Date();
@@ -126,17 +129,18 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
           <p className="max-w-md text-sm text-teal-950">{!held.length ? 'New held payments will appear here.'
             : active.role !== 'approver' ? 'An approver in your family decides these.'
             : canApproveHere ? 'Approve or deny here, or from the family app.' : 'Deny here. Approve from the Guardian notification on your phone.'}</p></div>
-        {held.length > 0 && <ul role="list" className="mt-6 grid gap-4 lg:grid-cols-2">{held.map((payment) => <li key={payment.id} className="rounded-xl border border-teal-900/10 bg-white p-5">
+        <DecisionStatus />
+        {held.length > 0 && <ul role="list" className="mt-6 grid gap-4 lg:grid-cols-2">{held.map((payment) => { const usualLine = usualLabel(usual.get(payment.id), payment.payee.name, firstName); return <li key={payment.id} className="rounded-xl border border-teal-900/10 bg-white p-5">
           <div className="flex flex-wrap items-center justify-between gap-2"><StateBadge status={payment.status} />
             <p className="text-sm font-semibold text-amber-950">{payment.expiresAt && <Countdown expiresAt={payment.expiresAt} />}</p></div>
           <div className="mt-3 flex items-start justify-between gap-4"><div><p className="text-sm text-stone-600">{payment.protectedName} is paying</p><h3 className="mt-1 text-xl font-semibold">{payment.payee.name}</h3></div>
             <strong className="text-xl tabular-nums">{money(payment.amountCents)}</strong></div>
-          {usualLabel(usual.get(payment.id), payment.payee.name) && <p className="mt-3 text-base font-semibold text-rose-900">{usualLabel(usual.get(payment.id), payment.payee.name)}</p>}
+          {usualLine && <p className="mt-3 text-base font-semibold text-rose-900">{usualLine}</p>}
           <p className="mt-3 text-sm leading-6 text-stone-700">{payment.explanation || 'This payment triggered a safety rule and needs a family decision.'}</p>
           <ul className="mt-4 flex flex-wrap gap-2" aria-label="Reasons for hold">{payment.holdReasons.map((reason) => <li key={reason.code} className="rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-700">{reason.label}</li>)}</ul>
           {active.role === 'approver' && <DecisionButtons paymentId={payment.id} canApproveHere={canApproveHere} />}
-        </li>)}</ul>}
-        {decided.length > 0 && <div className="mt-6"><h3 className="text-sm font-bold uppercase tracking-widest text-teal-900">Recently decided</h3>
+        </li>; })}</ul>}
+        {decided.length > 0 && <div className="mt-6"><h3 id="decided-title" tabIndex={-1} className="text-sm font-bold uppercase tracking-widest text-teal-900 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal-800">Recently decided</h3>
           <ul role="list" className="mt-3 grid gap-3 lg:grid-cols-2">{decided.map((payment) => <li key={payment.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-900/10 bg-white/70 px-5 py-4">
             <div><p className="font-semibold">{payment.payee.name} <span className="ml-1 font-normal tabular-nums text-stone-700">{money(payment.amountCents)}</span></p>
               <p className="mt-1 text-sm text-stone-700">{payment.status === 'expired' ? 'Nobody answered in time, so it was blocked'
@@ -182,7 +186,7 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
           <dl className="mt-4 grid gap-4 sm:grid-cols-3">
             <div><dt className="text-sm text-stone-600">From the weekly continuous aggregate</dt><dd className="mt-1 text-2xl font-semibold tabular-nums">{ms(speed.aggregateMs)} ms</dd></div>
             <div><dt className="text-sm text-stone-600">Same answer from raw payments</dt><dd className="mt-1 text-2xl font-semibold tabular-nums">{ms(speed.rawMs)} ms</dd></div>
-            <div><dt className="text-sm text-stone-600">Compressed payment history</dt><dd className="mt-1 text-2xl font-semibold tabular-nums">{speed.compression
+            <div><dt className="text-sm text-stone-600">Compressed history, all families</dt><dd className="mt-1 text-2xl font-semibold tabular-nums">{speed.compression
               ? `${(speed.compression.beforeBytes / speed.compression.afterBytes).toFixed(1)}x smaller` : <span className="text-base font-medium text-stone-700">Nothing compressed yet</span>}</dd></div>
           </dl>
           {/* ponytail: copied from docs/perf.md (npm run bench:perf, Oct 17); update by hand if the benchmark is rerun. */}
