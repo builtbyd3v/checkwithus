@@ -98,7 +98,8 @@ export type PaymentErrorCode =
   | 'expired'
   | 'already_decided'
   | 'idempotency_conflict'
-  | 'whole_dollars_only';
+  | 'whole_dollars_only'
+  | 'frozen';
 
 /** A request we refuse for a reason the caller should be told about. */
 export class PaymentError extends Error {
@@ -271,13 +272,13 @@ export function createPaymentService(deps: PaymentServiceDeps) {
 
   /**
    * The scam-sequence query over the spending hypertable: ATM cash in the
-   * last two hours. Only the recent chunks are scanned.
+   * last two hours, exactly two hours included. Only recent chunks are scanned.
    */
   async function atmCashRecently(circleId: string): Promise<boolean> {
     const { rowCount } = await pool.query(
       `select 1 from spending
         where circle_id = $1 and atm_id is not null
-          and occurred_at > now() - make_interval(secs => $2) and occurred_at <= now()
+          and occurred_at >= now() - make_interval(secs => $2) and occurred_at <= now()
         limit 1`,
       [circleId, CASH_THEN_GIFT_CARD_WINDOW_SECONDS],
     );
@@ -446,6 +447,14 @@ export function createPaymentService(deps: PaymentServiceDeps) {
       const row = locked.rows[0];
       if (!row) throw new PaymentError('not_found', 'Payment not found or approval permission missing');
       if (row.status !== 'held') return null;
+      // The circle lock orders this against a Freeze tap. While frozen the
+      // spending money is in the vault, so an approval would pay from nothing.
+      const circle = await client.query<{ frozen: boolean }>(
+        'select frozen from circles where id = $1 for update', [row.circle_id],
+      );
+      if (input.decision === 'approve' && circle.rows[0]?.frozen) {
+        throw new PaymentError('frozen', 'Spending is frozen. Unfreeze first.', toPayment(row));
+      }
       const member = await client.query<{ id: string }>(
         `select id from circle_members where circle_id = $1 and role = 'approver'
          and (auth0_sub = $2 or id = $3) for share`, [row.circle_id, bySub, byId],
