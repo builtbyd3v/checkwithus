@@ -27,6 +27,8 @@ vi.mock('@/lib/auth/family', async () => {
 });
 
 const fake = createFakeNessie();
+/** Flipped by the CIBA-mode test. CIBA itself is covered in lib/approvals.int.test.ts. */
+const approvalMode = { ciba: false };
 vi.mock('@/lib/services', async () => {
   const { db } = await import('@/lib/db');
   const { createNessieClient } = await import('@/lib/nessie/client');
@@ -35,7 +37,11 @@ vi.mock('@/lib/services', async () => {
     pool: db(),
     nessie: createNessieClient({ key: 'test-key', fetch: fake.fetch, sleep: async () => {} }),
   });
-  return { payments: () => service };
+  return {
+    payments: () => service,
+    cibaApprovals: () => null,
+    approvalsUseCiba: () => approvalMode.ciba,
+  };
 });
 
 const { db } = await import('@/lib/db');
@@ -159,6 +165,7 @@ describe('device authentication', () => {
 
 describe('the demo, over HTTP', () => {
   let scamId: string;
+  let billId: string;
 
   it('the electricity bill goes straight through', async () => {
     const bill = await read(
@@ -177,6 +184,7 @@ describe('the demo, over HTTP', () => {
       ),
     );
     expect(bill).toMatchObject({ status: 201, body: { outcome: 'sent', amountCents: 8_412 } });
+    billId = bill.body.id;
   });
 
   it('the gift cards during the call wait for the family', async () => {
@@ -219,6 +227,36 @@ describe('the demo, over HTTP', () => {
     });
   });
 
+  it('in CIBA mode the app cannot approve, only deny', async () => {
+    const held = await read(
+      await routes.payments.POST(
+        req('/payments', { device: deviceToken, body: { ...scamBody, idempotencyKey: 'api-test-ciba-mode-1' } }),
+        noParams,
+      ),
+    );
+    approvalMode.ciba = true;
+    try {
+      const approve = await read(
+        await routes.decision.POST(
+          req(`/family/payments/${held.body.id}/decision`, { sub: MARIA, body: { decision: 'approve' } }),
+          params(held.body.id),
+        ),
+      );
+      // A sign-in token alone must not move money: approvals come from Guardian.
+      expect(approve).toMatchObject({ status: 403, body: { error: 'approve_in_guardian' } });
+
+      const deny = await read(
+        await routes.decision.POST(
+          req(`/family/payments/${held.body.id}/decision`, { sub: MARIA, body: { decision: 'deny' } }),
+          params(held.body.id),
+        ),
+      );
+      expect(deny).toMatchObject({ status: 200, body: { status: 'denied' } });
+    } finally {
+      approvalMode.ciba = false;
+    }
+  });
+
   it('the older adult\'s phone learns the outcome in one word', async () => {
     const status = await read(await routes.payment.GET(req(`/payments/${scamId}`, { device: deviceToken }), params(scamId)));
     expect(status).toMatchObject({ status: 200, body: { outcome: 'blocked_by_family', decidedByName: 'Maria' } });
@@ -228,7 +266,7 @@ describe('the demo, over HTTP', () => {
     const labels = await read(await routes.labels.GET(req('/device/labels', { device: deviceToken }), noParams));
     expect(labels.body.labels).toContainEqual(expect.objectContaining({ paymentId: scamId, label: 'scam' }));
     // The bill was allowed by the rules, not decided by the family: not a label.
-    expect(labels.body.labels).toHaveLength(1);
+    expect(labels.body.labels.map((l: { paymentId: string }) => l.paymentId)).not.toContain(billId);
   });
 
   it('no money reached Nessie except the bill', async () => {
