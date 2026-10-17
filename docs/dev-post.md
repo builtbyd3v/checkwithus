@@ -1,5 +1,5 @@
 ---
-title: "We fit a scam model inside the iPhone's Message Filter, and let it decide nothing"
+title: "We fit a scam model inside the iPhone's Message Filter, and let it decide no money"
 published: false
 tags: ios, machinelearning, postgres, hackathon
 ---
@@ -22,13 +22,13 @@ So we trained a second, much smaller model: hashed character n-grams (3 to 5 cha
 
 Here is how the two compare on 884 real test texts (no near-duplicates of training rows):
 
-| Model | Size | Accuracy | Scam recall | False holds | Speed |
-| --- | --- | --- | --- | --- | --- |
-| Guard tiny (n-grams) | 1 MB | 97.2% | 96.0% | 2.4% | 11 ms on iPhone 18 Pro Max |
-| Guard v2 (DistilBERT, PyTorch) | | 97.4% | 93.9% | 1.3% | |
-| Guard v2, Core ML 8-bit | 67 MB | | 94.0% | 1.1% | 1.3 ms per text on a Mac |
+| Model | Shipped | Size | Accuracy | Scam recall | False holds | Mac speed per text |
+| --- | --- | --- | --- | --- | --- | --- |
+| Guard tiny (n-grams) | Yes | 1 MB | 97.2% | 96.0% | 2.4% | 0.14 ms |
+| Guard v2 (DistilBERT, PyTorch) | No | | 97.4% | 94.0% | 1.3% | |
+| Guard v2, Core ML 8-bit | No | 67 MB | | 94.0% | 1.1% | 1.50 ms |
 
-The tiny model uses 2.6 MB in the extension. It catches more scams, and it holds more legit texts. For a filter that only moves texts to Spam, we took that trade.
+The tiny model uses 2.6 MB in the extension. It catches more scams, and it holds more legit texts. For a filter that only moves texts to Spam, we took that trade. The app ships only the tiny model; DistilBERT stays trained and evaluated, but not shipped. (Mac speeds are from our Swift eval on an M5 Pro, rules included. We did not save an iPhone timing.)
 
 Two honest caveats. First, we raised the validation recall target to 97% after seeing one test result, so these test numbers are slightly optimistic. Second, "sorry, wrong number" investment openers are a weak spot: both models catch only 2 of 15 in our synthetic probe set.
 
@@ -38,7 +38,7 @@ The biggest lesson came before any of this. Our first split leaked. A read-only 
 
 A scam text is annoying. A scam payment is the real damage. We did not want any model to be the thing that moves money.
 
-Every payment from the older adult's phone goes to our server, and one pure function decides if it pauses. This is the core of it, from [`web/lib/rules.ts`](https://github.com/builtbyd3v/checkwithus/blob/main/web/lib/rules.ts):
+Every payment from the older adult's phone goes to our server, and one pure function decides if it pauses. This is the whole function, from `web/lib/rules.ts`:
 
 ```ts
 export function decideHold(input: {
@@ -46,12 +46,17 @@ export function decideHold(input: {
   holdOverCents: Cents;
   baseline: Baseline;
   guard: GuardSuggestion;
+  circle?: CircleFacts;
 }): HoldDecision {
-  const { payment, holdOverCents, baseline, guard } = input;
+  const { payment, holdOverCents, baseline, guard, circle } = input;
   const reasons = new Set<HoldReason>();
+
+  if (circle?.frozen) reasons.add('frozen');
 
   const categoryReason = ALWAYS_HOLD[payment.category];
   if (categoryReason) reasons.add(categoryReason);
+
+  if (payment.category === 'gift_cards' && circle?.atmCashRecently) reasons.add('cash_then_gift_card');
 
   if (!payment.payeeKnown) reasons.add('new_payee');
 
@@ -70,6 +75,8 @@ export function decideHold(input: {
   return { action: 'hold', reasons: HOLD_REASONS.filter((r) => reasons.has(r)) };
 }
 ```
+
+(This is the version from [PR #32](https://github.com/builtbyd3v/checkwithus/pull/32), which adds Freeze and the "cash then gift card" sequence. TODO(Dev): if #32 is not merged when you publish, use the version on `main` instead.)
 
 A fooled, broken or tampered model can make the system more careful, never less. Every reason has a plain-words label the family reads on their phone, like "Paid while on a phone call". "The AI said so" is not a reason a family member can check.
 
@@ -119,6 +126,6 @@ Compression took the table from 163.3 MB to 50.3 MB (3.2x smaller). To be fair t
 
 ## AI tools we used
 
-Claude Code (Opus 5 and 5.5) wrote most of the code and drafted this post with us. Codex (GPT-6) built parts of the web backend, and the Codex CLI reviewed changes read-only. Inside the product, Apple Foundation Models writes the family's note on the phone. The scam models are ours, trained during the event.
+Claude Code (Opus 5 and 5.5) wrote most of the code and drafted this post with us. OpenAI Codex CLI built parts of the web backend and reviewed changes read-only. Inside the product, Apple Foundation Models writes the family's note on the phone. The scam models are ours, trained during the event.
 
 TODO(Dev): add one or two sentences in your own voice: what you would do differently, or the moment the filter first worked on your phone.
