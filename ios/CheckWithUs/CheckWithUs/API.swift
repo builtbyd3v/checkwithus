@@ -8,7 +8,8 @@ struct API {
         // Simulator tests against a local mock: launch with `-apiBase http://127.0.0.1:8787/api/v1`.
         if let override = UserDefaults.standard.string(forKey: "apiBase"), let url = URL(string: override) { return url }
         #endif
-        return URL(string: "https://checkwith.us/api/v1")!
+        // www: the apex 308s to www, and URLSession drops Authorization on a cross-host redirect.
+        return URL(string: "https://www.checkwith.us/api/v1")!
     }()
 
     struct Failure: Error, LocalizedError {
