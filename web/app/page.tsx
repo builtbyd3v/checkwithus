@@ -141,10 +141,13 @@ export default function Home() {
         <section id="how" aria-labelledby="how-heading" className="scroll-mt-4 px-5 pt-16 sm:px-10 lg:px-[10%] lg:pt-[14svh]">
           <h2 id="how-heading" className="font-display text-[clamp(1.75rem,1.5rem+0.8vw,2.25rem)] leading-tight tracking-[-0.01em]">What your parent sees</h2>
           {STORY.map((s, i) => (
-            <div key={s.title} data-step={i + 1} className="flex flex-col justify-center py-12 lg:min-h-[78svh] lg:py-10 lg:last:min-h-[60svh]">
+            <div key={s.title} data-step={i + 1} className="flex flex-col justify-center py-8 lg:min-h-[78svh] lg:py-10 lg:last:min-h-[60svh]">
               <h3 className="rise max-w-[24ch] font-display text-[clamp(1.75rem,1.5rem+0.8vw,2.25rem)] leading-tight tracking-[-0.01em]">{s.title}</h3>
               <p className={`rise-late mt-4 max-w-[42ch] ${body}`}>{s.body}</p>
-              <div aria-hidden="true" className="mt-8 flex justify-center rounded-[20px] bg-field py-5 sm:px-3 lg:hidden">{SCREENS[i + 1]}</div>
+              {/* 600px screen scaled to 520px so the whole phone fits a 390x844 viewport. */}
+              <div aria-hidden="true" className="mt-6 flex h-[560px] justify-center overflow-hidden rounded-[20px] bg-field pt-5 lg:hidden">
+                <div className="origin-top scale-[0.8667]">{SCREENS[i + 1]}</div>
+              </div>
             </div>
           ))}
         </section>
