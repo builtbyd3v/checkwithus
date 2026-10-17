@@ -7,8 +7,11 @@
 import 'server-only';
 import type pg from 'pg';
 import { PAIRING_CODE_MINUTES } from '@/lib/auth/device';
-import { newShortCode, normalizeShortCode, sha256 } from '@/lib/auth/tokens';
+import { hashShortCode, newShortCode, normalizeShortCode } from '@/lib/auth/tokens';
+import { codeHashKey } from '@/lib/env';
 import { HttpError } from '@/lib/http';
+import { issueInviteCode } from '@/lib/invites';
+export { issueInviteCode } from '@/lib/invites';
 import type { PaymentService } from '@/lib/payments';
 import { familyPaymentView } from '@/lib/views';
 
@@ -64,9 +67,15 @@ export async function familyPayments(
   pool: pg.Pool,
   service: PaymentService,
   sub: string,
-  options: { heldOnly: boolean },
+  options: { heldOnly: boolean; circleId?: string },
 ) {
-  const circles = await memberships(pool, sub);
+  const membershipsForUser = await memberships(pool, sub);
+  const circles = options.circleId === undefined
+    ? membershipsForUser
+    : membershipsForUser.filter((circle) => circle.circleId === options.circleId);
+  if (options.circleId !== undefined && circles.length === 0) {
+    throw new HttpError(404, 'not_found', 'Not found');
+  }
   const payments = await service.listPayments(
     circles.map((c) => c.circleId),
     { heldOnly: options.heldOnly, limit: 50 },
@@ -92,12 +101,18 @@ export async function joinCircle(
 ): Promise<Membership> {
   const code = normalizeShortCode(input.inviteCode);
   const { rows } = code
-    ? await pool.query<{ id: string }>(`select id from circles where invite_code_hash = $1`, [
-        sha256(code),
-      ])
+    ? await pool.query<{ id: string }>(
+        `select id from circles where invite_code_hash = $1 and invite_expires_at > now()`,
+        [hashShortCode(code, codeHashKey())],
+      )
     : { rows: [] };
   const circleId = rows[0]?.id;
+  // Wrong, expired and never-issued codes all get the same answer.
   if (!circleId) throw new HttpError(404, 'invalid_invite', 'That invite code is not valid');
+
+  // Already in: joining again is a no-op, even in a full circle.
+  const existing = (await memberships(pool, sub)).find((m) => m.circleId === circleId);
+  if (existing) return existing;
 
   try {
     await pool.query(
@@ -122,7 +137,7 @@ export async function createPairingCode(pool: pg.Pool, sub: string, circleId: st
     `insert into pairing_codes (code_hash, circle_id, expires_at)
      values ($1, $2, now() + make_interval(mins => $3))
      returning expires_at`,
-    [sha256(code), circleId, PAIRING_CODE_MINUTES],
+    [hashShortCode(code, codeHashKey()), circleId, PAIRING_CODE_MINUTES],
   );
   return { code, expiresAt: rows[0]!.expires_at.toISOString() };
 }
@@ -130,12 +145,7 @@ export async function createPairingCode(pool: pg.Pool, sub: string, circleId: st
 /** A fresh invite code for the circle; the old one stops working. */
 export async function rotateInviteCode(pool: pg.Pool, sub: string, circleId: string) {
   await requireMembership(pool, sub, circleId);
-  const code = newShortCode();
-  await pool.query(`update circles set invite_code_hash = $2 where id = $1`, [
-    circleId,
-    sha256(code),
-  ]);
-  return { code };
+  return issueInviteCode(pool, circleId);
 }
 
 export async function familyAlerts(pool: pg.Pool, sub: string) {

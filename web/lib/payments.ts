@@ -182,6 +182,16 @@ const DEMO_MERCHANT_LOCATION = {
  * the time anyone may conclude a send failed, the send itself has resolved.
  */
 const STUCK_PAYING_SECONDS = 30;
+const LOOKUP_INTERVAL_SECONDS = 7;
+
+/**
+ * A payment whose bank outcome is unknown is only declared failed this long
+ * after it was actually sent. Until then it is looked for at Nessie at most
+ * once per lookup interval and shown as "sending". Nessie has no idempotency keys, so "failed"
+ * followed by a retry (a new payment) while the first one commits late would
+ * pay twice; ten minutes is far beyond any plausible late commit.
+ */
+const UNKNOWN_OUTCOME_MINUTES = 10;
 
 export type PaymentServiceDeps = {
   pool: pg.Pool;
@@ -508,10 +518,19 @@ export function createPaymentService(deps: PaymentServiceDeps) {
     // Restart the reconcile clock at the send itself, not at the claim: the
     // merchant lookup above can take a while, and a concurrent read must not
     // conclude "failed" while this send is still about to happen.
-    await pool.query(
-      `update payments set updated_at = now() where id = $1 and status = 'paying'`,
-      [payment.id],
+    // If that touches no row, a concurrent read already concluded this payment
+    // (preparation ran past the reconcile window), so it must not be sent.
+    const stillPaying = await pool.query(
+      `update payments set updated_at = now(), sent_at = now(),
+              next_lookup_at = now() + make_interval(secs => $2)
+        where id = $1 and status = 'paying'`,
+      [payment.id, LOOKUP_INTERVAL_SECONDS],
     );
+    if (stillPaying.rowCount === 0) {
+      const current = await getPayment(id);
+      if (!current) throw new PaymentError('not_found', 'Payment not found');
+      return current;
+    }
 
     // Only the send is guarded here. Once Nessie has said yes, nothing that
     // goes wrong afterwards may mark this payment failed: the money moved.
@@ -550,10 +569,10 @@ export function createPaymentService(deps: PaymentServiceDeps) {
     }
   }
 
-  /** Leaves a payment `paying`, with a note for the dashboard. Restarts the reconcile clock. */
+  /** Leaves a payment `paying`, with a note for the dashboard. */
   async function notePaying(id: string, note: string): Promise<void> {
     await pool.query(
-      `update payments set failure = $2, updated_at = now() where id = $1 and status = 'paying'`,
+      `update payments set failure = $2 where id = $1 and status = 'paying'`,
       [id, note],
     );
   }
@@ -568,7 +587,11 @@ export function createPaymentService(deps: PaymentServiceDeps) {
   async function reconcile(
     payment: Payment,
     nessieAccountId: string,
-    { mayConcludeFailed }: { mayConcludeFailed: boolean },
+    conclusion:
+      | { mayConcludeFailed: false }
+      // `observedUpdatedAt`: the payment's updated_at when it was judged stale,
+      // as Postgres text (microseconds; a JS Date would drop them).
+      | { mayConcludeFailed: true; observedUpdatedAt: string },
   ): Promise<Payment> {
     let record;
     try {
@@ -580,28 +603,49 @@ export function createPaymentService(deps: PaymentServiceDeps) {
     if (record && record.kind !== 'deposit') {
       return recordPaid(payment, record.kind, record.nessieId);
     }
-    if (!mayConcludeFailed) {
+    if (!conclusion.mayConcludeFailed) {
       await notePaying(payment.id, 'Nessie has not confirmed this payment yet; checking again shortly');
       return (await getPayment(payment.id)) ?? payment;
     }
-    return markFailed(payment.id, 'Nessie never confirmed this payment and has no record of it');
+    // Conclude only if nobody touched the payment while we were looking. A
+    // slow original request restarts updated_at just before it sends; if that
+    // happened, this update matches nothing and the send goes ahead. If this
+    // lands first, that request sees the payment is no longer `paying` and
+    // does not send. The row lock makes the two mutually exclusive.
+    return markFailed(payment.id, 'Nessie never confirmed this payment and has no record of it', {
+      ifUpdatedAt: conclusion.observedUpdatedAt,
+    });
   }
 
   /**
    * Settles a payment left `paying`: a send cut off mid-flight, or one waiting
-   * on reconciliation. Waits until the last attempt is STUCK_PAYING_SECONDS
-   * old, so a write still in flight at Nessie is not declared failed.
+   * on reconciliation. Claims one Nessie lookup per interval across all readers.
+   * An absent record cannot mean failure until the last send is old enough.
    */
   async function reconcileIfStuck(payment: Payment): Promise<Payment> {
     if (payment.status !== 'paying') return payment;
-    const { rowCount } = await pool.query(
-      `select 1 from payments where id = $1 and status = 'paying'
-          and updated_at < now() - make_interval(secs => $2)`,
-      [payment.id, STUCK_PAYING_SECONDS],
+    const { rows } = await pool.query<{ observed: string; long_enough: boolean }>(
+      `update payments set next_lookup_at = now() + make_interval(secs => $2)
+        where id = $1 and status = 'paying' and next_lookup_at <= now()
+          and (sent_at is not null or updated_at < now() - make_interval(secs => $3))
+       returning updated_at::text as observed,
+              -- Never sent (died before the send): nothing can land, safe to fail.
+              (sent_at is null or sent_at < now() - make_interval(mins => $4))
+                and updated_at < now() - make_interval(secs => $3) as long_enough`,
+      [payment.id, LOOKUP_INTERVAL_SECONDS, STUCK_PAYING_SECONDS, UNKNOWN_OUTCOME_MINUTES],
     );
-    if (!rowCount) return payment;
+    if (!rows[0]) return payment;
     const circle = await circleSettings(payment.circleId);
-    return reconcile(payment, circle.nessieAccountId, { mayConcludeFailed: true });
+    // Too soon after the send to call it failed: look, and if it is not at
+    // Nessie yet, keep showing "sending". Telling someone "failed" invites a
+    // second payment, and the first may still land.
+    if (!rows[0].long_enough) {
+      return reconcile(payment, circle.nessieAccountId, { mayConcludeFailed: false });
+    }
+    return reconcile(payment, circle.nessieAccountId, {
+      mayConcludeFailed: true,
+      observedUpdatedAt: rows[0].observed,
+    });
   }
 
   /** paying -> paid, and the ledger row, in one transaction; once only. */
@@ -637,12 +681,18 @@ export function createPaymentService(deps: PaymentServiceDeps) {
     });
   }
 
-  async function markFailed(id: string, failure: string): Promise<Payment> {
+  /** paying -> failed. With `ifUpdatedAt`, only if the row is unchanged since then. */
+  async function markFailed(
+    id: string,
+    failure: string,
+    options: { ifUpdatedAt?: string } = {},
+  ): Promise<Payment> {
     const { rows } = await pool.query<PaymentRow>(
       `update payments set status = 'failed', failure = $2, updated_at = now()
         where id = $1 and status = 'paying'
+          and ($3::timestamptz is null or updated_at = $3::timestamptz)
        returning ${COLUMNS}`,
-      [id, failure.slice(0, 500)],
+      [id, failure.slice(0, 500), options.ifUpdatedAt ?? null],
     );
     if (rows[0]) return toPayment(rows[0]);
     const current = await getPayment(id);

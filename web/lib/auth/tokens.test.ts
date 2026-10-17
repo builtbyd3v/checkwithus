@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  hashShortCode,
   looksLikeDeviceToken,
   newDeviceToken,
   newShortCode,
@@ -23,6 +24,15 @@ describe('device tokens', () => {
   it('are stored as a stable hash', () => {
     expect(sha256('cwd_abc')).toBe(sha256('cwd_abc'));
     expect(sha256('cwd_abc')).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+describe('short code hashes', () => {
+  it('depend on the server key, so a database alone cannot be brute-forced', () => {
+    const code = '7K2M-9Q4X';
+    expect(hashShortCode(code, 'key-one-'.repeat(4))).toBe(hashShortCode(code, 'key-one-'.repeat(4)));
+    expect(hashShortCode(code, 'key-one-'.repeat(4))).not.toBe(hashShortCode(code, 'key-two-'.repeat(4)));
+    expect(hashShortCode(code, 'key-one-'.repeat(4))).not.toBe(sha256(code));
   });
 });
 

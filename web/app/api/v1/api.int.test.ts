@@ -8,6 +8,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createFakeNessie } from '@/test/fake-nessie';
+import { toCents } from '@/lib/money';
 
 vi.mock('next/server', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/server')>()),
@@ -27,6 +28,9 @@ vi.mock('@/lib/auth/family', async () => {
 });
 
 const fake = createFakeNessie();
+/** Flipped by the CIBA-mode test. CIBA itself is covered in lib/approvals.int.test.ts. */
+const approvalMode = { ciba: false };
+const pollPayment = vi.fn(async () => {});
 vi.mock('@/lib/services', async () => {
   const { db } = await import('@/lib/db');
   const { createNessieClient } = await import('@/lib/nessie/client');
@@ -35,12 +39,16 @@ vi.mock('@/lib/services', async () => {
     pool: db(),
     nessie: createNessieClient({ key: 'test-key', fetch: fake.fetch, sleep: async () => {} }),
   });
-  return { payments: () => service };
+  return {
+    payments: () => service,
+    cibaApprovals: () => approvalMode.ciba ? { pollPayment, pollCircles: async () => {} } : null,
+    approvalsUseCiba: () => approvalMode.ciba,
+  };
 });
 
 const { db } = await import('@/lib/db');
 const { normalizeName } = await import('@/lib/names');
-const { newShortCode, sha256 } = await import('@/lib/auth/tokens');
+const { issueInviteCode } = await import('@/lib/family');
 const routes = {
   pairingCode: await import('./family/circles/[id]/pairing-code/route'),
   pair: await import('./device/pair/route'),
@@ -50,6 +58,7 @@ const routes = {
   payments: await import('./payments/route'),
   payment: await import('./payments/[id]/route'),
   familyPayments: await import('./family/payments/route'),
+  familyPayment: await import('./family/payments/[id]/route'),
   decision: await import('./family/payments/[id]/decision/route'),
   familyAlerts: await import('./family/alerts/route'),
   join: await import('./family/join/route'),
@@ -89,13 +98,13 @@ const scamBody = {
 };
 
 beforeAll(async () => {
-  inviteCode = newShortCode();
   const { rows } = await db().query<{ id: string }>(
-    `insert into circles (protected_name, nessie_customer_id, nessie_account_id, opening_balance_cents, invite_code_hash)
-     values ('Rosa Test (synthetic)', 'test-customer', $1, 500000, $2) returning id`,
-    ['test-account-' + crypto.randomUUID(), sha256(inviteCode)],
+    `insert into circles (protected_name, nessie_customer_id, nessie_account_id, opening_balance_cents)
+     values ('Rosa Test (synthetic)', 'test-customer', $1, 500000) returning id`,
+    ['test-account-' + crypto.randomUUID()],
   );
   circleId = rows[0]!.id;
+  inviteCode = (await issueInviteCode(db(), circleId)).code;
   await db().query(
     `insert into circle_members (circle_id, auth0_sub, display_name) values ($1, $2, 'Maria')`,
     [circleId, MARIA],
@@ -159,6 +168,7 @@ describe('device authentication', () => {
 
 describe('the demo, over HTTP', () => {
   let scamId: string;
+  let billId: string;
 
   it('the electricity bill goes straight through', async () => {
     const bill = await read(
@@ -177,6 +187,7 @@ describe('the demo, over HTTP', () => {
       ),
     );
     expect(bill).toMatchObject({ status: 201, body: { outcome: 'sent', amountCents: 8_412 } });
+    billId = bill.body.id;
   });
 
   it('the gift cards during the call wait for the family', async () => {
@@ -219,6 +230,36 @@ describe('the demo, over HTTP', () => {
     });
   });
 
+  it('in CIBA mode the app cannot approve, only deny', async () => {
+    const held = await read(
+      await routes.payments.POST(
+        req('/payments', { device: deviceToken, body: { ...scamBody, idempotencyKey: 'api-test-ciba-mode-1' } }),
+        noParams,
+      ),
+    );
+    approvalMode.ciba = true;
+    try {
+      const approve = await read(
+        await routes.decision.POST(
+          req(`/family/payments/${held.body.id}/decision`, { sub: MARIA, body: { decision: 'approve' } }),
+          params(held.body.id),
+        ),
+      );
+      // A sign-in token alone must not move money: approvals come from Guardian.
+      expect(approve).toMatchObject({ status: 403, body: { error: 'approve_in_guardian' } });
+
+      const deny = await read(
+        await routes.decision.POST(
+          req(`/family/payments/${held.body.id}/decision`, { sub: MARIA, body: { decision: 'deny' } }),
+          params(held.body.id),
+        ),
+      );
+      expect(deny).toMatchObject({ status: 200, body: { status: 'denied' } });
+    } finally {
+      approvalMode.ciba = false;
+    }
+  });
+
   it('the older adult\'s phone learns the outcome in one word', async () => {
     const status = await read(await routes.payment.GET(req(`/payments/${scamId}`, { device: deviceToken }), params(scamId)));
     expect(status).toMatchObject({ status: 200, body: { outcome: 'blocked_by_family', decidedByName: 'Maria' } });
@@ -228,7 +269,7 @@ describe('the demo, over HTTP', () => {
     const labels = await read(await routes.labels.GET(req('/device/labels', { device: deviceToken }), noParams));
     expect(labels.body.labels).toContainEqual(expect.objectContaining({ paymentId: scamId, label: 'scam' }));
     // The bill was allowed by the rules, not decided by the family: not a label.
-    expect(labels.body.labels).toHaveLength(1);
+    expect(labels.body.labels.map((l: { paymentId: string }) => l.paymentId)).not.toContain(billId);
   });
 
   it('no money reached Nessie except the bill', async () => {
@@ -237,7 +278,76 @@ describe('the demo, over HTTP', () => {
   });
 });
 
+describe('family payment detail and recovery', () => {
+  it('requires sign-in and hides unknown or unauthorized payments before polling', async () => {
+    const { payments } = await import('@/lib/services');
+    const held = await payments().createPayment(circleId, {
+      idempotencyKey: 'api-detail-private', amountCents: toCents(50000),
+      payeeName: 'Synthetic gift cards', payeeKind: 'merchant', category: 'gift_cards',
+      onCall: true, guard: null, explanation: null,
+    });
+    approvalMode.ciba = true;
+    pollPayment.mockClear();
+    const writes = fake.paymentWrites().length;
+    try {
+      expect((await routes.familyPayment.GET(req(`/family/payments/${held.id}`), params(held.id))).status).toBe(401);
+      for (const id of [held.id, crypto.randomUUID(), 'not-a-uuid']) {
+        expect((await routes.familyPayment.GET(req(`/family/payments/${id}`, { sub: 'test|stranger' }), params(id))).status).toBe(404);
+      }
+      expect(pollPayment).not.toHaveBeenCalled();
+      const response = await routes.familyPayment.GET(req(`/family/payments/${held.id}`, { sub: MARIA }), params(held.id));
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(await response.json()).toMatchObject({ id: held.id, status: 'held', protectedName: 'Rosa Test (synthetic)' });
+      expect(pollPayment).toHaveBeenCalledWith(held.id, circleId);
+      expect(fake.paymentWrites()).toHaveLength(writes);
+    } finally { approvalMode.ciba = false; }
+  });
+
+  it('expires an unanswered hold when only the family checks it', async () => {
+    const { rows } = await db().query<{ id: string }>(
+      `insert into payments (circle_id, idempotency_key, amount_cents, payee_name, payee_kind,
+         category, on_call, payee_known, status, expires_at)
+       values ($1, 'api-detail-expired', 50000, 'Synthetic shop', 'merchant', 'shopping',
+         false, false, 'held', now() - interval '1 second') returning id`, [circleId],
+    );
+    const id = rows[0]!.id;
+    const response = await read(await routes.familyPayment.GET(req(`/family/payments/${id}`, { sub: MARIA }), params(id)));
+    expect(response).toMatchObject({ status: 200, body: { status: 'expired', decidedVia: 'timeout' } });
+  });
+
+  it('recovers a bank write without resending when only the family polls', async () => {
+    const { payments } = await import('@/lib/services');
+    fake.failNext('/bills', 'lostThen500');
+    const payment = await payments().createPayment(circleId, {
+      idempotencyKey: 'api-detail-recovery', amountCents: toCents(8412), payeeName: 'City Power & Light',
+      payeeKind: 'biller', category: 'utilities', onCall: false, guard: null, explanation: null,
+    });
+    expect(payment.status).toBe('paying');
+    const account = await db().query<{ nessie_account_id: string }>('select nessie_account_id from circles where id = $1', [circleId]);
+    fake.records.push({ kind: 'bills', accountId: account.rows[0]!.nessie_account_id,
+      body: { _id: 'fake-family-recovered', payee: 'City Power & Light', nickname: `Utilities [cw:${payment.id}]`,
+        payment_date: '2026-10-17', payment_amount: 84.12 } });
+    await db().query('update payments set next_lookup_at = now() where id = $1', [payment.id]);
+    const writes = fake.paymentWrites().length;
+    for (let i = 0; i < 2; i++) {
+      const response = await read(await routes.familyPayment.GET(req(`/family/payments/${payment.id}`, { sub: MARIA }), params(payment.id)));
+      expect(response).toMatchObject({ status: 200, body: { status: 'paid', amountCents: 8412 } });
+    }
+    expect(fake.paymentWrites()).toHaveLength(writes);
+    const ledger = await db().query('select amount_cents from spending where payment_id = $1', [payment.id]);
+    expect(ledger.rows).toEqual([{ amount_cents: 8412 }]);
+  });
+});
+
 describe('strict input', () => {
+  it('rejects malformed label cursors and ambiguous pagination', async () => {
+    const malformed = Buffer.from(JSON.stringify({ decidedAt: 'not-a-date', paymentId: 'not-an-id' })).toString('base64url');
+    for (const query of ['cursor=garbage', `cursor=${malformed}`, 'cursor=abc&after=2026-10-17T00:00:00Z']) {
+      const response = await routes.labels.GET(req(`/device/labels?${query}`, { device: deviceToken }), noParams);
+      expect(response.status).toBe(400);
+    }
+  });
+
   it('rejects dollars sent where cents are expected, naming the field', async () => {
     const response = await read(
       await routes.payments.POST(req('/payments', { device: deviceToken, body: { ...scamBody, idempotencyKey: 'api-test-dollars-01', amountCents: 499.5 } }), noParams),
@@ -293,6 +403,21 @@ describe('alerts and the family circle', () => {
       await routes.join.POST(req('/family/join', { sub: 'test|fourth', body: { inviteCode, displayName: 'Four' } }), noParams),
     );
     expect(fourth).toMatchObject({ status: 409, body: { error: 'circle_full' } });
+
+    // Someone already in the full circle using the invite again is a no-op, not "full".
+    const again = await routes.join.POST(
+      req('/family/join', { sub: 'test|leo', body: { inviteCode, displayName: 'Leo' } }),
+      noParams,
+    );
+    expect(again.status).toBe(200);
+  });
+
+  it('an expired invite gets the same answer as a wrong one', async () => {
+    await db().query(`update circles set invite_expires_at = now() - interval '1 second' where id = $1`, [circleId]);
+    const response = await read(
+      await routes.join.POST(req('/family/join', { sub: 'test|late', body: { inviteCode, displayName: 'Late' } }), noParams),
+    );
+    expect(response).toMatchObject({ status: 404, body: { error: 'invalid_invite' } });
   });
 
   it('a wrong invite code is just "not valid"', async () => {

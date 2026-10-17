@@ -184,6 +184,20 @@ describe('the family circle', () => {
       expect(joins.filter((j) => j.status === 'fulfilled')).toHaveLength(3);
       const count = await pool.query('select count(*)::int as n from circle_members where circle_id = $1', [id]);
       expect(count.rows[0].n).toBe(3);
+
+      // The trigger itself lets an existing member's duplicate insert through
+      // to ON CONFLICT, instead of calling a full circle full at them.
+      const member = await pool.query<{ auth0_sub: string }>(
+        'select auth0_sub from circle_members where circle_id = $1 limit 1',
+        [id],
+      );
+      await expect(
+        pool.query(
+          `insert into circle_members (circle_id, auth0_sub, display_name) values ($1, $2, 'Again')
+           on conflict (circle_id, auth0_sub) do nothing`,
+          [id, member.rows[0]!.auth0_sub],
+        ),
+      ).resolves.toMatchObject({ rowCount: 0 });
     } finally {
       await pool.query('delete from circles where id = $1', [id]);
     }
@@ -278,14 +292,45 @@ describe('money moves exactly once', () => {
     // Right after the error: not found yet, but too soon to conclude anything.
     expect(payment.status).toBe('paying');
 
-    // A read 31 seconds later settles it: still nothing at Nessie, so failed.
-    await pool.query(`update payments set updated_at = now() - interval '31 seconds' where id = $1`, [payment.id]);
+    // A minute after the send: still "sending". Saying "failed" now would
+    // invite a second payment while the first might still land.
+    await pool.query(
+      `update payments set updated_at = now() - interval '31 seconds', sent_at = now() - interval '1 minute', next_lookup_at = now() where id = $1`,
+      [payment.id],
+    );
+    expect((await service.paymentForCircle(circleId, payment.id)).status).toBe('paying');
+
+    // Ten minutes after the send, still nothing at Nessie: now it is failed.
+    await pool.query(
+      `update payments set updated_at = now() - interval '31 seconds', sent_at = now() - interval '11 minutes', next_lookup_at = now() where id = $1`,
+      [payment.id],
+    );
     const settled = await service.paymentForCircle(circleId, payment.id);
 
     expect(settled.status).toBe('failed');
     expect(fake.paymentWrites()).toHaveLength(1); // looked, never sent again
     const ledger = await pool.query('select 1 from spending where payment_id = $1', [payment.id]);
     expect(ledger.rowCount).toBe(0);
+  });
+
+  it('a reconcile racing the original send backs off instead of declaring it failed', async () => {
+    fake.failNext('/bills', 'lostThen500');
+    const payment = await service.createPayment(circleId, { ...electricBill, idempotencyKey: key() });
+    // Old enough on both clocks that only the race guard can stop a "failed".
+    await pool.query(
+      `update payments set updated_at = now() - interval '31 seconds', sent_at = now() - interval '11 minutes', next_lookup_at = now() where id = $1`,
+      [payment.id],
+    );
+
+    // While the reconcile is looking at Nessie, the slow original request
+    // restarts the clock right before it sends.
+    fake.duringNextLookup(async () => {
+      await pool.query(`update payments set updated_at = now() where id = $1`, [payment.id]);
+    });
+    const settled = await service.paymentForCircle(circleId, payment.id);
+
+    // Not failed: that request is about to send, and its send must be recordable.
+    expect(settled.status).toBe('paying');
   });
 
   it('a slow write that lands after the first look is found later, not declared failed', async () => {
@@ -306,22 +351,50 @@ describe('money moves exactly once', () => {
         payment_amount: 84.12,
       },
     });
-    await pool.query(`update payments set updated_at = now() - interval '31 seconds' where id = $1`, [payment.id]);
+    await pool.query(`update payments set updated_at = now() - interval '31 seconds', next_lookup_at = now() where id = $1`, [payment.id]);
 
     const settled = await service.paymentForCircle(circleId, payment.id);
     expect(settled).toMatchObject({ status: 'paid', nessieId: 'fake-late-arrival' });
     expect(fake.paymentWrites()).toHaveLength(1);
   });
+
+  it('finds a newly landed payment within 30 seconds, with one claimed lookup per interval', async () => {
+    fake.failNext('/bills', 'lostThen500');
+    const payment = await service.createPayment(circleId, { ...electricBill, idempotencyKey: key() });
+    expect(payment.status).toBe('paying');
+    const initialGets = fake.calls.filter((call) => call.method === 'GET').length;
+
+    await Promise.all(Array.from({ length: 5 }, () => service.paymentForCircle(circleId, payment.id)));
+    expect(fake.calls.filter((call) => call.method === 'GET')).toHaveLength(initialGets);
+
+    fake.records.push({
+      kind: 'bills', accountId: ACCOUNT,
+      body: { _id: 'fake-quick-arrival', payee: 'City Power & Light',
+        nickname: `Utilities [cw:${payment.id}]`, payment_date: '2026-10-17', payment_amount: 84.12 },
+    });
+    await pool.query(`update payments set next_lookup_at = now() where id = $1`, [payment.id]);
+    const reads = await Promise.all(Array.from({ length: 5 }, () => service.paymentForCircle(circleId, payment.id)));
+    expect(reads.some((read) => read.status === 'paid')).toBe(true);
+    expect((await service.getPayment(payment.id))!.status).toBe('paid');
+    expect(fake.calls.filter((call) => call.method === 'GET')).toHaveLength(initialGets + 4);
+    expect(fake.paymentWrites()).toHaveLength(1);
+  });
 });
 
-describe('unusual spending, from the real-time continuous aggregate', () => {
-  it('holds a grocery run far above her usual, from history the aggregate has not materialized', async () => {
+describe('unusual spending, from the continuous aggregate', () => {
+  it('holds a grocery run far above her usual history', async () => {
     // Ten days of ~$40 grocery runs, straight into the hypertable.
     await pool.query(
       `insert into spending (occurred_at, circle_id, amount_cents, category, payee_name)
        select now() - make_interval(days => d), $1, 4000, 'groceries', 'Sunrise Grocery'
          from generate_series(1, 10) as d`,
       [circleId],
+    );
+    // Once historical buckets are materialized, a backdated insert needs a
+    // refresh before the continuous aggregate includes it.
+    await pool.query(
+      `call refresh_continuous_aggregate('spending_daily',
+         now() - interval '11 days', now() - interval '1 hour')`,
     );
 
     const usual = await service.createPayment(circleId, {

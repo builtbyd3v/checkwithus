@@ -20,18 +20,26 @@ vi.mock('@/lib/env', () => ({
 
 let privateKey: CryptoKey;
 let publicJwk: JWK;
+/** Simulates Auth0's key endpoint being unreachable. */
+let auth0Down = false;
 
 vi.mock('jose', async (importOriginal) => {
   const actual = await importOriginal<typeof import('jose')>();
   // The real code fetches Auth0's key set over HTTPS; serve ours locally instead.
   return {
     ...actual,
-    createRemoteJWKSet: () => createLocalJWKSet({ keys: [{ ...publicJwk, kid: 'k1', alg: 'RS256' }] }),
+    createRemoteJWKSet: () => {
+      const local = createLocalJWKSet({ keys: [{ ...publicJwk, kid: 'k1', alg: 'RS256' }] });
+      return (...args: Parameters<typeof local>) => {
+        if (auth0Down) throw new TypeError('fetch failed');
+        return local(...args);
+      };
+    },
   };
 });
 
 const { requireFamilyUser } = await import('./family');
-const { AuthError } = await import('./http-auth');
+const { AuthError, AuthUnavailableError } = await import('./http-auth');
 
 beforeAll(async () => {
   const pair = await generateKeyPair('RS256');
@@ -115,6 +123,19 @@ describe('requireFamilyUser', () => {
       .setExpirationTime('5m')
       .sign(new TextEncoder().encode('guessable-secret-guessable-secret'));
     await expect(requireFamilyUser(request(token))).rejects.toBeInstanceOf(AuthError);
+  });
+
+  it('does not sign anyone out when Auth0 itself is unreachable', async () => {
+    const token = await sign();
+    auth0Down = true;
+    try {
+      const error = await requireFamilyUser(request(token)).catch((e: unknown) => e);
+      // A retryable 503, not "your sign-in is invalid".
+      expect(error).toBeInstanceOf(AuthUnavailableError);
+      expect(error).not.toBeInstanceOf(AuthError);
+    } finally {
+      auth0Down = false;
+    }
   });
 
   it('rejects an unsigned alg:none token', async () => {
