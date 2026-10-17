@@ -45,3 +45,5 @@ quotes were provided. Add verified quotes and resulting design changes to
 `docs/research.md` when available; do not fabricate them.
 
 AI tool used: Codex for the vector assets and handoff.
+
+Team steps: [Figma import, missing native captures and genuine feedback](team-review.md).

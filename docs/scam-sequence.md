@@ -26,6 +26,23 @@ seeds no Guardian push. Each run is another withdrawal, so run it once for a dem
 Keep the existing `npm run demo:atm` flow when demonstrating the subsequent request
 from the phone itself. Never run either command against real people/accounts.
 
+Before deciding the request, copy the printed held-payment UUID and run:
+
+```sh
+npm run check:sequence -- <held-payment-uuid>
+```
+
+This verifier opens a repeatable-read, read-only transaction. It checks that the
+payment belongs to synthetic Rosa, is held and unexpired, has no recorded Nessie
+payment ID or payment spending row, and has the stored sequence reason plus
+eligible ATM evidence through the production dashboard query. It creates no
+withdrawal or payment and prints a JSON evidence record. Save its output with
+the tested commit and timestamp when doing the live sandbox smoke test.
+It does not independently query Nessie or prove Auth0 permissions. A failed
+check is not a reason to repeat the withdrawal; inspect the existing request
+and configuration first. After family denial, verify the dashboard and ledger
+separately; the verifier intentionally requires the pre-decision held state.
+
 Validation:
 
 - Five tests execute the production display SQL in an ephemeral embedded PostgreSQL
