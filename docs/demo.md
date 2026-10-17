@@ -44,6 +44,7 @@ iPhone B (family)
 - [ ] Family role. Signed in with the Auth0 approver account. Joined Rosa's circle.
 - [ ] Face ID works for the app (passcode is the fallback). The phone has a passcode set.
 - [ ] Money tab says not frozen, and Allowances shows "Utilities, up to $400" (both from `demo:reset`).
+- [ ] Sign in again on iPhone B right before filming or a judge's Freeze step. Freeze needs an Auth0 sign-in from the last 5 minutes; an older one opens the Auth0 login sheet first.
 
 MacBook
 - [ ] www.checkwith.us/dashboard signed in, on Rosa's circle.
