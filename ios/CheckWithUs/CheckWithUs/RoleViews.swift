@@ -43,8 +43,9 @@ struct RolePickerView: View {
                 .font(.title2)
                 .foregroundStyle(.secondary)
         } action: {
-            BigButton("I'm the one being protected", symbol: "checkmark.shield.fill") { role = "protected" }
-            BigButton("I'm family", symbol: "person.2.fill", prominent: false) { role = "family" }
+            // Any role choice starts the family side signed out (see FamilyAuth.forget).
+            BigButton("I'm the one being protected", symbol: "checkmark.shield.fill") { FamilyAuth.forget(); role = "protected" }
+            BigButton("I'm family", symbol: "person.2.fill", prominent: false) { FamilyAuth.forget(); role = "family" }
         }
     }
 }
@@ -74,6 +75,9 @@ struct SwitchRoleButton: View {
     @AppStorage("role") private var role = ""
 
     var body: some View {
-        Button("Change who uses this phone") { role = "" }
+        Button("Change who uses this phone") {
+            FamilyAuth.forget()
+            role = ""
+        }
     }
 }

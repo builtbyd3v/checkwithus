@@ -15,7 +15,8 @@ struct FamilyRootView: View {
             }
         }
         .environment(model)
-        .task(id: model.tokens?.access) { await model.poll() }
+        // Keyed on signed in or not, so a token refresh does not restart polling.
+        .task(id: model.tokens == nil) { await model.poll() }
     }
 }
 
@@ -405,6 +406,7 @@ struct MoneyView: View {
 
 struct AllowancesView: View {
     @Environment(FamilyModel.self) private var model
+    @State private var revoking: FamilyAPI.Allowance?
 
     var body: some View {
         @Bindable var model = model
@@ -423,7 +425,7 @@ struct AllowancesView: View {
                             }
                         }
                         .swipeActions {
-                            Button("Revoke", role: .destructive) { Task { await model.revoke(allowance) } }
+                            Button("Revoke", role: .destructive) { revoking = allowance }
                         }
                     }
                 } footer: {
@@ -436,6 +438,12 @@ struct AllowancesView: View {
                 Button { model.addingAllowance = true } label: { Label("Add", systemImage: "plus") }
             }
             .sheet(isPresented: $model.addingAllowance) { GrantAllowanceView() }
+            .confirmationDialog("Revoke this allowance?", isPresented: .init { revoking != nil } set: { if !$0 { revoking = nil } },
+                                titleVisibility: .visible, presenting: revoking) { allowance in
+                Button("Revoke", role: .destructive) { Task { await model.revoke(allowance) } }
+            } message: { _ in
+                Text("Payments it covered will ask you first again.")
+            }
             .refreshable { await model.refresh() }
         }
     }

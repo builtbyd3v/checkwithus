@@ -126,9 +126,9 @@ enum TokenStore {
         return String(data: data, encoding: .utf8)
     }
 
-    static func save(_ token: String, service: String = "us.checkwith.device") {
+    static func save(_ token: String, service: String = "us.checkwith.device", accessible: CFString = kSecAttrAccessibleAfterFirstUnlock) {
         delete(service: service)
-        let q = query(service).merging([kSecValueData as String: Data(token.utf8), kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock]) { $1 }
+        let q = query(service).merging([kSecValueData as String: Data(token.utf8), kSecAttrAccessible as String: accessible]) { $1 }
         SecItemAdd(q as CFDictionary, nil)
     }
 

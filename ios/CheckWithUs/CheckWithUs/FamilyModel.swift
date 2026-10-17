@@ -19,16 +19,24 @@ import SwiftUI
     var tab = Tab.holds
     var holdsPath: [String] = []
     var addingAllowance = false
-    /// What the last freeze moved to safety, to offer it back on unfreeze.
-    var frozenCents = UserDefaults.standard.integer(forKey: "frozenCents") {
-        didSet { UserDefaults.standard.set(frozenCents, forKey: "frozenCents") }
+    /// What the last freeze moved to safety per circle, to offer it back on unfreeze. FamilyAuth.forget clears it.
+    private var frozenByCircle = UserDefaults.standard.dictionary(forKey: "frozenCents") as? [String: Int] ?? [:] {
+        didSet { UserDefaults.standard.set(frozenByCircle, forKey: "frozenCents") }
     }
     @ObservationIgnored private var mock = false
+    /// One refresh at a time: Auth0 rotates refresh tokens, and reusing an old one revokes the sign-in.
+    @ObservationIgnored private var refreshing: Task<FamilyAuth.Tokens, Error>?
+    /// The access token a refresh just produced. A 401 on it signs out instead of refreshing again.
+    @ObservationIgnored private var justRefreshed: String?
 
     var circle: FamilyAPI.Circle? { circles?.first }
     var protectedName: String { circle?.protectedName ?? "They" }
     var held: [FamilyAPI.Payment] { payments.filter { $0.status == "held" } }
     var frozen: Bool { balance?.frozen ?? false }
+    var frozenCents: Int {
+        get { frozenByCircle[circle?.circleId ?? ""] ?? 0 }
+        set { if let id = circle?.circleId { frozenByCircle[id] = newValue } }
+    }
 
     init() {
         #if DEBUG
@@ -87,7 +95,10 @@ import SwiftUI
     }
 
     func decide(_ payment: FamilyAPI.Payment, approve: Bool) async {
-        if approve, !(await ownerConfirms("Approve \(dollars(payment.amountCents)) to \(payment.payee.name)")) { return }
+        // Busy before Face ID, so a second tap cannot start a second decision.
+        guard !busy else { return }
+        busy = true
+        if approve, !(await ownerConfirms("Approve \(dollars(payment.amountCents)) to \(payment.payee.name)")) { busy = false; return }
         await run {
             #if DEBUG
             if self.mock { return self.replace(payment.id) { $0.status = approve ? "approved" : "denied"; $0.decidedByName = "You" } }
@@ -108,13 +119,11 @@ import SwiftUI
             #if DEBUG
             if self.mock { self.balance?.frozen = true; self.frozenCents = self.balance?.availableCents ?? 0; return }
             #endif
-            guard let id = self.circle?.circleId else { return }
-            try await self.unlessMissing {
-                let result = try await self.authed { try await FamilyAPI.freeze(id, $0) }
-                self.frozenCents = result.movedCents
-                self.balance?.frozen = result.frozen
-                await self.refresh()
-            }
+            guard let id = self.circle?.circleId,
+                  let result = try await self.unlessMissing({ try await self.authed { try await FamilyAPI.freeze(id, $0) } }) else { return }
+            self.frozenCents = result.movedCents
+            self.balance?.frozen = result.frozen
+            await self.refresh()
         }
     }
 
@@ -123,13 +132,11 @@ import SwiftUI
             #if DEBUG
             if self.mock { self.balance?.frozen = false; self.frozenCents = 0; return }
             #endif
-            guard let id = self.circle?.circleId else { return }
-            try await self.unlessMissing {
-                let result = try await self.authed { try await FamilyAPI.unfreeze(id, amountCents: cents, $0) }
-                self.frozenCents = max(0, self.frozenCents - result.movedCents)
-                self.balance?.frozen = result.frozen
-                await self.refresh()
-            }
+            guard let id = self.circle?.circleId,
+                  let result = try await self.unlessMissing({ try await self.authed { try await FamilyAPI.unfreeze(id, amountCents: cents, $0) } }) else { return }
+            self.frozenCents = max(0, self.frozenCents - result.movedCents)
+            self.balance?.frozen = result.frozen
+            await self.refresh()
         }
     }
 
@@ -156,34 +163,65 @@ import SwiftUI
 
     func revoke(_ allowance: FamilyAPI.Allowance) async {
         await run {
+            if !self.mock {
+                guard let id = self.circle?.circleId else { return }
+                try await self.authed { try await FamilyAPI.revoke(id, allowance.id, $0) }
+            }
+            // Only once the server agreed, so the list never shows a revoke that did not happen.
             self.allowances.removeAll { $0.id == allowance.id }
-            guard !self.mock, let id = self.circle?.circleId else { return }
-            try await self.authed { try await FamilyAPI.revoke(id, allowance.id, $0) }
         }
     }
 
     // MARK: - Plumbing
 
-    /// Calls the API with the access token. A 401 refreshes the token once, then signs out (the sign-in screen
-    /// shows). A step-up answer opens Auth0 for a fresh sign-in and retries once.
+    /// Calls the API with the access token. A 401 refreshes the token once (shared by every caller), then signs
+    /// out (the sign-in screen shows). A step-up answer opens Auth0 for a fresh sign-in and retries once.
     private func authed<T>(_ call: (String) async throws -> T) async throws -> T {
         guard let current = tokens else { throw API.Failure(message: "Please sign in.") }
         do {
-            return try await call(current.access)
+            let result = try await call(current.access)
+            if justRefreshed == current.access { justRefreshed = nil }
+            return result
         } catch let failure as FamilyAPI.Failure where failure.status == 401 {
-            guard let renewed = await FamilyAuth.refresh(current) else { signOut(); throw failure }
-            save(renewed)
-            return try await call(renewed.access)
+            guard justRefreshed != current.access else { signOut(); throw failure }
+            let renewed = try await renew(current)
+            do { return try await call(renewed.access) } catch let again as FamilyAPI.Failure where again.status == 401 {
+                signOut()
+                throw again
+            }
         } catch let failure as FamilyAPI.Failure where failure.code == "step_up_required" {
             save(try await FamilyAuth.signIn(fresh: true))
             return try await call(tokens!.access)
         }
     }
 
-    /// The freeze routes are being built in parallel; until they ship the server answers 404.
-    private func unlessMissing(_ work: () async throws -> Void) async throws {
-        do { try await work() } catch let failure as FamilyAPI.Failure where failure.status == 404 {
+    /// A new access token. Concurrent 401s wait for the same refresh. Only Auth0 refusing the refresh token
+    /// signs out; no connection keeps the sign-in for the next try.
+    private func renew(_ stale: FamilyAuth.Tokens) async throws -> FamilyAuth.Tokens {
+        if let tokens, tokens.access != stale.access { return tokens }
+        let task = refreshing ?? Task { try await FamilyAuth.refresh(stale) }
+        refreshing = task
+        defer { if refreshing == task { refreshing = nil } }
+        do {
+            let renewed = try await task.value
+            if tokens?.access != renewed.access {
+                justRefreshed = renewed.access
+                save(renewed)
+            }
+            return renewed
+        } catch is FamilyAuth.Rejected {
+            signOut()
+            throw API.Failure(message: "Please sign in again.")
+        } catch {
+            throw API.Failure(message: "No connection. Check the internet and try again.")
+        }
+    }
+
+    /// Nil, with a calm notice, when the freeze route itself answers 404 (a server without freeze yet).
+    private func unlessMissing<T>(_ call: () async throws -> T) async throws -> T? {
+        do { return try await call() } catch let failure as FamilyAPI.Failure where failure.status == 404 {
             notice = "Freeze is not available yet"
+            return nil
         }
     }
 
@@ -255,7 +293,7 @@ import SwiftUI
         case "detail": holdsPath = ["p1"]
         case "alerts": tab = .alerts
         case "money": tab = .money
-        case "frozen": tab = .money; balance?.frozen = true; frozenCents = 241_288
+        case "frozen": tab = .money; balance?.frozen = true; frozenByCircle = ["c1": 241_288]
         case "allowances": tab = .allowances
         case "grant": tab = .allowances; addingAllowance = true
         case "settings": tab = .settings
