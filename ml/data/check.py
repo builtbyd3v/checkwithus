@@ -2,6 +2,8 @@
 
 Usage: ml/.venv/bin/python -I ml/data/check.py
 """
+import re
+from collections import defaultdict
 from pathlib import Path
 
 import pandas as pd
@@ -26,12 +28,36 @@ print(pd.crosstab(full.scam_type, full.label, margins=True).to_string())
 print("\n== split sizes by scam_type")
 print(pd.DataFrame({n: p.scam_type.value_counts() for n, p in parts.items()}).fillna(0).astype(int).to_string())
 
-assert not parts["test"].source.isin({"synthetic", "aitl_scam_dialogues", "clove_india_sms"}).any(), "generated row in test"
+for n in ("val", "test"):
+    assert not parts[n].source.isin({"synthetic", "aitl_scam_dialogues", "clove_india_sms"}).any(), f"generated row in {n}"
 assert sum(map(len, parts.values())) == len(full), "splits do not add up"
-# Same near-duplicate key as build.py: digits, links and case stripped.
-key = lambda s: set(s.str.lower().str.replace(r"https?://\S+|\S+\.(?:com|net|org|info|xyz|top|co)\S*|\d+", " ", regex=True)
-                   .str.replace(r"\W+", " ", regex=True).str.strip().pipe(lambda x: x.str.slice(0, 60) + "|" + x.str.slice(-40)))
-seen = key(parts["train"].text)
-assert not (key(parts["val"].text) | key(parts["test"].text)) & seen, "near-duplicate text leaks across splits"
+# Leak check, independent of build.py's word-trigram MinHash: character 5-gram Jaccard via an inverted index.
+def grams(s):
+    s = re.sub(r"https?://\S+|\d+", "", s.lower())
+    s = re.sub(r"\W+", " ", s).strip()
+    return {s[i:i + 5] for i in range(max(len(s) - 4, 1))}
+
+
+def leaks(queries, pool, thr=0.8):
+    pg = [grams(x) for x in pool]
+    index = defaultdict(list)
+    for i, g in enumerate(pg):
+        for x in g:
+            index[x].append(i)
+    hits = []
+    for q in queries:
+        qg = grams(q)
+        rare = sorted(qg, key=lambda x: len(index.get(x, ())))[:8]
+        cand = {i for x in rare for i in index.get(x, ())}
+        best = max((len(qg & pg[i]) / len(qg | pg[i]) for i in cand), default=0)
+        if best >= thr:
+            hits.append((round(best, 2), q[:80]))
+    return hits
+
+
+for a, b in (("val", "train"), ("test", "train"), ("test", "val")):
+    hits = leaks(parts[a].text.tolist(), parts[b].text.tolist())
+    print(f"near-duplicates {a} vs {b}: {len(hits)}", *hits[:3], sep="\n  ")
+    assert not hits, f"near-duplicate text leaks: {a} vs {b}"
 assert full.source.value_counts(normalize=True).max() <= 0.40 + 1e-9, "a source is above 40%"
-print("\nOK: schema, no dupes, no synthetic in test, no cross-split leaks, every source <= 40%")
+print("\nOK: schema, no dupes, no generated rows in val or test, no cross-split leaks, every source <= 40%")

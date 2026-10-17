@@ -1,39 +1,39 @@
 # Scam dataset report (2026-10-16)
 
-- **14,394 rows** in `scams.csv`: 10,816 legit, 3,578 scam. Splits: train 11,557 / val 1,440 / test 1,397.
-- **Test is 100% real text** (Mendeley, NCSU, UCI). Generated sources (our synthetic, AI-in-the-Loop, CloveAI) stay in train and val.
-- **Biggest gap:** no real, openly licensed grandparent or romance texts exist. Those types are synthetic only, so test has 0 of them. Gift card and tech support are mostly GPT call scripts.
-- **No source above 40%** (largest: Mendeley at 38%). Near-duplicates removed across all sources and checked across splits.
+- **9,255 rows** in `scams.csv`: 6,336 legit, 2,919 scam. Splits: train 7,535 / val 842 / test 878.
+- **Val and test are 100% real text** (Mendeley, NCSU, UCI). Generated sources (our synthetic, AI-in-the-Loop, CloveAI) all go to train. Val sets the threshold, so it must look like real traffic.
+- **No near-duplicates across splits:** rows are clustered (character 5-gram Jaccard >= 0.75) and whole clusters go to one split; `check.py` re-tests with its own search at 0.8 and finds 0.
+- **Biggest gap:** no real, openly licensed grandparent, romance or tech-support texts exist. Those types are generated only, so test has 0 of them.
 - Rebuild and check: `ml/.venv/bin/python -I ml/data/build.py && ml/.venv/bin/python -I ml/data/check.py`.
 
 ## Rows per source
 
-| source | legit | scam | total | in test? |
+| source | legit | scam | total | in val/test? |
 |---|---|---|---|---|
-| mendeley_smishing | 5,121 | 401 | 5,522 | yes |
-| clove_india_sms | 4,443 | 605 | 5,048 | no (template-made) |
-| ncsu_sms_phishing | 0 | 1,565 | 1,565 | yes |
-| aitl_scam_dialogues | 741 | 796 | 1,537 | no (GPT-made) |
+| mendeley_smishing | 3,311 | 391 | 3,702 | yes |
+| clove_india_sms | 1,977 | 99 | 2,076 | no (template-made) |
+| aitl_scam_dialogues | 730 | 796 | 1,526 | no (GPT-made) |
+| ncsu_sms_phishing | 0 | 1,426 | 1,426 | yes |
 | synthetic | 200 | 200 | 400 | no |
-| uci_sms_spam | 311 | 11 | 322 | yes |
-| **total** | **10,816** | **3,578** | **14,394** | |
+| uci_sms_spam | 118 | 7 | 125 | yes |
+| **total** | **6,336** | **2,919** | **9,255** | |
 
 ## Rows per scam_type (scam rows)
 
-| scam_type | total | real (test-eligible) | train / val / test |
+| scam_type | total | real (val/test-eligible) | train / val / test |
 |---|---|---|---|
-| other | 1,681 | 1,112 | 1,345 / 168 / 168 |
-| delivery | 357 | 325 | 285 / 36 / 36 |
-| prize | 346 | 274 | 276 / 35 / 35 |
-| bank_alert | 347 | 222 | 277 / 35 / 35 |
-| impostor | 302 | 33 | 242 / 30 / 30 |
-| gift_card | 235 | 2 | 209 / 24 / 2 |
-| tech_support | 260 | 9 | 225 / 26 / 9 |
-| grandparent | 25 | 0 | 23 / 2 / 0 |
-| romance | 25 | 0 | 23 / 2 / 0 |
-| none (legit) | 10,816 | | 8,652 / 1,082 / 1,082 |
+| other | 1,086 | 1,010 | 869 / 109 / 108 |
+| bank_alert | 349 | 221 | 277 / 36 / 36 |
+| delivery | 339 | 305 | 273 / 31 / 35 |
+| prize | 317 | 252 | 255 / 30 / 32 |
+| impostor | 308 | 34 | 275 / 2 / 31 |
+| gift_card | 235 | 2 | 233 / 0 / 2 |
+| tech_support | 235 | 0 | 235 / 0 / 0 |
+| grandparent | 25 | 0 | 25 / 0 / 0 |
+| romance | 25 | 0 | 25 / 0 / 0 |
+| none (legit) | 6,336 | | 5,068 / 634 / 634 |
 
-Note: each group's test share is 10% of the whole group, taken only from real rows. When real rows are scarce, most of them land in test: impostor sends 30 of its 33 real rows to test, so train sees almost only generated impostor text (see `split()` in `build.py`).
+Note: each group's val and test shares are 10% of the whole group each, taken only from real clusters (test first, then val). When real rows are scarce, most land in test: impostor sends 31 of its 34 real rows to test.
 
 `scam_type` for real rows comes from keyword rules (`TYPE_RULES` in `build.py`), so treat it as a rough tag, not a gold label. `other` = smishing with no rule match (crypto, toll, job, account scams).
 
@@ -44,7 +44,9 @@ Note: each group's test share is 10% of the whole group, taken only from real ro
 - **Promotions relabeled legit, not dropped:** Mendeley "spam" and UCI spam with no scam cue.
 - **Adult promo spam:** dropped (MLH code of conduct).
 - **NCSU:** non-English rows, gambling spam, and campaign repeats (68,029 to 1,565).
-- **Near-duplicates:** same text after removing digits and links (first 60 + last 40 characters). Example: 638 Mendeley smishing rows hold only 375 distinct templates.
+- **Near-duplicates:** exact-template duplicates removed first; then at most 3 real rows per near-duplicate cluster. One label per cluster (majority vote, ties to scam).
+- **CloveAI broken templates:** 3,204 rows with a name or month where the amount belongs.
+- **NCSU store promos** (sale, % off, coupon): dropped, since the label is unclear.
 - **Non-commercial, unclear, or unreleased licenses:** see "Checked and not used" in `SOURCES.md`.
 
 ## Image sources found (not downloaded)
@@ -61,7 +63,13 @@ Note: each group's test share is 10% of the whole group, taken only from real ro
 
 Gap: no openly licensed set of fake virus / tech-support pop-ups. Synthetic screenshots may be the only option.
 
-## Next steps for training
+## Guard model results (DistilBERT, `ml/train_guard.py`)
 
-1. Train DistilBERT on `train.csv`, tune the threshold on `val.csv`, report on `test.csv`.
-2. Report grandparent, romance, gift card and tech support recall on a hand-written real-world set (Teammate C's 200 elder scams), since test has almost none.
+Threshold set on val for 95% scam recall; test scored once. Full numbers in `ml/models/guard/eval.json`.
+
+| split | n | scam recall | precision | false holds | ECE |
+|---|---|---|---|---|---|
+| val (threshold tuned here) | 842 | 95.2% | 94.7% | 1.7% | 0.016 |
+| test | 878 | 98.4% | 93.4% | 2.7% (17 of 634) | 0.029 |
+
+Next: score grandparent, romance, gift card and tech-support recall on Teammate C's hand-written elder scams, since test has almost none.
