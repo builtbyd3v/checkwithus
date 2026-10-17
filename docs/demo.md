@@ -53,7 +53,7 @@ Suggested scam text (made up, test it first): `FL Toll Services: unpaid toll bal
 Times are cumulative. Say the lines in quotes; do the steps in bold.
 
 ### 0:00 Hook (15 s)
-"Older adults lost billions to scams last year, and every safety tool asks them to do something new. checkwith.us asks them to do nothing. The family does the work. This is Rosa's phone, and this is her family's phone."
+"Scammers target older adults, and every safety tool asks them to do something new. checkwith.us asks them to do nothing. The family does the work. This is Rosa's phone, and this is her family's phone."
 
 TODO(Dev): add a sourced loss figure (for example the FBI IC3 Elder Fraud report) or keep the line without a number.
 
