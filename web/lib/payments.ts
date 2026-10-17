@@ -474,7 +474,8 @@ export function createPaymentService(deps: PaymentServiceDeps) {
         `insert into payment_votes(payment_id, member_id, decision, via)
          select $1, $2, $3, $4 where exists
            (select 1 from payments where id = $1 and expires_at > clock_timestamp())
-         on conflict do nothing`,
+         on conflict (payment_id, member_id) do update set decision = 'deny', via = excluded.via
+           where excluded.decision = 'deny' and payment_votes.decision = 'approve'`,
         [row.id, member.rows[0].id, input.decision, input.via],
       );
       if (!voted.rowCount) {
