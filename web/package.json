@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "check:db": "node --env-file=.env.local scripts/check-db.mjs",
     "check:nessie": "node --env-file=.env.local --conditions=react-server --import tsx scripts/check-nessie.ts",
     "test": "vitest run",
