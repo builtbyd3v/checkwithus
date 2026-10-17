@@ -18,6 +18,7 @@
     "demo:atm": "node --env-file=.env.local --conditions=react-server --import tsx scripts/demo-atm.ts",
     "test:db": "vitest run --config vitest.int.config.mts",
     "check:auth0": "node --env-file=.env.local scripts/check-auth0.mjs",
+    "agent:bills": "node --env-file=.env.local --conditions=react-server --import tsx scripts/agent-bills.ts",
     "bench:perf": "node --import tsx scripts/perf-bench.ts"
   },
   "dependencies": {

@@ -28,12 +28,24 @@ vi.mock('@/lib/auth/family', async () => {
       const sub = request.headers.get('x-test-sub');
       if (!sub) throw new AuthError('Missing bearer token');
       const authTime = request.headers.get('x-test-auth-time');
-      return { sub, name: null, ...(authTime ? { authTime: Number(authTime) } : {}) };
+      // Stands in for the verified token's Auth0 RBAC `permissions` claim.
+      const permissions = request.headers.get('x-test-permissions');
+      return {
+        sub, name: null,
+        ...(authTime ? { authTime: Number(authTime) } : {}),
+        ...(permissions !== null ? { permissions: permissions.split(',').filter(Boolean) } : {}),
+      };
     },
   };
 });
 
 const fake = createFakeNessie();
+// Routes that read Nessie directly (balance) must hit the fake, never the real sandbox.
+vi.mock('@/lib/nessie/client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/nessie/client')>();
+  const client = actual.createNessieClient({ key: 'test-key', fetch: fake.fetch, sleep: async () => {} });
+  return { ...actual, nessie: () => client };
+});
 /** Flipped by the CIBA-mode test. CIBA itself is covered in lib/approvals.int.test.ts. */
 const approvalMode = { ciba: false };
 const pollPayment = vi.fn(async () => {});
@@ -45,9 +57,12 @@ vi.mock('@/lib/services', async () => {
   const nessie = createNessieClient({ key: 'test-key', fetch: fake.fetch, sleep: async () => {} });
   const service = createPaymentService({ pool: db(), nessie });
   const freezeService = createFreezeService({ pool: db(), nessie });
+  const { createTopUpService } = await import('@/lib/top-up');
+  const topUpService = createTopUpService({ pool: db(), nessie });
   return {
     payments: () => service,
     freeze: () => freezeService,
+    topUp: () => topUpService,
     cibaApprovals: () => approvalMode.ciba ? { pollPayment, pollCircles: async () => {} } : null,
     approvalsUseCiba: () => approvalMode.ciba,
   };
@@ -73,6 +88,8 @@ const routes = {
   me: await import('./family/me/route'),
   freeze: await import('./family/circles/[id]/freeze/route'),
   unfreeze: await import('./family/circles/[id]/unfreeze/route'),
+  balance: await import('./family/circles/[id]/balance/route'),
+  topUp: await import('./family/circles/[id]/top-up/route'),
 };
 
 const BASE = 'https://checkwith.us/api/v1';
@@ -81,11 +98,12 @@ let circleId: string;
 let inviteCode: string;
 let deviceToken: string;
 
-type Init = { body?: unknown; sub?: string; device?: string; method?: string };
+type Init = { body?: unknown; sub?: string; device?: string; method?: string; permissions?: string[] };
 function req(path: string, init: Init = {}) {
   const headers: Record<string, string> = {};
   if (init.body !== undefined) headers['content-type'] = 'application/json';
   if (init.sub) headers['x-test-sub'] = init.sub;
+  if (init.permissions) headers['x-test-permissions'] = init.permissions.join(',');
   if (init.device) headers.authorization = `Bearer ${init.device}`;
   return new Request(`${BASE}${path}`, {
     method: init.method ?? (init.body === undefined ? 'GET' : 'POST'),
@@ -474,5 +492,109 @@ describe('Freeze over HTTP (the family app contract)', () => {
     fresh.headers.set('x-test-auth-time', String(Math.floor(Date.now() / 1000)));
     expect(await read(await routes.unfreeze.POST(fresh, params(circleId))))
       .toEqual({ status: 200, body: { frozen: false, movedCents: 10_000 } });
+  });
+
+  it('the balance is integer cents from the ledger; Nessie\'s stored balance is informational', async () => {
+    const balance = async () => read(await routes.balance.GET(req(`/family/circles/${circleId}/balance`, { sub: MARIA }), params(circleId)));
+    // The circle's Nessie account is not in the fake: Nessie unreachable must not hide the balance.
+    const offline = await balance();
+    expect(offline).toMatchObject({ status: 200, body: { nessieReportedBalanceCents: null, balanceSource: 'ledger', frozen: false } });
+    for (const key of ['ledgerBalanceCents', 'reservedCents', 'availableCents']) expect(Number.isInteger(offline.body[key])).toBe(true);
+    expect(offline.body.availableCents).toBe(Math.max(0, offline.body.ledgerBalanceCents - offline.body.reservedCents));
+
+    // A stored balance below the ledger is not a ceiling: Nessie never updates it.
+    const { rows } = await db().query<{ nessie_account_id: string }>('select nessie_account_id from circles where id = $1', [circleId]);
+    fake.accounts.push({ _id: rows[0]!.nessie_account_id, customer_id: 'test-customer', type: 'Checking', nickname: 'x', balance: 1 });
+    const live = await balance();
+    expect(live.body).toMatchObject({ nessieReportedBalanceCents: 100, availableCents: offline.body.availableCents });
+  });
+
+  it('an approver tops up spending with a fresh login and an idempotency key; the balance shows it', async () => {
+    const path = `/family/circles/${circleId}/top-up`;
+    const body = { amountCents: 2_500, idempotencyKey: 'api-test-topup-0001' };
+    expect((await routes.topUp.POST(req(path, { sub: MARIA, body: { amountCents: 2_500 } }), params(circleId))).status).toBe(400);
+    expect(await read(await routes.topUp.POST(req(path, { sub: MARIA, body }), params(circleId))))
+      .toMatchObject({ status: 403, body: { error: 'step_up_required' } });
+    const before = await read(await routes.balance.GET(req(`/family/circles/${circleId}/balance`, { sub: MARIA }), params(circleId)));
+    const fresh = () => {
+      const r = req(path, { sub: MARIA, body });
+      r.headers.set('x-test-auth-time', String(Math.floor(Date.now() / 1000)));
+      return r;
+    };
+    const first = await read(await routes.topUp.POST(fresh(), params(circleId)));
+    expect(first).toEqual({ status: 200, body: { id: expect.any(String), movedCents: 2_500, status: 'sent' } });
+    expect(await read(await routes.topUp.POST(fresh(), params(circleId)))).toEqual(first);
+    const after = await read(await routes.balance.GET(req(`/family/circles/${circleId}/balance`, { sub: MARIA }), params(circleId)));
+    expect(after.body.ledgerBalanceCents).toBe(before.body.ledgerBalanceCents + 2_500);
+  });
+});
+
+describe('over the two-approval limit, through the family app', () => {
+  // Its own circle: the circle above ends frozen with its phone revoked.
+  const MARIA2 = 'test|two-maria';
+  const LEO = 'test|two-leo';
+  const VIEWER = 'test|two-viewer';
+  let twoCircleId: string;
+  let largeId: string;
+  const holdLarge = async (key: string) => {
+    const { payments } = await import('@/lib/services');
+    const held = await payments().createPayment(twoCircleId, {
+      idempotencyKey: key, amountCents: toCents(150_000), payeeName: 'QuickGift Cards', payeeKind: 'merchant',
+      category: 'gift_cards', onCall: false, guard: null, explanation: null,
+    });
+    expect(held).toMatchObject({ status: 'held', approvalsRequired: 2 });
+    largeId = held.id;
+  };
+  const decide = async (sub: string, decision: 'approve' | 'deny', permissions?: string[]) =>
+    read(await routes.decision.POST(
+      req(`/family/payments/${largeId}/decision`, { sub, body: { decision }, ...(permissions ? { permissions } : {}) }),
+      params(largeId),
+    ));
+  const writesFor = (id: string) => fake.paymentWrites().filter((w) => JSON.stringify(w.body).includes(id));
+
+  beforeAll(async () => {
+    const { rows } = await db().query<{ id: string }>(
+      `insert into circles (protected_name, nessie_customer_id, nessie_account_id, opening_balance_cents)
+       values ('Two Approvals Test (synthetic)', 'test-customer', $1, 500000) returning id`,
+      ['test-account-' + crypto.randomUUID()],
+    );
+    twoCircleId = rows[0]!.id;
+    await db().query(
+      `insert into circle_members (circle_id, auth0_sub, display_name, role)
+       values ($1, $2, 'Maria', 'approver'), ($1, $3, 'Leo', 'approver'), ($1, $4, 'Vi', 'viewer')`,
+      [twoCircleId, MARIA2, LEO, VIEWER],
+    );
+    await holdLarge(`api-two-approvals-${crypto.randomUUID()}`);
+  });
+
+  afterAll(async () => {
+    await db().query('delete from circles where id = $1', [twoCircleId]);
+  });
+
+  it('a token whose Auth0 permissions lack approve:payments cannot approve, even for an approver', async () => {
+    expect(await decide(MARIA2, 'approve', ['read:payments'])).toMatchObject({ status: 403, body: { error: 'permission_required' } });
+    expect(await decide(MARIA2, 'approve', [])).toMatchObject({ status: 403, body: { error: 'permission_required' } });
+  });
+
+  it('a viewer cannot decide, even with approve:payments in the token', async () => {
+    expect((await decide(VIEWER, 'approve', ['approve:payments'])).status).toBe(404);
+  });
+
+  it('one approval keeps it held; a repeat by the same person does not count twice', async () => {
+    expect(await decide(MARIA2, 'approve', ['approve:payments'])).toMatchObject({ status: 200, body: { status: 'held', approvalsRequired: 2 } });
+    expect(await decide(MARIA2, 'approve')).toMatchObject({ status: 200, body: { status: 'held' } });
+    expect(writesFor(largeId)).toHaveLength(0);
+  });
+
+  it('a second approver releases it, once', async () => {
+    expect(await decide(LEO, 'approve')).toMatchObject({ status: 200, body: { status: 'paid', decidedVia: 'app' } });
+    expect(writesFor(largeId)).toHaveLength(1);
+  });
+
+  it('one approval then one deny stops it; deny needs only the circle role, not the permission', async () => {
+    await holdLarge(`api-two-approvals-${crypto.randomUUID()}`);
+    expect(await decide(MARIA2, 'approve')).toMatchObject({ status: 200, body: { status: 'held' } });
+    expect(await decide(LEO, 'deny', ['read:payments'])).toMatchObject({ status: 200, body: { status: 'denied' } });
+    expect(writesFor(largeId)).toHaveLength(0);
   });
 });

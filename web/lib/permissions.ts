@@ -12,6 +12,23 @@ export async function requirePermission(q: Queryable, sub: string, circleId: str
   return rows[0].id;
 }
 
+/**
+ * Auth0 RBAC on top of the circle role. Checked only when the verified token
+ * carries a `permissions` claim (RBAC + "Add Permissions in the Access Token"
+ * on the Auth0 API), so tokens from a tenant without RBAC keep working on the
+ * circle role alone. With the claim, both must allow it. With AUTH0_RBAC=true
+ * callers pass [] for a missing claim, so it is a no.
+ */
+export function hasTokenPermission(permissions: readonly string[] | undefined, permission: 'approve:payments') {
+  return permissions === undefined || permissions.includes(permission);
+}
+
+export function requireTokenPermission(permissions: readonly string[] | undefined, permission: 'approve:payments') {
+  if (!hasTokenPermission(permissions, permission)) {
+    throw new HttpError(403, 'permission_required', `${permission} permission required`);
+  }
+}
+
 /** auth_time comes from a verified Auth0 token/session, never a request body. */
 export function requireFreshLogin(authTime: unknown) {
   const now = Math.floor(Date.now() / 1000);

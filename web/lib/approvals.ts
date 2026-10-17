@@ -21,6 +21,8 @@ import 'server-only';
 import type pg from 'pg';
 import { bindingMessage, CibaError, type CibaClient, type CibaPoll } from '@/lib/auth0/ciba';
 import { PaymentError, type Payment, type PaymentService } from '@/lib/payments';
+import { hasTokenPermission } from '@/lib/permissions';
+import { HOLD_REASON_LABELS } from '@/lib/rules';
 
 /**
  * Auth0 answers `access_denied` both for "Deny" and for an expired push.
@@ -72,7 +74,12 @@ export function createCibaApprovals(deps: CibaApprovalsDeps) {
               payeeName: payment.payeeName,
             }),
             expirySeconds: member.seconds_left,
-            payment: { amountCents: payment.amountCents, payee: payment.payeeName, reasons: payment.holdReasons },
+            payment: {
+              amountCents: payment.amountCents,
+              payee: payment.payeeName,
+              reasons: payment.holdReasons.map((r) => HOLD_REASON_LABELS[r]),
+              approvalsRequired: payment.approvalsRequired,
+            },
           });
           await pool.query(
             `insert into ciba_requests
@@ -230,6 +237,11 @@ export function createCibaApprovals(deps: CibaApprovalsDeps) {
         // The verified token must be the member this push went to.
         if (result.sub !== request.sub) {
           await update(`state = 'failed', last_error = $2`, ['Auth0 returned a token for a different user']);
+          return;
+        }
+        // Auth0 RBAC: when the access token lists permissions, it must include this one.
+        if (!hasTokenPermission(result.permissions, 'approve:payments')) {
+          await update(`state = 'failed', last_error = $2`, ['Auth0 token lacks the approve:payments permission']);
           return;
         }
         await update(`state = 'approved', answered_at = clock_timestamp(), last_polled_at = clock_timestamp(), last_error = null`);

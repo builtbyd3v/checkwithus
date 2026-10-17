@@ -98,6 +98,7 @@ import SwiftUI
         // Busy before Face ID, so a second tap cannot start a second decision.
         guard !busy else { return }
         busy = true
+        error = nil
         if approve, !(await ownerConfirms("Approve \(dollars(payment.amountCents)) to \(payment.payee.name)")) { busy = false; return }
         await run {
             #if DEBUG
@@ -229,8 +230,11 @@ import SwiftUI
     private func ownerConfirms(_ reason: String) async -> Bool {
         guard !mock else { return true }
         let context = LAContext()
-        // ponytail: a phone with no passcode has nothing to check; the Auth0 sign-in is the only gate then.
-        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: nil) else { return true }
+        // No passcode means anyone holding the phone could approve, so approving is refused. Deny still works.
+        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: nil) else {
+            error = "Set a passcode on this iPhone to approve payments."
+            return false
+        }
         return (try? await context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason)) ?? false
     }
 
@@ -270,7 +274,7 @@ import SwiftUI
         payments = [
             payment("p1", "held", 50000, "Gift card store", "merchant", false, ("gift_cards", "Gift cards"), true,
                     [("gift_card", "Gift card purchase"), ("new_payee", "Someone they have not paid before"), ("during_call", "Paid while on a phone call")],
-                    "Rosa is paying $500 to Gift card store while on a phone call. Gift cards are the most common way scammers ask to be paid, because they cannot be traced or refunded.", 1, nil),
+                    "Rosa is paying $500 to Gift card store while on a phone call. Scammers often ask to be paid with gift cards, because the money is hard to trace or get back.", 1, nil),
             payment("p2", "held", 32000, "City Power & Light", "biller", true, ("utilities", "Utilities"), false,
                     [("over_limit", "Over the limit you set")], nil, 2, nil),
             payment("p3", "paid", 8412, "Sunrise Grocery", "merchant", true, ("groceries", "Groceries"), false, [], nil, 90, nil),
@@ -293,7 +297,8 @@ import SwiftUI
         case "detail": holdsPath = ["p1"]
         case "alerts": tab = .alerts
         case "money": tab = .money
-        case "frozen": tab = .money; balance?.frozen = true; frozenByCircle = ["c1": 241_288]
+        // Freeze sweeps the spending balance to the safe account, so nothing is left to spend.
+        case "frozen": tab = .money; balance = .init(availableCents: 0, ledgerBalanceCents: 0, reservedCents: 0, checkedAt: iso(-1), frozen: true); frozenByCircle = ["c1": 241_288]
         case "allowances": tab = .allowances
         case "grant": tab = .allowances; addingAllowance = true
         case "settings": tab = .settings

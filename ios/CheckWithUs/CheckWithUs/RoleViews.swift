@@ -12,19 +12,27 @@ struct RootView: View {
             FamilyRootView()
         case "protected":
             ContentView()
-                .overlay(alignment: .topTrailing) {
+                // A bar above the page, not an overlay, so very large text never runs under the gear.
+                .safeAreaInset(edge: .top, spacing: 0) {
                     // Only on the home and connect screens, so it never sits on top of a payment
                     // or the bank permission step (#25).
                     if model.token == nil || (model.screen == .home && !BankWatcher.shared.needsPermission) {
-                        Button { settings = true } label: {
-                            Image(systemName: "gearshape.fill").font(.title2).frame(width: 56, height: 56)
+                        HStack {
+                            Spacer()
+                            Button { settings = true } label: {
+                                Image(systemName: "gearshape.fill").font(.title2).frame(width: 56, height: 56)
+                            }
+                            .tint(.secondary)
+                            .accessibilityLabel("Settings")
+                            .padding(.trailing, 8)
                         }
-                        .tint(.secondary)
-                        .accessibilityLabel("Settings")
-                        .padding(.trailing, 8)
+                        .background(.background)
                     }
                 }
                 .sheet(isPresented: $settings) { ProtectedSettingsView() }
+                #if DEBUG
+                .onAppear { if UserDefaults.standard.string(forKey: "preview") == "settings" { settings = true } }
+                #endif
         default:
             RolePickerView()
                 // A phone that was paired before the picker existed belongs to the older adult.
@@ -42,7 +50,6 @@ struct RolePickerView: View {
                 .font(.largeTitle.bold())
             Text("You can change this later in Settings.")
                 .font(.title2)
-                .foregroundStyle(.secondary)
         } action: {
             // Any role choice starts the family side signed out (see FamilyAuth.forget).
             BigButton("I'm the one being protected", symbol: "checkmark.shield.fill") { FamilyAuth.forget(); role = "protected" }
@@ -63,7 +70,8 @@ struct ProtectedSettingsView: View {
                         .font(.title3)
                         .frame(minHeight: 56)
                 } footer: {
-                    Text("Only do this if a family member will use this phone.").font(.body)
+                    // Primary color: the gray footer text is under 4.5:1 on the grouped background.
+                    Text("Only do this if a family member will use this phone.").font(.body).foregroundStyle(Color.primary)
                 }
             }
             .navigationTitle("Settings")

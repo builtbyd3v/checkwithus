@@ -11,6 +11,7 @@ import SwiftUI
         WindowGroup {
             RootView()
                 .environment(model)
+                .tint(Color.action)
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { model.keepPollingInBackground() }

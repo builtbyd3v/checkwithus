@@ -50,7 +50,9 @@ vi.mock('@/lib/services', async () => {
 
 const { db } = await import('@/lib/db');
 const { createNessieClient } = await import('@/lib/nessie/client');
-const { demoTarget, resetDemo, DEMO_ALLOWANCE } = await import('@/scripts/demo-reset');
+const { demoTarget, resetDemo, DEMO_ALLOWANCE, DEMO_AGENT_BILL } = await import('@/scripts/demo-reset');
+const { runBillAgent } = await import('@/lib/bill-agent');
+const { payments } = await import('@/lib/services');
 const routes = {
   pairingCode: await import('@/app/api/v1/family/circles/[id]/pairing-code/route'),
   pair: await import('@/app/api/v1/device/pair/route'),
@@ -107,8 +109,19 @@ beforeAll(async () => {
     `insert into circle_members (circle_id, auth0_sub, display_name, role) values ($1, $2, 'Maria', 'approver')`,
     [circleId, MARIA],
   );
+  // A top-up left over from the last demo; the reset clears it.
+  await db().query(
+    `insert into ledger_credits (circle_id, kind, amount_cents, status, idempotency_key) values ($1, 'top_up', 10000, 'sent', 'smoke-old-topup')`,
+    [circleId],
+  );
   // Second run: idempotent, and now grants the allowance through Maria.
   expect((await reset()).circleId).toBe(circleId);
+  // The seeded monthly pension: three Nessie deposits and three ledger credits, not doubled by the rerun.
+  expect(fakeNessie.records.filter((r) => r.kind === 'deposits')).toHaveLength(3);
+  const credits = await db().query<{ kind: string; n: number }>(
+    'select kind, count(*)::int as n from ledger_credits where circle_id = $1 group by kind', [circleId],
+  );
+  expect(credits.rows).toEqual([{ kind: 'deposit', n: 3 }]);
   const code = await read(await routes.pairingCode.POST(req(`/family/circles/${circleId}/pairing-code`, { sub: MARIA, body: {} }), params(circleId)));
   deviceToken = (await read(await routes.pair.POST(req('/device/pair', { body: { code: code.body.code } }), noParams))).body.deviceToken;
 }, 60_000);
@@ -173,6 +186,15 @@ describe('the demo, steps 3 to 6', () => {
       req(`/family/circles/${circleId}/unfreeze`, { sub: MARIA, fresh: true, body: { amountCents: frozen.body.movedCents } }), params(circleId),
     ));
     expect(back).toMatchObject({ status: 200, body: { frozen: false } });
+  }));
+
+  it('step 6a', () => step('step 6a: the bill-pay agent pays the $350 water bill under the allowance with no push', async () => {
+    // The route's Auth0 M2M checks are covered in app/api/v1/agent/agent.int.test.ts.
+    const pushes = fakeAuth0.pushes.size;
+    const proposals = await runBillAgent({ pool: db(), payments: payments() }, { circleId, dueWithinDays: 7 });
+    expect(proposals.filter(p => p.payeeName === DEMO_AGENT_BILL.name).map(p => [p.payeeName, p.amountCents, p.payment?.status, p.payment?.allowanceId ? 'allowance' : null]))
+      .toEqual([[DEMO_AGENT_BILL.name, DEMO_AGENT_BILL.amountCents, 'paid', 'allowance']]);
+    expect(fakeAuth0.pushes.size).toBe(pushes);
   }));
 
   it('step 6', () => step('step 6: a known $350 utility bill pays with no push under the allowance, and is held without it', async () => {
