@@ -22,3 +22,11 @@ Choices made while Dev was away. Each one is a default; change it and rerun `bui
 18. **AI-in-the-Loop SSD and CloveAI** are generated text. Both count as generated (`GENERATED` in `build.py`) and never go to test.
 19. **Skipped new candidates** from the recent-datasets search (difraud, bolewara, BothBosu): duplicates of UCI/Mendeley, or small with unstated origin.
 20. **Image datasets: listed only**, per the task. Best clean pick: Zenodo 8041387 (CC BY 4.0).
+21. **Val is real rows only, like test** (fixed after the first training run). The first split took val from what test left over, which made val 91% generated. A threshold tuned there gave 88.9% test scam recall against a 95% target. Generated rows now all go to train.
+22. **Codex review fixes** (3 reviewers, read-only):
+    - Near-duplicate leaks: rows are clustered by character 5-gram Jaccard >= 0.75 (MinHash LSH + exact check), and whole clusters go to one split. A final exact pass moves any val/test cluster with a near-duplicate in train into train. `check.py` tests leaks with its own exhaustive search at 0.8.
+    - Same message, opposite labels: one label per cluster by majority vote; ties go to scam.
+    - At most 3 real rows per cluster, so one campaign cannot dominate.
+    - Mendeley is read as UTF-8 (it was read as Latin-1, which broke characters).
+    - `tech_support` rule no longer matches a bare "virus" (COVID lures) or a bare "microsoft".
+    - CloveAI rows with a broken amount slot dropped. NCSU store promos dropped; NCSU filters run after whitespace cleanup.

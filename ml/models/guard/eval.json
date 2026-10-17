@@ -1,0 +1,71 @@
+{
+  "base": "distilbert-base-uncased",
+  "epochs": 2,
+  "max_len": 128,
+  "temperature": 1.5054,
+  "threshold": 0.7249,
+  "val_tuned_on": {
+    "n": 842,
+    "accuracy": 0.9751,
+    "scam_recall": 0.9519,
+    "precision": 0.9474,
+    "false_hold_rate": 0.0174,
+    "ece": 0.0155,
+    "recall_by_type": {
+      "bank_alert": {
+        "n": 36,
+        "recall": 0.944
+      },
+      "delivery": {
+        "n": 31,
+        "recall": 0.968
+      },
+      "impostor": {
+        "n": 2,
+        "recall": 1.0
+      },
+      "other": {
+        "n": 109,
+        "recall": 0.936
+      },
+      "prize": {
+        "n": 30,
+        "recall": 1.0
+      }
+    }
+  },
+  "test": {
+    "n": 878,
+    "accuracy": 0.9761,
+    "scam_recall": 0.9836,
+    "precision": 0.9339,
+    "false_hold_rate": 0.0268,
+    "ece": 0.0285,
+    "recall_by_type": {
+      "bank_alert": {
+        "n": 36,
+        "recall": 1.0
+      },
+      "delivery": {
+        "n": 35,
+        "recall": 1.0
+      },
+      "gift_card": {
+        "n": 2,
+        "recall": 1.0
+      },
+      "impostor": {
+        "n": 31,
+        "recall": 1.0
+      },
+      "other": {
+        "n": 108,
+        "recall": 0.981
+      },
+      "prize": {
+        "n": 32,
+        "recall": 0.938
+      }
+    }
+  }
+}
