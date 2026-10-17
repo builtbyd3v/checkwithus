@@ -8,12 +8,13 @@ vi.mock('@/lib/nessie/client', () => ({
   }),
 }));
 
-async function load(value: string | undefined) {
+async function fresh(value: string | undefined) {
   vi.resetModules();
   if (value === undefined) delete process.env.DEMO_BANK_LOCATIONS;
   else process.env.DEMO_BANK_LOCATIONS = value;
-  return (await import('./bank-locations')).bankLocations();
+  return import('./bank-locations');
 }
+const load = async (value: string | undefined) => (await fresh(value)).bankLocations();
 
 afterEach(() => {
   delete process.env.DEMO_BANK_LOCATIONS;
@@ -33,12 +34,15 @@ describe('bankLocations', () => {
     });
   });
 
-  it('rejects bad config without echoing it', async () => {
+  it('ignores bad config with one warning that does not echo it', async () => {
     for (const value of ['not json', '[{"name":"x","lat":91,"lng":0}]', '[{"name":"x","lat":1}]']) {
-      const error = await load(value).then(() => null, (e: unknown) => e);
-      expect(error).toBeInstanceOf(Error);
-      expect(String(error)).toContain('DEMO_BANK_LOCATIONS');
-      expect(String(error)).not.toContain(value);
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const { bankLocations } = await fresh(value);
+      for (let i = 0; i < 2; i++) expect((await bankLocations()).locations.map((l) => l.id)).toEqual(['atm-1']);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0]![0])).toContain('DEMO_BANK_LOCATIONS');
+      expect(String(warn.mock.calls[0]![0])).not.toContain(value);
+      warn.mockRestore();
     }
   });
 });

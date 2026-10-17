@@ -90,7 +90,7 @@ describe('Family top-up', () => {
     expect(transfers().filter((t) => !String((t.body as { description: string }).description).startsWith('Freeze'))).toHaveLength(1);
   });
 
-  it('a refused send does not count and may be retried; an unknown outcome counts and is never resent', async () => {
+  it('a refused send does not count and may be retried; an unknown outcome neither counts nor is resent', async () => {
     const circleId = await makeCircle();
     const refused = { amountCents: toCents(10_000), idempotencyKey: key() };
     fake.failNext('/transfers', 'rejected400');
@@ -103,7 +103,21 @@ describe('Family top-up', () => {
     expect(await service.topUp(APPROVER, fresh(), circleId, unknown)).toMatchObject({ status: 'sending', movedCents: 30_000 });
     expect(await service.topUp(APPROVER, fresh(), circleId, unknown)).toMatchObject({ status: 'sending' });
     expect(transfers()).toHaveLength(3);
-    // 5,000 opening + 100 + 300 (counted although unconfirmed).
-    expect(await freezer.freeze(APPROVER, circleId)).toEqual({ frozen: true, movedCents: 540_000 });
+    // 5,000 opening + 100. The unconfirmed 300 raises nothing and Freeze does not sweep it.
+    expect(await freezer.freeze(APPROVER, circleId)).toEqual({ frozen: true, movedCents: 510_000 });
+  });
+
+  it('checks the key and the freeze before opening a Nessie account', async () => {
+    const circleId = await makeCircle();
+    await pool.query(
+      `insert into ledger_credits (circle_id, kind, amount_cents, status, idempotency_key) values ($1, 'deposit', 10000, 'sent', 'seed:deposit:1')`,
+      [circleId],
+    );
+    await expect(service.topUp(APPROVER, fresh(), circleId, { amountCents: toCents(10_000), idempotencyKey: 'seed:deposit:1' }))
+      .rejects.toMatchObject({ status: 409, code: 'idempotency_conflict' });
+    await pool.query('update circles set frozen = true where id = $1', [circleId]);
+    await expect(service.topUp(APPROVER, fresh(), circleId, { amountCents: toCents(10_000), idempotencyKey: key() }))
+      .rejects.toMatchObject({ status: 409, code: 'frozen' });
+    expect(fake.calls.filter((c) => c.method === 'POST')).toEqual([]);
   });
 });

@@ -2,9 +2,9 @@
 --
 -- Nessie never updates stored balances, so, like spending and the vault, the
 -- money that comes in is our own ledger. Balance = opening - spending - vault
--- + credits. A credit counts unless it definitely failed: a top-up send whose
--- outcome is unknown stays 'sending' and is never retried, so it cannot move
--- twice. The idempotency key makes a retried tap answer with the first one.
+-- + credits. Only 'sent' credits count: a top-up send whose outcome is
+-- unknown stays 'sending', does not count, and is never retried, so it cannot
+-- move twice. The idempotency key makes a retried tap answer with the first one.
 create table ledger_credits (
   id uuid primary key default uuidv7(),
   circle_id uuid not null references circles (id) on delete cascade,

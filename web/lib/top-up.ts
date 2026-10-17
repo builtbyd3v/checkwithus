@@ -5,7 +5,8 @@
  * Exactly once, like Freeze (lib/freeze.ts): the credit row is claimed under
  * the circle's row lock with the caller's idempotency key, so a retried tap
  * answers with the first one and never sends again. A send whose outcome is
- * unknown stays 'sending', counts, and is never repeated. Only a definite
+ * unknown stays 'sending', is never repeated, and does not count: only a
+ * confirmed top-up raises the balance (the safe side for money coming in). Only a definite
  * refusal (4xx) marks it failed, and then the same key may try again.
  */
 import 'server-only';
@@ -18,7 +19,7 @@ import { checkingAccountBody, customerBody, taggedDescription, transferBody } fr
 import { requireFreshLogin, requirePermission } from '@/lib/permissions';
 
 export type TopUpResult = { id: string; movedCents: Cents; status: 'sending' | 'sent' };
-type Credit = { id: string; amount_cents: number; member_id: string | null; status: string };
+type Credit = { id: string; kind: string; amount_cents: number; member_id: string | null; status: string };
 
 // ponytail: family members give no address; Nessie requires one, so it is synthetic.
 const FAMILY_ADDRESS = { street_number: '1', street_name: 'Family Street', city: 'Gainesville', state: 'FL', zip: '32601' };
@@ -48,6 +49,13 @@ export async function ensureFamilyAccount(pool: pg.Pool, nessie: NessieClient, m
 export function createTopUpService(deps: { pool: pg.Pool; nessie: NessieClient }) {
   const { pool, nessie } = deps;
 
+  /** A claimed top-up that definitely never reached Nessie; the same key may try again. */
+  async function markFailed(creditId: string, error: unknown) {
+    const failure = (error instanceof Error ? error.message : String(error)).slice(0, 500);
+    console.error(`Top-up ${creditId} failed: ${failure}`);
+    await pool.query(`update ledger_credits set status = 'failed', failure = $2 where id = $1`, [creditId, failure]);
+  }
+
   async function topUp(
     sub: string, authTime: unknown, circleId: string, input: { amountCents: Cents; idempotencyKey: string },
   ): Promise<TopUpResult> {
@@ -57,22 +65,18 @@ export function createTopUpService(deps: { pool: pg.Pool; nessie: NessieClient }
     if (input.amountCents % 100 !== 0) {
       throw new HttpError(422, 'whole_dollars_only', 'The bank only moves whole dollars between accounts.');
     }
-    const from = await ensureFamilyAccount(pool, nessie, memberId).catch((error: unknown) => {
-      console.error(`Family account for ${memberId} failed: ${error instanceof Error ? error.message : String(error)}`);
-      throw new HttpError(502, 'bank_error', 'The bank did not open your account. Try again.');
-    });
-
     const claimed = await transaction(pool, async (q) => {
       // The same lock as payments and Freeze taps: a top-up lands before a freeze (and moves with it) or is refused after.
       const circle = (await q.query<{ frozen: boolean; nessie_account_id: string; time_zone: string }>(
         'select frozen, nessie_account_id, time_zone from circles where id = $1 for update', [circleId],
       )).rows[0]!;
       const existing = (await q.query<Credit>(
-        `select id, amount_cents, member_id, status from ledger_credits
-          where circle_id = $1 and idempotency_key = $2 and kind = 'top_up'`,
+        // Every kind: the key is unique per circle across top-ups and deposits.
+        `select id, kind, amount_cents, member_id, status from ledger_credits
+          where circle_id = $1 and idempotency_key = $2`,
         [circleId, input.idempotencyKey],
       )).rows[0];
-      if (existing && (existing.amount_cents !== input.amountCents || existing.member_id !== memberId)) {
+      if (existing && (existing.kind !== 'top_up' || existing.amount_cents !== input.amountCents || existing.member_id !== memberId)) {
         throw new HttpError(409, 'idempotency_conflict', 'This key was already used for a different top-up.');
       }
       if (existing && existing.status !== 'failed') return { credit: existing, send: false, circle };
@@ -81,9 +85,9 @@ export function createTopUpService(deps: { pool: pg.Pool; nessie: NessieClient }
         existing
           // It definitely never reached Nessie, so the same key may try again.
           ? `update ledger_credits set status = 'sending', failure = null, occurred_at = now() where id = $1
-             returning id, amount_cents, member_id, status`
+             returning id, kind, amount_cents, member_id, status`
           : `insert into ledger_credits (circle_id, kind, amount_cents, member_id, idempotency_key)
-             values ($1, 'top_up', $2, $3, $4) returning id, amount_cents, member_id, status`,
+             values ($1, 'top_up', $2, $3, $4) returning id, kind, amount_cents, member_id, status`,
         existing ? [existing.id] : [circleId, input.amountCents, memberId, input.idempotencyKey],
       );
       return { credit: rows[0]!, send: true, circle };
@@ -91,6 +95,14 @@ export function createTopUpService(deps: { pool: pg.Pool; nessie: NessieClient }
 
     const { credit, circle } = claimed;
     if (!claimed.send) return { id: credit.id, movedCents: toCents(credit.amount_cents), status: credit.status as TopUpResult['status'] };
+    // After the frozen and key checks, so a refused tap opens no Nessie account.
+    let from: string;
+    try {
+      from = await ensureFamilyAccount(pool, nessie, memberId);
+    } catch (error) {
+      await markFailed(credit.id, error);
+      throw new HttpError(502, 'bank_error', 'The bank did not open your account. Try again.');
+    }
     let nessieId: string;
     try {
       nessieId = await nessie.createTransfer(from, transferBody({
@@ -102,11 +114,10 @@ export function createTopUpService(deps: { pool: pg.Pool; nessie: NessieClient }
       if (error instanceof NessieError && error.outcomeUnknown) {
         return { id: credit.id, movedCents: toCents(credit.amount_cents), status: 'sending' };
       }
-      const failure = (error instanceof Error ? error.message : String(error)).slice(0, 500);
-      await pool.query(`update ledger_credits set status = 'failed', failure = $2 where id = $1`, [credit.id, failure]);
+      await markFailed(credit.id, error);
       throw new HttpError(502, 'bank_error', 'The bank did not move the money. Try again.');
     }
-    // If this write fails the row stays 'sending': still counted, never resent.
+    // If this write fails the row stays 'sending': not counted, never resent.
     await pool.query(`update ledger_credits set status = 'sent', nessie_id = $2 where id = $1`, [credit.id, nessieId]);
     return { id: credit.id, movedCents: toCents(credit.amount_cents), status: 'sent' };
   }

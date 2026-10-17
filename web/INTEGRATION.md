@@ -41,7 +41,7 @@ Health endpoint: `GET https://checkwith.us/api/health`.
 
 Bank directory entries contain `id`, `kind` (`atm` or `branch`), `name`, `coordinates` (`latitude`, `longitude`, or null), and `address` (or null). Use only entries with coordinates for geofences; do not treat a missing coordinate as zero. Match the phone's location locally, then post `bank_during_call` when the iOS call/location rules trigger. No phone location is required by the directory endpoint. The directory is cached with Next's `hours` profile.
 
-Nessie has no ATMs or branches in Gainesville, so the expo needs a demo bank. Set `DEMO_BANK_LOCATIONS` on the server (Vercel env var) to JSON `[{name, lat, lng}]`; each entry is added after Nessie's banks as `{id: "demo-<n>", kind: "branch", name, coordinates, address: null}`. It is empty by default, works in a Release build, and needs no app change. Bad JSON or out-of-range coordinates fail the directory request with a message that names the variable. Example for the SwampHacks expo (UF Reitz Union; confirm the expo room's coordinates on site):
+Nessie has no ATMs or branches in Gainesville, so the expo needs a demo bank. Set `DEMO_BANK_LOCATIONS` on the server (Vercel env var) to JSON `[{name, lat, lng}]`; each entry is added after Nessie's banks as `{id: "demo-<n>", kind: "branch", name, coordinates, address: null}`. It is empty by default, works in a Release build, and needs no app change. Bad JSON or out-of-range coordinates are ignored with one server warning that names the variable; Nessie's banks still return. Example for the SwampHacks expo (UF Reitz Union; confirm the expo room's coordinates on site):
 
 ```
 DEMO_BANK_LOCATIONS=[{"name":"SwampHacks Demo Bank","lat":29.6463,"lng":-82.3478}]
@@ -204,8 +204,8 @@ Reusing a key answers with the first top-up and sends nothing (`status` `sent`, 
 is `409 idempotency_conflict`. Errors: viewers `403 permission_required`, stale login
 `403 step_up_required`, cents `422 whole_dollars_only`, frozen circle `409 frozen`
 (unfreeze first; the vault is the way back), definite bank refusal `502 bank_error`
-(retry with the same key). A top-up is a ledger credit (`ledger_credits`, migration 017),
-so it raises `ledgerBalanceCents`, and a later Freeze moves it to the vault too.
+(retry with the same key), and a key already used by a deposit `409 idempotency_conflict`. A top-up is a ledger credit (`ledger_credits`, migration 017),
+so once Nessie confirms it (`sent`) it raises `ledgerBalanceCents` and a later Freeze moves it to the vault too. A top-up whose outcome is unknown (`sending`) counts nowhere and is never resent. The family account is opened only after the frozen and key checks pass.
 Verified live on October 17 on a synthetic circle: one transfer listed on the member's
 account for three calls with the same key. `demo:reset` deletes last demo's top-ups.
 
