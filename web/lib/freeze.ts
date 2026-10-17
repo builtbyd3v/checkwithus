@@ -21,12 +21,9 @@ import { transaction } from '@/lib/db';
 import { HttpError } from '@/lib/http';
 import { toCents, type Cents } from '@/lib/money';
 import { NessieError, type NessieClient } from '@/lib/nessie/client';
-import { taggedDescription, transferBody, vaultAccountBody } from '@/lib/nessie/format';
+import { taggedDescription, transferBody } from '@/lib/nessie/format';
 import { requirePermission } from '@/lib/permissions';
-
-/** Cents in circle `c`'s vault. A transfer counts unless it definitely failed. */
-export const VAULT_CENTS_SQL = `coalesce((select sum(case t.direction when 'freeze' then t.amount_cents
-  else -t.amount_cents end) from vault_transfers t where t.circle_id = c.id and t.status <> 'failed'), 0)::bigint`;
+import { ensureVaultAccount, VAULT_CENTS_SQL } from '@/lib/vault';
 
 export type FreezeResult = { frozen: boolean; movedCents: Cents };
 
@@ -39,27 +36,6 @@ type CircleRow = {
   spendable: number;
   vault: number;
 };
-
-/** The circle's vault account at Nessie, created on first use. Safe to call again. */
-export async function ensureVaultAccount(pool: pg.Pool, nessie: NessieClient, circleId: string): Promise<string> {
-  const { rows } = await pool.query<{ vault_account_id: string | null; nessie_customer_id: string }>(
-    'select vault_account_id, nessie_customer_id from circles where id = $1', [circleId],
-  );
-  if (!rows[0]) throw new HttpError(404, 'not_found', 'Not found');
-  if (rows[0].vault_account_id) return rows[0].vault_account_id;
-  // Found by nickname first, so a create that timed out is not made twice.
-  const nickname = `checkwith.us vault [cw:${circleId}]`;
-  const existing = (await nessie.listCustomerAccounts(rows[0].nessie_customer_id))
-    .find((account) => account.nickname === nickname);
-  const created = existing?.nessieId
-    ?? await nessie.createAccount(rows[0].nessie_customer_id, vaultAccountBody({ nickname }));
-  // ponytail: two first freezes racing here can each create an account; the first saved wins, the other stays empty.
-  const saved = await pool.query<{ vault_account_id: string }>(
-    'update circles set vault_account_id = coalesce(vault_account_id, $2) where id = $1 returning vault_account_id',
-    [circleId, created],
-  );
-  return saved.rows[0]!.vault_account_id;
-}
 
 export function createFreezeService(deps: { pool: pg.Pool; nessie: NessieClient }) {
   const { pool, nessie } = deps;

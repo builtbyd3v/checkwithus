@@ -6,7 +6,7 @@ import { auth0 } from '@/lib/auth0/web';
 import { CATEGORY_LABELS, type Category } from '@/lib/categories';
 import { db } from '@/lib/db';
 import { familyPayments, memberships } from '@/lib/family';
-import { VAULT_CENTS_SQL } from '@/lib/freeze';
+import { VAULT_CENTS_SQL } from '@/lib/vault';
 import { formatCents, toCents } from '@/lib/money';
 import { cibaApprovals, payments } from '@/lib/services';
 import { Countdown, FreezeControl, JoinForm, SettingsForms } from './controls';

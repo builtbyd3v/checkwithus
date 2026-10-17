@@ -1,7 +1,7 @@
 import { requireFamilyUser } from '@/lib/auth/family';
 import { db } from '@/lib/db';
 import { requireMembership } from '@/lib/family';
-import { VAULT_CENTS_SQL } from '@/lib/freeze';
+import { VAULT_CENTS_SQL } from '@/lib/vault';
 import { handle, json, uuidParam } from '@/lib/http';
 import { nessie } from '@/lib/nessie/client';
 export const GET = handle(async (request, { params }: { params: Promise<{ id: string }> }) => {
