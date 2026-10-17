@@ -14,9 +14,9 @@
 3. **Payments:** a protected Nessie account. Code rules hold gift cards, crypto, new payees, large amounts, anything unusual for this user, payments started during a call, and the "ATM cash then gift cards" sequence. #11, #17
 4. **Screen:** "You're safe" or "Paused, your family will call", one big "Ask my family" button, a lock-screen card that updates live. #11
 
-### Family (web dashboard + Auth0 Guardian push)
-1. **Approve or deny** a held payment from the Guardian push (Auth0 CIBA) or the dashboard, with amount, payee and reason shown. #14, #16
-2. **Family circle:** approvers vs viewers; large amounts need 2 of 3 approvals. #14
+### Family (family iPhone app; web dashboard as backup)
+1. **Approve or deny** a held payment from the family iPhone app (approve needs Face ID) or the dashboard, with amount, payee and reason shown. The Auth0 Guardian push (CIBA) is built but off by default. #14, #16
+2. **Family circle:** approvers vs viewers; over $1,000, two approvers must say yes, and one no stops it. #14
 3. **Freeze:** one tap sweeps the spending balance to the vault (Nessie transfer). #18
 4. **Allowances:** the family grants the AI agent limited, expiring permission (for example utility bills under $200 until Nov 30); inside it, no push. #19
 5. **Dashboard:** holds, spending over time, "6x her usual", Tiger Data performance numbers. #6, #16
@@ -25,7 +25,7 @@
 | Sponsor | What wins it | Issues |
 |---|---|---|
 | Capital One Nessie | Many endpoints, each with a job: accounts (vault + spending), merchants (categories), purchases (baseline), withdrawals + ATMs (cash then gift cards), transfers (Freeze, family top-up), bills (known billers), deposits, branches | #9, #13, #17, #18 |
-| Auth0 | Auth0 for AI Agents: CIBA approvals with payment details, roles, 2-of-3, and scoped expiring allowances for the agent | #14, #19 |
+| Auth0 | Auth0 for AI Agents: CIBA approvals with payment details, roles, two approvers over $1,000, and scoped expiring allowances for the agent | #14, #19 |
 | Tiger Data | Hypertable + compression + real-time continuous aggregates (daily, weekly, per-payee) driving holds and the dashboard; a measured performance story (1M rows, query times, compression ratio); time-window scam sequence query | #6, #17 |
 | Easy On The Eyes | Polished older-adult screens (big text, one action per screen, plain words) and a clear family dashboard; design principles and steps in the gallery | #11, #15, #16 |
 | GoDaddy | checkwith.us registered via the MLH code, live at the expo, used as the product name everywhere | #10 |
@@ -33,7 +33,7 @@
 | Best Use of AI/ML | Two trained models with honest scores in the README (already done) | #7 |
 
 ## The 3-minute demo
-Setup: one iPhone as the older adult, the MacBook dashboard as the family, Google Voice as the scammer.
+Setup: one iPhone as the older adult, one iPhone with the family app as the family (MacBook dashboard as backup), Google Voice as the scammer.
 1. A scam text never reaches the inbox.
 2. A scam call rings as "Possible scam".
 3. A gift-card payment during the call pauses; the family denies it from the Guardian push; the phone updates live.
