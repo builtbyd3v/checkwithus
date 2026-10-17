@@ -88,6 +88,7 @@ struct HomeView: View {
         } action: {
             BigButton("Ask my family", symbol: "person.2.fill") { await model.askFamily() }
             BigButton("Pay a bill", symbol: "dollarsign.circle", prominent: false) { model.go(.choosePayee) }
+            BankAlwaysNote()
             if model.callLabelsOff {
                 // One-time setup, usually done by the family: iOS only lets Settings turn the extension on.
                 Button("Turn on scam call warnings") { model.openCallSettings() }

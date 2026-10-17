@@ -30,20 +30,23 @@ import os
     #if DEBUG
     /// The simulator cannot place a call: toggle on Home, or launch with `-pretendCall YES`.
     var pretendCall = UserDefaults.standard.bool(forKey: "pretendCall") {
-        didSet { UserDefaults.standard.set(pretendCall, forKey: "pretendCall"); if pretendCall { callStarted() } }
+        didSet { UserDefaults.standard.set(pretendCall, forKey: "pretendCall"); if pretendCall { callStarted() } else { callEnded() } }
     }
     #endif
 
     @ObservationIgnored private let manager = CLLocationManager()
     @ObservationIgnored private let calls = CXCallObserver()
     @ObservationIgnored private var monitor: CLMonitor?
+    /// The bank list is fetched once per launch; later app opens only re-pick.
+    @ObservationIgnored private var fetched = false
     /// iOS 18+ only monitors for an app that holds a service session.
     @ObservationIgnored private var session: CLServiceSession?
     @ObservationIgnored private var banks = UserDefaults.standard.data(forKey: "banks")
         .flatMap { try? JSONDecoder().decode([Bank].self, from: $0) } ?? [] {
         didSet { UserDefaults.standard.set(try? JSONEncoder().encode(banks), forKey: "banks") }
     }
-    /// Banks already alerted for this visit; cleared when the phone leaves. Saved, so a relaunch does not repeat.
+    /// Banks already alerted for this visit and call; cleared when the phone leaves or the call ends. Saved, so a
+    /// relaunch does not repeat.
     @ObservationIgnored private var alerted = Set(UserDefaults.standard.stringArray(forKey: "bankAlerted") ?? []) {
         didSet { UserDefaults.standard.set(Array(alerted), forKey: "bankAlerted") }
     }
@@ -71,12 +74,18 @@ import os
     /// When In Use first; the Always prompt follows in locationManagerDidChangeAuthorization, as Apple requires.
     func requestPermission() { manager.requestWhenInUseAuthorization() }
 
-    /// App open: reload the bank list and re-pick the nearest regions.
+    /// App open: load the bank list (once per launch) and re-pick the nearest regions.
     func refresh() async {
-        guard status == .authorizedAlways || status == .authorizedWhenInUse, let token = TokenStore.load(),
-              let list = try? await API.bankLocations(token: token) else { return }
-        // Only entries with coordinates can be a region (web/INTEGRATION.md).
-        banks = list.compactMap { b in b.coordinates.map { Bank(id: b.id, name: b.name, kind: b.kind, latitude: $0.latitude, longitude: $0.longitude) } }
+        guard status == .authorizedAlways || status == .authorizedWhenInUse, let token = TokenStore.load() else { return }
+        if !fetched {
+            fetched = true
+            if let list = try? await API.bankLocations(token: token) {
+                // Only entries with coordinates can be a region (web/INTEGRATION.md).
+                banks = list.compactMap { b in b.coordinates.map { Bank(id: b.id, name: b.name, kind: b.kind, latitude: $0.latitude, longitude: $0.longitude) } }
+            } else {
+                fetched = false
+            }
+        }
         manager.requestLocation()
     }
 
@@ -97,10 +106,14 @@ import os
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: any Error) {}
 
-    /// Covers "already inside when the call starts".
+    /// Covers "already inside when the call starts", but only while the app is running: iOS does not wake a
+    /// suspended app for a call. A suspended app still hears the geofence when the phone walks into a bank.
     func callObserver(_ callObserver: CXCallObserver, callChanged call: CXCall) {
-        if !call.hasEnded { callStarted() }
+        if !call.hasEnded { callStarted() } else if !isOnCall { callEnded() }
     }
+
+    /// The next call at the same bank is a new rehearsal or a new scam, so it alerts again.
+    private func callEnded() { alerted.removeAll() }
 
     private func callStarted() {
         Task { await checkAll() }
@@ -136,9 +149,12 @@ import os
         }
         watching = nearest.count
         // Backup from the fix itself: simulators report CLMonitor geofences as unsupported, and a wakeup fix may
-        // land inside before the geofence fires. Undecided while the fix is too rough to tell.
+        // land inside before the geofence fires. Only a precise fix may say "inside", so a rough significant-change
+        // fix cannot send a false alert. Undecided while the fix is too rough to tell.
+        let precise = here.horizontalAccuracy >= 0 && here.horizontalAccuracy <= Self.radius
+            && manager.accuracyAuthorization == .fullAccuracy
         for bank in nearest {
-            if distance(bank) <= Self.radius { handle(bank.id, .satisfied) }
+            if precise, distance(bank) <= Self.radius { handle(bank.id, .satisfied) }
             if distance(bank) - here.horizontalAccuracy > Self.radius { handle(bank.id, .unsatisfied) }
         }
         // Covers "app opened (or woken) while already inside during a call".
@@ -162,12 +178,14 @@ import os
         let task = UIApplication.shared.beginBackgroundTask()
         Task {
             defer { UIApplication.shared.endBackgroundTask(task) }
-            do {
-                try await API.bankAlert(detail: "At a bank (\(bank.name) \(bank.kind == "atm" ? "ATM" : "branch")) while on a phone call.", token: token)
-            } catch {
-                // Not sent: let the next check try again.
-                alerted.remove(id)
+            let detail = "At a bank (\(bank.name) \(bank.kind == "atm" ? "ATM" : "branch")) while on a phone call."
+            // Three tries, 1 then 2 seconds apart, inside the background time.
+            for attempt in 0..<3 {
+                if attempt > 0 { try? await Task.sleep(for: .seconds(attempt)) }
+                if (try? await API.bankAlert(detail: detail, token: token)) != nil { return }
             }
+            // Not sent: let the next check try again.
+            alerted.remove(id)
         }
     }
 
@@ -187,6 +205,7 @@ import os
     func markTestBank() {
         guard let here = manager.location?.coordinate else { return }
         UserDefaults.standard.set("\(here.latitude),\(here.longitude)", forKey: "testBank")
+        alerted.remove("test-bank")
         // Drop the old spot's geofence; the next fix re-adds it at the new spot.
         Task {
             await monitor?.remove("test-bank")
@@ -209,14 +228,32 @@ struct BankPermissionView: View {
                 .font(.largeTitle.bold())
             Text("If someone keeps you on the phone and sends you to the bank, we tell your family.")
                 .font(.title2)
-            Text("Your phone will ask to use your location. Tap Allow. Then tap Change to Always Allow.")
+            Text("Your phone will ask to use your location. Tap Allow While Using App. Then tap Change to Always Allow.")
                 .font(.title3)
-            Text("We never share where you are. We only say when you are at a bank during a call.")
+            Text("We only tell your family the bank's name, never your exact location.")
                 .font(.title3)
                 .foregroundStyle(.secondary)
         } action: {
             BigButton("Turn on", symbol: "location.fill") { BankWatcher.shared.requestPermission() }
             BigButton("Not now", symbol: "xmark", prominent: false) { BankWatcher.shared.skipped = true }
+        }
+    }
+}
+
+/// Bank alerts need Always: with While Using App, iOS stops watching banks once the app closes.
+struct BankAlwaysNote: View {
+    var body: some View {
+        if BankWatcher.shared.status == .authorizedWhenInUse {
+            VStack(spacing: 4) {
+                Text("Bank alerts only work if location is set to Always.")
+                    .font(.title3)
+                    .multilineTextAlignment(.center)
+                Button("Open Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                }
+                .font(.title3.weight(.semibold))
+                .frame(minHeight: 56)
+            }
         }
     }
 }
