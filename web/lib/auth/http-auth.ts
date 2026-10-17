@@ -8,6 +8,18 @@ export class AuthError extends Error {
   }
 }
 
+/**
+ * We could not check the credentials (e.g. Auth0's signing keys could not be
+ * fetched). Answered as 503 so the app retries instead of signing the person
+ * out: a valid sign-in must not look invalid during someone else's outage.
+ */
+export class AuthUnavailableError extends Error {
+  constructor(message = 'Sign-in could not be checked right now; try again shortly') {
+    super(message);
+    this.name = 'AuthUnavailableError';
+  }
+}
+
 /** The token from `Authorization: Bearer <token>`, or AuthError. */
 export function bearerToken(request: Request): string {
   const header = request.headers.get('authorization') ?? '';

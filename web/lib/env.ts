@@ -45,6 +45,20 @@ export const dbEnv = memo(() =>
   ),
 );
 
+/** Key for hashing short codes (see hashShortCode). Generate with:
+ *  node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))" */
+export const codeHashKey = memo(
+  () =>
+    parse(
+      'code hashing',
+      z.object({
+        CODE_HASH_KEY: z
+          .string()
+          .min(32, 'must be at least 32 characters of random data (see lib/env.ts)'),
+      }),
+    ).CODE_HASH_KEY,
+);
+
 export const nessieEnv = memo(() =>
   parse('Nessie', z.object({ NESSIE_API_KEY: required })),
 );

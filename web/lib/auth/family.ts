@@ -9,7 +9,7 @@
 import 'server-only';
 import { createRemoteJWKSet, errors, jwtVerify } from 'jose';
 import { auth0Env } from '@/lib/env';
-import { AuthError, bearerToken } from './http-auth';
+import { AuthError, AuthUnavailableError, bearerToken } from './http-auth';
 
 let jwks: ReturnType<typeof createRemoteJWKSet> | undefined;
 
@@ -39,7 +39,26 @@ export async function requireFamilyUser(request: Request): Promise<FamilyUser> {
   } catch (error) {
     if (error instanceof AuthError) throw error;
     if (error instanceof errors.JWTExpired) throw new AuthError('Sign-in expired');
-    // Never echo why verification failed beyond this; it helps an attacker.
-    throw new AuthError('Invalid sign-in');
+    if (error instanceof errors.JOSEError && TOKEN_REJECTED.has(error.code)) {
+      // Never echo why verification failed beyond this; it helps an attacker.
+      throw new AuthError('Invalid sign-in');
+    }
+    // Anything else means we could not check the token at all (Auth0's keys
+    // unreachable, timed out, malformed). That is not the person's fault.
+    console.error('[auth] could not verify family token:', error instanceof Error ? error.message : error);
+    throw new AuthUnavailableError();
   }
 }
+
+/** jose error codes that mean "this token is bad", as opposed to "we could not check it". */
+const TOKEN_REJECTED = new Set([
+  'ERR_JWT_EXPIRED',
+  'ERR_JWT_CLAIM_VALIDATION_FAILED',
+  'ERR_JWT_INVALID',
+  'ERR_JWS_INVALID',
+  'ERR_JWS_SIGNATURE_VERIFICATION_FAILED',
+  'ERR_JOSE_ALG_NOT_ALLOWED',
+  'ERR_JOSE_NOT_SUPPORTED',
+  'ERR_JWKS_NO_MATCHING_KEY',
+  'ERR_JWKS_MULTIPLE_MATCHING_KEYS',
+]);
