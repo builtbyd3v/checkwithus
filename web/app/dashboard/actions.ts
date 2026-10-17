@@ -16,10 +16,9 @@ const fail = (error: unknown): FormState => ({
 });
 const value = (data: FormData, key: string) => data.get(key);
 
-async function actor(circleId?: string) {
+async function actor() {
   const session = await auth0.getSession();
   if (!session?.user.sub) redirect('/auth/login?returnTo=/dashboard');
-  if (circleId) await requireMembership(db(), session.user.sub, circleId);
   return session.user.sub;
 }
 
@@ -29,8 +28,8 @@ export async function joinAction(_state: FormState, form: FormData): Promise<For
     displayName: z.string().trim().min(1).max(80),
   }).safeParse({ inviteCode: value(form, 'inviteCode'), displayName: value(form, 'displayName') });
   if (!parsed.success) return { message: 'Enter your name and a valid invite code.' };
+  const sub = await actor();
   try {
-    const sub = await actor();
     await joinCircle(db(), sub, parsed.data);
   } catch (error) {
     return fail(error);
@@ -43,8 +42,9 @@ export async function saveSettingsAction(_state: FormState, form: FormData): Pro
   const parsed = z.object({ circleId: z.uuid(), holdDollars: z.string().trim().regex(/^\d+(\.\d{1,2})?$/) })
     .safeParse({ circleId: value(form, 'circleId'), holdDollars: value(form, 'holdDollars') });
   if (!parsed.success) return { message: 'Enter a valid dollar amount.' };
+  const sub = await actor();
   try {
-    await actor(parsed.data.circleId);
+    await requireMembership(db(), sub, parsed.data.circleId);
     const cents = parseDollars(parsed.data.holdDollars);
     await db().query('update circles set hold_over_cents = $2 where id = $1', [parsed.data.circleId, cents]);
     revalidatePath('/dashboard');
@@ -61,8 +61,9 @@ export async function addPayeeAction(_state: FormState, form: FormData): Promise
     kind: value(form, 'kind'), category: value(form, 'category'),
   });
   if (!parsed.success) return { message: 'Check the payee name, type, and category.' };
+  const sub = await actor();
   try {
-    await actor(parsed.data.circleId);
+    await requireMembership(db(), sub, parsed.data.circleId);
     await db().query(
       `insert into payees (circle_id, name, normalized_name, kind, category)
        values ($1, $2, $3, $4, $5) on conflict (circle_id, kind, normalized_name) do nothing`,
@@ -76,8 +77,8 @@ export async function addPayeeAction(_state: FormState, form: FormData): Promise
 export async function inviteAction(_state: FormState, form: FormData): Promise<FormState> {
   const circleId = z.uuid().safeParse(value(form, 'circleId'));
   if (!circleId.success) return { message: 'Circle not found.' };
+  const sub = await actor();
   try {
-    const sub = await actor(circleId.data);
     const invite = await rotateInviteCode(db(), sub, circleId.data);
     return { message: 'Share this invite with a family member.', ...invite };
   } catch (error) { return fail(error); }
@@ -86,8 +87,8 @@ export async function inviteAction(_state: FormState, form: FormData): Promise<F
 export async function pairingAction(_state: FormState, form: FormData): Promise<FormState> {
   const circleId = z.uuid().safeParse(value(form, 'circleId'));
   if (!circleId.success) return { message: 'Circle not found.' };
+  const sub = await actor();
   try {
-    const sub = await actor(circleId.data);
     const pairing = await createPairingCode(db(), sub, circleId.data);
     return { message: 'Enter this code on the older adult’s phone.', ...pairing };
   } catch (error) { return fail(error); }

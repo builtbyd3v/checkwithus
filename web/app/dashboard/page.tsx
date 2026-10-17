@@ -38,8 +38,10 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
   const requested = (await searchParams).circle;
   const active = circles.find((circle) => circle.circleId === requested) ?? circles[0]!;
   await cibaApprovals()?.pollCircles([active.circleId]);
-  const [allPayments, spendResult, circleResult, memberResult, payeeResult] = await Promise.all([
-    familyPayments(db(), payments(), session.user.sub, { heldOnly: false }),
+  const [recent, held, spendResult, circleResult, memberResult, payeeResult] = await Promise.all([
+    familyPayments(db(), payments(), session.user.sub, { heldOnly: false, circleId: active.circleId }),
+    // Query holds independently: newer completed payments must not hide them.
+    familyPayments(db(), payments(), session.user.sub, { heldOnly: true, circleId: active.circleId }),
     db().query<SpendRow>(
       `select day, category, total_cents::text
          from spending_daily where circle_id = $1 and day >= now() - interval '90 days'
@@ -50,8 +52,6 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
     db().query<PayeeRow>('select id, name, kind, category from payees where circle_id = $1 order by name', [active.circleId]),
   ]);
   const circle = circleResult.rows[0]!;
-  const recent = allPayments.filter((payment) => payment.circleId === active.circleId);
-  const held = recent.filter((payment) => payment.status === 'held');
   const categories = new Map<Category, bigint>();
   const weeks = Array<bigint>(13).fill(0n);
   for (const row of spendResult.rows) {

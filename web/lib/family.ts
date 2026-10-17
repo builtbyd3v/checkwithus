@@ -67,9 +67,15 @@ export async function familyPayments(
   pool: pg.Pool,
   service: PaymentService,
   sub: string,
-  options: { heldOnly: boolean },
+  options: { heldOnly: boolean; circleId?: string },
 ) {
-  const circles = await memberships(pool, sub);
+  const membershipsForUser = await memberships(pool, sub);
+  const circles = options.circleId === undefined
+    ? membershipsForUser
+    : membershipsForUser.filter((circle) => circle.circleId === options.circleId);
+  if (options.circleId !== undefined && circles.length === 0) {
+    throw new HttpError(404, 'not_found', 'Not found');
+  }
   const payments = await service.listPayments(
     circles.map((c) => c.circleId),
     { heldOnly: options.heldOnly, limit: 50 },
