@@ -1,0 +1,27 @@
+{
+  "name": "checkwithus-video",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render:judge": "remotion render src/index.ts Judge30 out/judge-30s.mp4",
+    "render:j45": "remotion render src/index.ts Judge45 out/judge-45s.mp4",
+    "render:devpost": "remotion render src/index.ts Devpost out/devpost.mp4",
+    "render": "npm run render:judge && npm run render:devpost",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.536",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "remotion": "4.0.536"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "7.0.2"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true
+  }
+}

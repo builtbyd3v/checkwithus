@@ -163,12 +163,13 @@ Two models we trained, with honest scores on 884 real test texts (README "Model 
 ## AI tools disclosure
 
 We used AI coding tools, as allowed by the SwampHacks and MLH rules:
-- **Claude Code (Anthropic, Opus 5 and Opus 5.5):** wrote most of the code in `web/`, `ios/` and `ml/`, and drafted these docs, with Haiku subagents for dataset search. Licenses listed in `ml/data/SOURCES.md`.
-- **OpenAI Codex CLI:** continued parts of the web backend (approval and reconciliation fixes, the demo seed, the dashboard).
+- **Claude Code (Anthropic, Opus 5 and Opus 5.5, with Sonnet 5.5 and Haiku 5.5 subagents):** wrote most of the code in `web/`, `ios/` and `ml/`, and drafted these docs. Haiku subagents searched for datasets. Licenses listed in `ml/data/SOURCES.md`.
+- **OpenAI Codex CLI (GPT-6):** continued parts of the web backend (approval and reconciliation fixes, the demo seed, the dashboard).
 - **Codex:** dashboard accessibility, scam-sequence evidence, benchmark reporting, local PostgreSQL tests, original SVG design assets, synthetic UI video, and submission-material editing.
-- **OpenAI Codex CLI (review):** read-only second-opinion code review on changed files and review panels on the dataset and app. It found real bugs, which we verified and fixed.
+- **OpenAI Codex CLI (GPT-6.1-Sol, review):** read-only second-opinion code review on changed files and review panels on the dataset and app. It found real bugs, which we verified and fixed.
 - **ElevenLabs:** voice, music and sound effects for the demo video.
 - **Remotion:** video rendering for the demo video.
+- **Video assets:** Atkinson Hyperlegible Next font (SIL OFL 1.1). Sponsor logos belong to their owners and only name the challenges we enter.
 - **Inside the product:** Apple Foundation Models runs on the phone to rewrite facts into a note for the family. Our scam models are trained by us. checkwith.us is not a reskin of an existing AI tool.
 
 All code was written during the event. Each pull request names the AI tools it used.

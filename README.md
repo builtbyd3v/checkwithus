@@ -220,8 +220,8 @@ Required by SwampHacks and MLH rules, and disclosed on Devpost. Each PR also nam
 | Tool | Used for |
 | --- | --- |
 | Claude Code (Opus 5, Opus 5.5, with Sonnet 5.5 and Haiku 5.5 subagents) | Most code in `web/`, `ios/` and `ml/`: backend, Nessie and Auth0 integration, Tiger Data schema and benchmark, family-circle logic, dataset pipeline, training and eval scripts, Core ML export, GuardKit, iPhone app and extensions, landing page, and these docs. Haiku subagents searched for datasets. Licenses listed in [`ml/data/SOURCES.md`](ml/data/SOURCES.md). |
-| OpenAI Codex CLI | Continued the `web/` backend: approval and reconciliation fixes, the synthetic demo seed, and the family dashboard. |
-| OpenAI Codex CLI (read-only review) | Second-opinion review of changed files through a `Stop` hook, and review panels on the `ml/` dataset and the iPhone app. It found near-duplicate data leaks, label conflicts and several race conditions, which were then fixed. It reviews; a human and the authoring agent decide. |
+| OpenAI Codex CLI (GPT-6) | Continued the `web/` backend: approval and reconciliation fixes, the synthetic demo seed, and the family dashboard. |
+| OpenAI Codex CLI (GPT-6.1-Sol, read-only review) | Second-opinion review of changed files through a `Stop` hook, and review panels on the `ml/` dataset and the iPhone app. It found near-duplicate data leaks, label conflicts and several race conditions, which were then fixed. It reviews; a human and the authoring agent decide. |
 | Apple Foundation Models (inside the product) | Runs on the phone and rewrites true facts into a short note for the family. It never decides anything. |
 | ElevenLabs | Demo video voice, music and sound effects. |
 | Remotion | Demo video rendering. |
@@ -283,6 +283,15 @@ Type definitions (`@types/node`, `@types/pg`, `@types/react`, `@types/react-dom`
 | [Geist Mono](https://github.com/vercel/geist-font) | Monospace text on web | SIL Open Font License 1.1 |
 
 The web loads all three with `next/font/google`. The iOS app bundles the Figtree and Gabarito `.ttf` files. License text: [`LICENSES/OFL-1.1.txt`](LICENSES/OFL-1.1.txt).
+
+### Demo video
+
+| Asset | Used for | License |
+| --- | --- | --- |
+| [Remotion](https://github.com/remotion-dev/remotion) 4.0.536 | Renders the demo video from React code | Remotion License (free for individuals and teams of up to 3 employees) |
+| [Atkinson Hyperlegible Next](https://www.brailleinstitute.org/freefont/) | Video captions and titles | SIL Open Font License 1.1 |
+| ElevenLabs | Voice, music and sound effects | ElevenLabs terms of service |
+| Sponsor logos (Capital One, Nessie, Auth0, Tiger Data, GoDaddy Registry, SwampHacks, Easy On The Eyes) | Name the challenges we enter | Trademarks of their owners. No endorsement implied. |
 
 ### `ios/` frameworks
 
