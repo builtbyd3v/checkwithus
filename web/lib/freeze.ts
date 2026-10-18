@@ -109,6 +109,12 @@ export function createFreezeService(deps: { pool: pg.Pool; nessie: NessieClient 
       if (last?.direction === 'unfreeze' && last.in_flight) {
         throw new HttpError(409, 'unfreeze_in_progress', 'The unfreeze is still moving the money. Try again in a moment.');
       }
+      // Already frozen behind an unfreeze the bank never confirmed: the ledger counts that money as back in
+      // spending, but it may still be in the vault, so sweeping it could move it twice. Spending is frozen
+      // either way, so there is nothing to protect: move nothing.
+      if (circle.frozen && last?.direction === 'unfreeze' && last.status === 'sending') {
+        return { transfer: null, moved: 0, circle };
+      }
       // A retry of a freeze that already happened: answer with it, move nothing. A repeat tap that finds
       // whole dollars left (a top-up that landed after the sweep) falls through and sweeps them too.
       if (circle.frozen && last?.direction === 'freeze' && last.status !== 'failed' && circle.spendable < 100) {
@@ -159,9 +165,10 @@ export function createFreezeService(deps: { pool: pg.Pool; nessie: NessieClient 
         if (last.in_flight) throw new HttpError(409, 'unfreeze_in_progress', 'The unfreeze is still moving the money. Try again in a moment.');
         // Stuck 'sending': its outcome is unknown and it may still fail, so stay frozen rather than let
         // payments pass while the money may be in the vault. Never resent.
-        // ponytail: no lookup at Nessie to settle it, so this stays frozen until someone checks the bank.
+        // ponytail: no lookup at Nessie to settle it, so this stays frozen until someone checks the bank and marks
+        // the transfer 'sent' or 'failed'. No tap can resolve it: a new transfer could move money twice.
         if (last.status === 'sending') {
-          throw new HttpError(409, 'unfreeze_unconfirmed', 'The bank has not confirmed the earlier unfreeze, so spending stays frozen. Tap Freeze, then Unfreeze to try again.');
+          throw new HttpError(409, 'unfreeze_unconfirmed', 'The bank has not confirmed the unfreeze, so spending stays frozen. Ask the checkwith.us team to check it with the bank.');
         }
         // It sent but stopped before lifting the freeze: finish it, send nothing.
         await q.query('update circles set frozen = false where id = $1', [circleId]);
@@ -184,18 +191,22 @@ export function createFreezeService(deps: { pool: pg.Pool; nessie: NessieClient 
       }
       if (outcome === 'unknown') {
         // It may still be in the vault: stay frozen rather than let payments pass. Never resent.
-        throw new HttpError(502, 'unfreeze_unconfirmed', 'The bank has not confirmed the unfreeze, so spending stays frozen. Tap Freeze, then Unfreeze to try again.');
+        throw new HttpError(502, 'unfreeze_unconfirmed', 'The bank has not confirmed the unfreeze, so spending stays frozen. Ask the checkwith.us team to check it with the bank.');
       }
     }
     let frozen = false;
     if (transfer) {
-      // The money is back. Lift the freeze unless a newer freeze took over; answer with what was saved.
-      const lifted = await pool.query(
-        `update circles set frozen = false where id = $1
-           and (select direction from vault_transfers where circle_id = $1 order by id desc limit 1) = 'unfreeze'`,
-        [circleId],
-      );
-      frozen = !lifted.rowCount;
+      // The money is back. Lift the freeze unless a newer freeze took over, under the same circle lock a Freeze
+      // tap takes, reading the latest transfer only after the lock (a fresh snapshot); answer with what was saved.
+      frozen = await transaction(pool, async (q) => {
+        await q.query('select 1 from circles where id = $1 for update', [circleId]);
+        const latest = await q.query<{ direction: string }>(
+          'select direction from vault_transfers where circle_id = $1 order by id desc limit 1', [circleId],
+        );
+        if (latest.rows[0]?.direction !== 'unfreeze') return true;
+        await q.query('update circles set frozen = false where id = $1', [circleId]);
+        return false;
+      });
     }
     return { frozen, movedCents: toCents(tap.moved) };
   }
