@@ -209,6 +209,7 @@ ios/    iPhone app (older adult and family), Message Filter, Call Directory, Saf
 web/    Next.js backend, family dashboard and landing page (Vercel)
 ml/     datasets, training and eval scripts
 docs/   plan, rules, demo script, Devpost and DEV drafts, perf numbers
+video/  Remotion source for the demo video: filmed clips, voice, music
 ```
 
 Contributors and agents: read [AGENTS.md](AGENTS.md) first, then [docs/RULES.md](docs/RULES.md).
