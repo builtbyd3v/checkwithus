@@ -22,6 +22,9 @@ export const C = {
 // "CW Digits" swaps in plain digits: Atkinson's slashed zero turns "Auth0" into "AuthØ".
 export const FONT = "'CW Digits', 'Atkinson Hyperlegible Next', Arial, sans-serif";
 
+// The tagline that opens and closes the judge video. One place to change it.
+export const TAGLINE = "Before money moves, check with us.";
+
 export const FPS = 30;
 export const W = 1920;
 export const H = 1080;

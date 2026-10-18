@@ -1,5 +1,5 @@
 import { AbsoluteFill, Easing, Img, interpolate, staticFile, useCurrentFrame } from "remotion";
-import { C, FONT } from "../theme";
+import { C, FONT, TAGLINE } from "../theme";
 import * as logos from "../logos";
 import type { SponsorId } from "../logos";
 import { usePop } from "../ui";
@@ -71,7 +71,7 @@ export const HookCard = () => {
 };
 
 // 2. Promise: what checkwith.us does, in three short chips.
-const CHIPS = ["Rosa does nothing.", "Family decides.", "Code decides money."];
+const CHIPS = ["Routine bills pay.", "Unusual waits for family.", "Scams stop."];
 
 export const PromiseCard = () => {
   const head = usePop(0, 14);
@@ -83,7 +83,7 @@ export const PromiseCard = () => {
         <div style={{ color: C.purpleInk, fontWeight: 800, fontSize: 110, letterSpacing: -2 }}>checkwith.us</div>
       </div>
       <div style={{ color: C.ink, fontWeight: 700, fontSize: 76, marginTop: 44, opacity: line, transform: `translateY(${(1 - line) * 20}px)` }}>
-        Risky payments wait for family.
+        {TAGLINE}
       </div>
       <div style={{ display: "flex", gap: 28, marginTop: 80 }}>
         {CHIPS.map((t, i) => <PromiseChip key={t} text={t} delay={24 + i * 12} strong={i === CHIPS.length - 1} />)}
@@ -105,11 +105,11 @@ const PromiseChip = ({ text, delay, strong }: { text: string; delay: number; str
 
 // 3. "Not just ___": one row per sponsor; the strike-through is the reveal.
 const ROWS: { id: SponsorId; not: string; does: string }[] = [
-  { id: "nessie", not: "Not just balances", does: "Rosa's real bank: 10 resource types, Freeze runs exactly once" },
-  { id: "auth0", not: "Not just login", does: "Who can say yes: roles, 2\u00a0approvers,\u00a0Face\u00a0ID" },
-  { id: "tiger", not: "Not just storage", does: "Catches cash, then a gift card, in\u00a0about\u00a01\u00a0ms" },
-  { id: "eyes", not: "Not just pretty", does: "Nothing new for Rosa to learn" },
-  { id: "godaddy", not: "Not just a URL", does: "checkwith.us: the name is the promise" },
+  { id: "nessie", not: "Not just balances", does: "Real purchases, bills, ATM cash and a vault\u00a0transfer" },
+  { id: "auth0", not: "Not just login", does: "Decides who can say yes: roles, 2\u00a0approvers,\u00a0Face\u00a0ID" },
+  { id: "tiger", not: "Not just storage", does: "Spots unusual spending in 1 ms, while the\u00a0payment\u00a0waits" },
+  { id: "eyes", not: "Not just pretty", does: "Nothing new to learn: one action per\u00a0screen" },
+  { id: "godaddy", not: "Not just a URL", does: "checkwith.us: the name says what it\u00a0does" },
 ];
 const ROW_START = 24;
 const ROW_GAP = 45;
@@ -160,9 +160,9 @@ export const TableCard = () => {
 
 // 4. End: brand, the promise, and the logo wall with one word each.
 const WALL: { id: SponsorId; word: string }[] = [
-  { id: "nessie", word: "the bank" },
-  { id: "auth0", word: "who says yes" },
-  { id: "tiger", word: "spots the pattern" },
+  { id: "nessie", word: "moves the money" },
+  { id: "auth0", word: "who can say yes" },
+  { id: "tiger", word: "spots the unusual" },
   { id: "eyes", word: "nothing to learn" },
   { id: "godaddy", word: "the name" },
 ];
@@ -186,9 +186,7 @@ export const EndCard = () => {
         <Icon size={150} />
         <div style={{ color: C.white, fontWeight: 800, fontSize: 140, letterSpacing: -3 }}>checkwith.us</div>
       </div>
-      <div style={{ color: C.white, fontWeight: 700, fontSize: 52, marginTop: 36, opacity: line }}>
-        Rosa does nothing. Family decides. <span style={{ color: C.yellow }}>Code decides money.</span>
-      </div>
+      <div style={{ color: C.yellow, fontWeight: 800, fontSize: 64, marginTop: 36, opacity: line }}>{TAGLINE}</div>
       <div style={{ display: "flex", gap: 24, marginTop: 110 }}>
         {WALL.map((w, i) => <WallItem key={w.id} {...w} delay={24 + i * 6} />)}
       </div>
