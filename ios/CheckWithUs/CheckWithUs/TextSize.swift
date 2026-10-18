@@ -75,6 +75,7 @@ struct TextSizeSheet: View {
                     Text("You're safe. Your family is looking out for you.")
                 }
             }
+            .font(.brand(.title3))
             .navigationTitle("Text size")
             .toolbar { Button("Done") { dismiss() } }
         }

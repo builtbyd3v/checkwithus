@@ -31,10 +31,11 @@ struct CodeEntryField: View {
                 }
             }
         }
-        .font(large ? .system(.largeTitle, design: .rounded, weight: .bold) : .system(.title2, design: .rounded, weight: .semibold))
+        .font(large ? .brand(.largeTitle, weight: .bold) : .brand(.title2, weight: .bold))
         .accessibilityHidden(true)
         .overlay {
-            TextField(label, text: $code)
+            // An empty prompt: the label is for VoiceOver and Voice Control, never drawn over the boxes.
+            TextField(label, text: $code, prompt: Text(""))
                 .focused($focused)
                 .keyboardType(.asciiCapable)
                 .textInputAutocapitalization(.characters)
