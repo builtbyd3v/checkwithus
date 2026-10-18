@@ -1,5 +1,6 @@
 import LocalAuthentication
 import SwiftUI
+import UserNotifications
 
 /// State for the family side of the app. Everything is reloaded by polling (no push notifications yet).
 @Observable final class FamilyModel {
@@ -18,13 +19,22 @@ import SwiftUI
     var notice: String?
     /// The last pairing code made on this phone, shown until it is used or a new one replaces it.
     var pairingCode: FamilyAPI.PairingCode?
-    var tab = Tab.holds
+    var tab = Tab.holds { didSet { markAlertsSeen() } }
     var holdsPath: [String] = []
     var addingAllowance = false
     /// What the last freeze moved to safety per circle, to offer it back on unfreeze. FamilyAuth.forget clears it.
     private var frozenByCircle = UserDefaults.standard.dictionary(forKey: "frozenCents") as? [String: Int] ?? [:] {
         didSet { UserDefaults.standard.set(frozenByCircle, forKey: "frozenCents") }
     }
+    /// When the family last opened Alerts, per circle, for the tab badge.
+    private var alertsSeenByCircle = UserDefaults.standard.dictionary(forKey: "alertsSeen") as? [String: Date] ?? [:] {
+        didSet { UserDefaults.standard.set(alertsSeenByCircle, forKey: "alertsSeen") }
+    }
+    /// Alert and held payment ids already notified about, per circle. Nil for a circle means its first load: no burst.
+    @ObservationIgnored private var notifiedByCircle = UserDefaults.standard.dictionary(forKey: "notifiedIds") as? [String: [String]] ?? [:] {
+        didSet { UserDefaults.standard.set(notifiedByCircle, forKey: "notifiedIds") }
+    }
+    @ObservationIgnored private let notifier = FamilyNotifier()
     @ObservationIgnored private var mock = false
     /// One refresh at a time: Auth0 rotates refresh tokens, and reusing an old one revokes the sign-in.
     @ObservationIgnored private var refreshing: Task<FamilyAuth.Tokens, Error>?
@@ -35,12 +45,19 @@ import SwiftUI
     var protectedName: String { circle?.protectedName ?? "They" }
     var held: [FamilyAPI.Payment] { payments.filter { $0.status == "held" } }
     var frozen: Bool { balance?.frozen ?? false }
+    /// Alerts newer than the last time the family opened the Alerts tab.
+    var newAlertCount: Int {
+        let seen = alertsSeenByCircle[circle?.circleId ?? ""] ?? .distantPast
+        return alerts.count { AlertWords.title($0.kind, name: "") != nil && (isoDate($0.createdAt) ?? .distantPast) > seen }
+    }
     var frozenCents: Int {
         get { frozenByCircle[circle?.circleId ?? ""] ?? 0 }
         set { if let id = circle?.circleId { frozenByCircle[id] = newValue } }
     }
 
     init() {
+        notifier.onTap = { [weak self] tab in self?.tab = tab }
+        UNUserNotificationCenter.current().delegate = notifier
         #if DEBUG
         // Screenshots without Auth0: launch with `-familyPreview holds|detail|alerts|money|frozen|allowances|grant|settings`.
         if let preview = UserDefaults.standard.string(forKey: "familyPreview") { loadMock(preview) }
@@ -62,6 +79,8 @@ import SwiftUI
         balance = nil
         allowances = []
         holdsPath = []
+        notifiedByCircle = [:]
+        UNUserNotificationCenter.current().setBadgeCount(0)
     }
 
     func join(code: String, name: String) async {
@@ -87,6 +106,8 @@ import SwiftUI
             guard let id = circle?.circleId else { return }
             payments = try await authed(FamilyAPI.payments)
             alerts = try await authed(FamilyAPI.alerts)
+            markAlertsSeen()
+            notifyNew(circle: id)
             allowances = try await authed { try await FamilyAPI.allowances(id, $0) }
             // The balance asks the bank; keep the last one if the bank is slow.
             if let latest = try? await authed({ try await FamilyAPI.balance(id, $0) }) { balance = latest }
@@ -94,6 +115,54 @@ import SwiftUI
         } catch {
             self.error = error.localizedDescription
         }
+    }
+
+    /// Clears the badge while Alerts is open. Uses the newest alert time too, in case the server clock runs ahead.
+    private func markAlertsSeen() {
+        guard tab == .alerts, let id = circle?.circleId else { return }
+        let newest = alerts.compactMap { isoDate($0.createdAt) }.max() ?? .distantPast
+        alertsSeenByCircle[id] = max(.now, newest)
+        updateAppBadge()
+    }
+
+    /// Asks once; iOS shows the prompt only the first time.
+    func askForNotifications() async {
+        // No prompt over preview screenshots.
+        guard !mock else { return }
+        _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])
+        updateAppBadge()
+    }
+
+    private func updateAppBadge() {
+        guard !mock else { return }
+        UNUserNotificationCenter.current().setBadgeCount(newAlertCount + held.count)
+    }
+
+    /// A local notification for each alert or held payment not seen in an earlier poll.
+    /// ponytail: polling only runs while the app is open or recently used; real APNs push from the server is the follow-up.
+    private func notifyNew(circle id: String) {
+        var items: [(id: String, title: String, body: String, tab: Tab)] = alerts.compactMap { alert in
+            AlertWords.title(alert.kind, name: alert.protectedName).map {
+                ("a:\(alert.id)", $0, alert.detail ?? "Open Check With Us to see it.", .alerts)
+            }
+        }
+        items += held.map {
+            ("p:\($0.id)", "A \(dollars($0.amountCents)) payment is waiting for the family",
+             "\($0.protectedName) wants to pay \($0.payee.name). Open Approvals to decide.", .holds)
+        }
+        if let notified = notifiedByCircle[id].map(Set.init) {
+            for item in items where !notified.contains(item.id) {
+                let content = UNMutableNotificationContent()
+                content.title = item.title
+                content.body = item.body
+                content.sound = .default
+                content.userInfo = ["tab": item.tab.rawValue]
+                UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: item.id, content: content, trigger: nil))
+            }
+        }
+        // Only current ids are kept: a decided payment or an old alert does not come back.
+        notifiedByCircle[id] = items.map(\.id)
+        updateAppBadge()
     }
 
     func decide(_ payment: FamilyAPI.Payment, approve: Bool) async {
@@ -295,13 +364,13 @@ import SwiftUI
     private func loadMock(_ preview: String) {
         mock = true
         tokens = .init(access: "preview", refresh: nil)
-        circles = [.init(circleId: "c1", protectedName: "Rosa", yourName: "Maria")]
+        circles = [.init(circleId: "c1", protectedName: "Sam", yourName: "Maria")]
         let now = Date()
         let iso = { (minutes: Double) in ISO8601DateFormatter().string(from: now.addingTimeInterval(minutes * 60)) }
         let payment = { (id: String, status: String, cents: Int, payee: String, kind: String, known: Bool, category: (String, String),
                          onCall: Bool, reasons: [(String, String)], note: String?, ago: Double, by: String?) in
             FamilyAPI.Payment(
-                id: id, circleId: "c1", protectedName: "Rosa", status: status, amountCents: cents,
+                id: id, circleId: "c1", protectedName: "Sam", status: status, amountCents: cents,
                 payee: .init(name: payee, kind: kind, known: known), category: .init(code: category.0, label: category.1),
                 onCall: onCall, holdReasons: reasons.map { .init(code: $0.0, label: $0.1) }, explanation: note,
                 createdAt: iso(-ago), expiresAt: iso(5 - ago), decidedByName: by, approvalsRequired: 1)
@@ -309,7 +378,7 @@ import SwiftUI
         payments = [
             payment("p1", "held", 50000, "Gift card store", "merchant", false, ("gift_cards", "Gift cards"), true,
                     [("gift_card", "Gift card purchase"), ("new_payee", "Someone they have not paid before"), ("during_call", "Paid while on a phone call")],
-                    "Rosa is paying $500 to Gift card store while on a phone call. Scammers often ask to be paid with gift cards, because the money is hard to trace or get back.", 1, nil),
+                    "Sam is paying $500 to Gift card store while on a phone call. Scammers often ask to be paid with gift cards, because the money is hard to trace or get back.", 1, nil),
             payment("p2", "held", 32000, "City Power & Light", "biller", true, ("utilities", "Utilities"), false,
                     [("over_limit", "Over the limit you set")], nil, 2, nil),
             payment("p3", "paid", 8412, "Sunrise Grocery", "merchant", true, ("groceries", "Groceries"), false, [], nil, 90, nil),
@@ -319,9 +388,9 @@ import SwiftUI
                     [("new_payee", "Someone they have not paid before")], nil, 1500, nil),
         ]
         alerts = [
-            .init(id: "a1", protectedName: "Rosa", kind: "bank_during_call", detail: "Near Chase on University Ave", createdAt: iso(-3)),
-            .init(id: "a2", protectedName: "Rosa", kind: "ask_family", detail: nil, createdAt: iso(-45)),
-            .init(id: "a3", protectedName: "Rosa", kind: "some_future_kind", detail: nil, createdAt: iso(-50)),
+            .init(id: "a1", protectedName: "Sam", kind: "bank_during_call", detail: "Near Chase on University Ave", createdAt: iso(-3)),
+            .init(id: "a2", protectedName: "Sam", kind: "ask_family", detail: nil, createdAt: iso(-45)),
+            .init(id: "a3", protectedName: "Sam", kind: "some_future_kind", detail: nil, createdAt: iso(-50)),
         ]
         balance = .init(availableCents: 241_288, ledgerBalanceCents: 273_288, reservedCents: 32000, checkedAt: iso(-1), frozen: false)
         allowances = [
@@ -341,4 +410,22 @@ import SwiftUI
         }
     }
     #endif
+}
+
+/// Shows banners while the app is open, and opens the matching tab on a tap.
+final class FamilyNotifier: NSObject, UNUserNotificationCenterDelegate {
+    var onTap: ((FamilyModel.Tab) -> Void)?
+
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+        [.banner, .badge, .sound]
+    }
+
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        let raw = response.notification.request.content.userInfo["tab"] as? String
+        await open(raw)
+    }
+
+    private func open(_ raw: String?) {
+        if let raw, let tab = FamilyModel.Tab(rawValue: raw) { onTap?(tab) }
+    }
 }

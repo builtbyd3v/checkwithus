@@ -1,10 +1,10 @@
 # checkwith.us: the plan (single source of truth)
 
-- **Goal: win the sponsor challenges.** Capital One Nessie, Auth0, Tiger Data, Easy On The Eyes (UI/UX), GoDaddy, plus the DEV Writing Challenge. We still enter Best Use of AI/ML, but it is not the focus.
+- **Goal: win the sponsor challenges.** Capital One Nessie, Auth0, Tiger Data, Easy On The Eyes (UI/UX), GoDaddy, plus the DEV Writing Challenge. We enter Best First Timers as our one specialized track. The scam models stay in the product and the README, not as an entry.
 - **Product:** scam protection where the older adult does nothing and the family does the work.
 - **Work lives in GitHub issues.** This file says what and why; issues say who and done-when. If they disagree, ask in the team chat and fix this file.
 - **Rule of thumb:** every sponsor's tech must do real work in the demo, not just be present.
-- Devpost due **Sun Oct 18, 8:00 AM ET**. Expo Sun 10 AM to noon, 3-minute demo. Rules: [RULES.md](RULES.md).
+- Devpost due **Sun Oct 18, 7:30 AM EDT**. Expo Sun 10 AM to noon, 3-minute demo. Rules: [RULES.md](RULES.md).
 
 ## What we build
 
@@ -15,22 +15,22 @@
 4. **Screen:** "You're safe" or "Paused, your family will call", one big "Ask my family" button, a lock-screen card that updates while the app polls (no push). #11
 
 ### Family (family iPhone app; web dashboard as backup)
-1. **Approve or deny** a held payment from the family iPhone app (approve asks for Face ID on the phone; the server checks the approver's Auth0 token) or the dashboard, with amount, payee and reason shown. The Auth0 Guardian push (CIBA) is built but off by default and not verified live. #14, #16
-2. **Family circle:** approvers vs viewers; over $1,000, two approvers must say yes, and one no stops it. #14
-3. **Freeze:** one tap sweeps the spending balance to the vault (Nessie transfer). #18
-4. **Allowances:** the family grants limited, expiring permission (for example utility bills up to $400 until Nov 30); inside it, a known payee over the usual limit pays with no approval and no push. A bill-pay agent with its own Auth0 identity is in progress and would work only inside an allowance. #19
-5. **Dashboard:** holds, spending over time, "About Nx her usual", alerts, a live Tiger Data speed card. #6, #16
+1. **Approve or deny** a held payment from the family iPhone app (approve asks for Face ID on the phone; the server checks the approver's Auth0 token) or the dashboard, with amount, payee and reason shown. The Auth0 Guardian push (CIBA) is built and tested, and off in the demo. #14, #16
+2. **Family circle:** approvers vs viewers. By default, over $1,000 two approvers must say yes, and one no stops it; families can change the amount or turn it off on the dashboard. The hold limit (default $300) works the same way. #14
+3. **Freeze:** one tap, no fresh sign-in, sweeps the spending balance to the vault (Nessie transfer). #18
+4. **Allowances:** the family grants limited, expiring permission (for example utility bills up to $400 until Nov 30); inside it, a known payee over the usual limit pays with no approval and no push. The bill-pay agent with its own Auth0 identity is built, merged and verified live (Oct 17). It acts only in circles with a live allowance; inside it, bills pay with no push, and outside it the normal rules decide (a known biller under the hold limit pays). #19
+5. **Dashboard:** holds, spending over time, "About Nx their usual", alerts, a live Tiger Data speed card. #6, #16
 
 ## How each sponsor is won
 | Sponsor | What wins it | Issues |
 |---|---|---|
 | Capital One Nessie | Many endpoints, each with a job: accounts (vault + spending), merchants (categories), purchases (baseline), withdrawals + ATMs (cash then gift cards), transfers (Freeze, family top-up), bills (known billers), deposits, branches | #9, #13, #17, #18 |
-| Auth0 | Auth0 for AI Agents: CIBA approvals with payment details, roles, two approvers over $1,000, and scoped expiring allowances for the agent | #14, #19 |
+| Auth0 | Auth0 for AI Agents: CIBA approvals with payment details (built, off in the demo), roles, two approvers over $1,000 by default, and scoped expiring allowances for the agent | #14, #19 |
 | Tiger Data | Hypertable + compression + real-time continuous aggregates (daily, weekly, per-payee) driving holds and the dashboard; a measured performance story (1M rows, query times, compression ratio); time-window scam sequence query | #6, #17 |
 | Easy On The Eyes | Polished older-adult screens (big text, one action per screen, plain words) and a clear family dashboard; design principles and steps in the gallery | #11, #15, #16 |
 | GoDaddy | checkwith.us registered via the MLH code, live at the expo, used as the product name everywhere | #10 |
 | DEV Writing | A post about how we built it | #7 |
-| Best Use of AI/ML | Two trained models with honest scores in the README (already done) | #7 |
+| Best First Timers | First-timers demo and explain their own pieces; a true "what we learned" story | #7 |
 
 ## The expo demo (3 minutes max) and the Devpost video
 - **At the table (2:30):** a 30 s judge video with the wow moments, then a 2:00 live talk with one block per sponsor. Script: [pitch.md](pitch.md).

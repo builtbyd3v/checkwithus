@@ -33,6 +33,8 @@ enum Screen: Equatable {
     var payment: API.Payment?
     var busy = false
     var error: String?
+    /// The older adult's Settings sheet, opened from the gear on Home.
+    var settingsOpen = false
 
     private let calls = CXCallObserver()
     /// One request per payment attempt, resent unchanged when retrying it, so the idempotency key always
@@ -54,12 +56,13 @@ enum Screen: Equatable {
     var isOnCall: Bool { calls.calls.contains { !$0.hasEnded } }
 
     #if DEBUG
-    /// Screenshots without a server: launch with `-preview home|payees|confirm|waiting|denied|asked`.
+    /// Screenshots without a server: launch with `-preview home|settings|payees|confirm|waiting|denied|asked`.
     init() {
         let payee = Payee.all[3]
         let held = { (outcome: String) in API.Payment(id: "preview", outcome: outcome, amountCents: 50000, payee: .init(name: payee.name), decidedByName: nil) }
         switch UserDefaults.standard.string(forKey: "preview") {
-        case "home": token = "preview"; config = .init(protectedName: "Rosa", family: [])
+        case "home": token = "preview"; config = .init(protectedName: "Sam", family: [])
+        case "settings": token = "preview"; config = .init(protectedName: "Sam", family: []); settingsOpen = true
         case "asked": token = "preview"; screen = .asked
         case "payees": token = "preview"; screen = .choosePayee
         case "confirm": token = "preview"; screen = .confirm(payee, cents: 50000)
@@ -101,6 +104,7 @@ enum Screen: Equatable {
         payment = nil
         attempt = nil
         screen = .home
+        settingsOpen = false
         UserDefaults.standard.removeObject(forKey: Self.watchedKey)
         UserDefaults.standard.set("", forKey: "role")
         activity = nil
@@ -135,6 +139,17 @@ enum Screen: Equatable {
     func loadConfig() async {
         guard let token else { return }
         do { config = try await API.config(token: token) } catch is API.Unpaired { forget() } catch {}
+    }
+
+    /// Who is in the family, for Settings. Throws in plain words; a revoked phone goes back to the first screen.
+    func family() async throws -> [API.FamilyMember] {
+        #if DEBUG
+        if UserDefaults.standard.string(forKey: "preview") != nil {
+            return [.init(displayName: "Jordan", role: "approver"), .init(displayName: "Lee", role: "viewer")]
+        }
+        #endif
+        guard let token else { throw API.Unpaired() }
+        do { return try await API.family(token: token) } catch is API.Unpaired { forget(); throw API.Unpaired() }
     }
 
     func askFamily() async {

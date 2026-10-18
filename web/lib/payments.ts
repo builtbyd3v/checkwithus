@@ -30,7 +30,7 @@ import {
   withdrawalBody,
 } from '@/lib/nessie/format';
 import { AVAILABLE_CENTS_SQL } from '@/lib/vault';
-import { CASH_THEN_GIFT_CARD_WINDOW_SECONDS, decideHold, type Baseline, type HoldReason } from '@/lib/rules';
+import { approvalsRequired, CASH_THEN_GIFT_CARD_WINDOW_SECONDS, decideHold, type Baseline, type HoldReason } from '@/lib/rules';
 
 export const PAYMENT_STATUSES = [
   'held',
@@ -350,7 +350,8 @@ export function createPaymentService(deps: PaymentServiceDeps) {
       const reasons = decision.reasons.filter(r => r !== 'over_limit' && r !== 'unusual_spending');
       decision = reasons.length ? { action: 'hold', reasons } : { action: 'allow' };
     }
-    if (input.amountCents > policy.rows[0]!.two_approvals_over_cents) {
+    const approvals = approvalsRequired(input.amountCents, policy.rows[0]!.two_approvals_over_cents);
+    if (approvals === 2) {
       const reasons = decision.action === 'hold' ? decision.reasons : [];
       decision = { action: 'hold', reasons: reasons.includes('over_limit') ? reasons : [...reasons, 'over_limit'] };
     }
@@ -389,7 +390,7 @@ export function createPaymentService(deps: PaymentServiceDeps) {
         held ? 'held' : 'approved',
         held,
         circle.approvalTimeoutSeconds,
-        input.amountCents > policy.rows[0]!.two_approvals_over_cents ? 2 : 1,
+        approvals,
         !held ? allowanceId : null,
         input.billDueDate ?? null,
         input.initiatedBy ?? 'device',

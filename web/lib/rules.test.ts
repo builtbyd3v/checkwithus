@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { toCents } from './money';
 import {
+  approvalsRequired,
   decideHold,
   DEFAULT_HOLD_OVER_CENTS,
+  DEFAULT_TWO_APPROVALS_OVER_CENTS,
+  POLICY_OFF_CENTS,
   HOLD_REASONS,
   type Baseline,
   type GuardSuggestion,
@@ -186,5 +189,41 @@ describe('freeze and the cash-then-gift-card sequence', () => {
 
   it('ATM cash alone does not hold anything else', () => {
     expect(run({}, { frozen: false, atmCashRecently: true })).toEqual({ action: 'allow' });
+  });
+});
+
+describe('family settings', () => {
+  const big = { ...ordinary, amountCents: toCents(500_000) };
+  const withLimit = (payment: PaymentFacts, holdOverCents: number) =>
+    decideHold({ payment, holdOverCents: toCents(holdOverCents), baseline: null, guard: null });
+
+  it('hold limit off skips over_limit, and the payment goes through', () => {
+    expect(withLimit(big, POLICY_OFF_CENTS)).toEqual({ action: 'allow' });
+    expect(withLimit({ ...big, amountCents: toCents(200_000_000) }, POLICY_OFF_CENTS)).toEqual({ action: 'allow' });
+  });
+
+  it('hold limit off still holds a gift card and every other scam rule', () => {
+    expect(withLimit({ ...big, category: 'gift_cards', payeeKnown: false, onCall: true }, POLICY_OFF_CENTS))
+      .toEqual({ action: 'hold', reasons: ['gift_card', 'new_payee', 'during_call'] });
+  });
+
+  it('a changed hold limit takes effect', () => {
+    expect(withLimit(big, 600_000)).toEqual({ action: 'allow' });
+    expect(withLimit(big, 400_000)).toEqual({ action: 'hold', reasons: ['over_limit'] });
+  });
+
+  it('two approvers on keeps 2 over the amount, 1 at or under it', () => {
+    expect(approvalsRequired(toCents(100_001), DEFAULT_TWO_APPROVALS_OVER_CENTS)).toBe(2);
+    expect(approvalsRequired(toCents(100_000), DEFAULT_TWO_APPROVALS_OVER_CENTS)).toBe(1);
+  });
+
+  it('two approvers off gives 1 over the old amount, even for huge payments', () => {
+    expect(approvalsRequired(toCents(100_001), POLICY_OFF_CENTS)).toBe(1);
+    expect(approvalsRequired(toCents(200_000_000), POLICY_OFF_CENTS)).toBe(1);
+  });
+
+  it('a changed two-approver amount takes effect', () => {
+    expect(approvalsRequired(toCents(60_000), toCents(50_000))).toBe(2);
+    expect(approvalsRequired(toCents(150_000), toCents(200_000))).toBe(1);
   });
 });

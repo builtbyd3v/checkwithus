@@ -38,7 +38,7 @@ export function dashboardFixture(nowIso: string, expiresAt: string): Omit<Dashbo
   ];
   return {
     now, firstName, circles: [{ circleId, protectedName: PROTECTED_NAME }], activeCircleId: circleId,
-    role: 'approver', canApproveHere: true, frozen: false, vaultCents: 0, holdDollars: '300.00',
+    role: 'approver', canApproveHere: true, frozen: false, vaultCents: 0, holdDollars: '300.00', twoApprovalsDollars: '1000.00', approverCount: 2,
     held: [held], recent,
     alerts: [{ id: 'alert-1', kind: 'bank_during_call', detail: 'At a bank (Main St ATM) while on a phone call.', createdAt: minutes(now, 6).toISOString() }],
     weeks: [19335, 3890, 5210, 4460, 19470, 4730, 3695, 4940, 19375, 4070, 5125, 3860, 19833],

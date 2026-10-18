@@ -4,7 +4,7 @@
 - Phone scams have the highest median loss. Bank transfers and crypto lose the most money in total. Gift cards are among the most often reported payment methods for impersonation, tech support and romance scams. Each one is a fixed hold rule in our code.
 - Scammers win by rushing people before they can talk to family. So a held payment pauses and the family decides.
 - Older users read slower, tap less precisely and blame themselves for errors. So the older adult's screens use big text, big buttons, plain words and one action per screen.
-- Every number below is quoted from a source we opened and read on Oct 17, 2026. Parent interview quotes are still a TODO.
+- Every number below is quoted from a source we opened and read on Oct 17, 2026.
 
 ## How we did the research
 
@@ -155,27 +155,22 @@ We read government data on fraud (FTC, FBI IC3, CFPB) and usability research on 
   - "Convey information with more than color alone."
 - **What we built because of it:** Every state has an icon, a headline and a color together: a green shield and "You're safe" (`checkmark.shield.fill` in `HomeView`, `ContentView.swift`), an orange pause symbol and "Paused", a red raised hand and "Stopped" (`OutcomeText.symbol` and `OutcomeText.color` in `PaymentActivity.swift`). VoiceOver reads the family's answer aloud when it arrives (`StatusView`).
 
-## Interview quotes
-
-TODO(Dev): add real quotes from the parent interview.
-
 ## Design steps
 
 The screens below are iPhone simulator screenshots of the real app. They are not mockups.
 
 | Step | Image | Screen | Where in code |
 | --- | --- | --- | --- |
-| 1. Who uses this phone | [01-role-picker.png](gallery/01-role-picker.png) | Two big buttons: "I'm the one being protected" and "I'm family" | `RolePickerView`, `RoleViews.swift` (PR #30) |
+| 1. Who uses this phone | [01-role-picker.png](gallery/01-role-picker.png) | Two big buttons: "I have a code from my family" and "I'm family: Sign in" | `RolePickerView`, `RoleViews.swift` (PR #30) |
 | 2. Connect once | [02-older-adult-connect.png](gallery/02-older-adult-connect.png) | Type the family's code, one Connect button | `PairView`, `ContentView.swift` |
 | 3. Home: you're safe | [03-older-adult-home-safe.png](gallery/03-older-adult-home-safe.png) | "You're safe", one big "Ask my family" button, "Pay a bill" below | `HomeView`, `ContentView.swift` |
 | 4. Bank safety setup | [04-older-adult-bank-safety.png](gallery/04-older-adult-bank-safety.png) | Plain-words reason first, then Apple's location prompt | `BankPermissionView`, `BankWatcher.swift` (PR #34) |
 | 5. Family: approvals | [05-family-approvals.png](gallery/05-family-approvals.png) | Waiting holds first, each with its reason | `HoldsView`, `FamilyViews.swift` (PR #30) |
 | 6. Family: why we paused it | [06-family-why-we-paused.png](gallery/06-family-why-we-paused.png) | Amount, payee, every reason, the phone's note, Deny and Approve | `PaymentDetailView`, `FamilyViews.swift` (PR #30) |
 
-- TODO(Dev): capture the "Paused, waiting for family" screen, the "We told your family" screen and the lock-screen card on a device, and add them here.
 - New design assets: [SVG handoff and design boards](design/handoff.md), including new exploratory sketches, wireframes and visual specifications. They were created after implementation and are labelled accordingly; they are not historical process evidence. Import the SVG frames into Figma when a team workspace is available.
 
 ## Limits
 
 - All fraud numbers are reports people chose to file. The FTC says losses reported to it are the "tip of the iceberg".
-- We did not run a usability test with older adults this weekend (out of scope in `docs/PLAN.md`). The design rests on the published research above. Parent-interview quotes and evidence of changes from those quotes are still pending.
+- We did not run a usability test with older adults this weekend (out of scope in `docs/PLAN.md`). The design rests on the published research above.

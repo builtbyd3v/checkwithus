@@ -3,6 +3,8 @@ import SwiftUI
 @main struct MyApp: App {
     @State private var model = AppModel()
     @Environment(\.scenePhase) private var scenePhase
+    /// "system", "light" or "dark", set in either role's Settings.
+    @AppStorage("appearance") private var appearance = "system"
 
     // A region event can relaunch the app in the background; the bank watcher must exist to hear it.
     init() { _ = BankWatcher.shared }
@@ -14,6 +16,7 @@ import SwiftUI
                 .environment(model)
                 // Purple as text everywhere; filled buttons set the brand fill themselves.
                 .tint(Color.link)
+                .preferredColorScheme(appearance == "light" ? .light : appearance == "dark" ? .dark : nil)
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { model.keepPollingInBackground() }

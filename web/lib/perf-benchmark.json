@@ -27,7 +27,7 @@
     },
     {
       "key": "payee",
-      "name": "\"Her usual\" at one payee (1 circle, 1 year)",
+      "name": "\"Usual spending\" at one payee (1 circle, 1 year)",
       "rawMs": 7.92,
       "columnstoreMs": 8.55,
       "aggregateMs": 2.65,

@@ -2,8 +2,7 @@
 
 - Six rules shape every screen the older adult sees, and the family screens that back them up.
 - Each rule comes from a finding in [research.md](research.md), cited by its number there.
-- Each rule points to the real SwiftUI view that follows it.
-- Implementation references describe `rishon` in PR #54; they do not establish that the restored `main` branch or deployed site includes these screens.
+- Each rule points to the real SwiftUI view that follows it. All of it is on `main`.
 
 ## 1. The family does the work
 

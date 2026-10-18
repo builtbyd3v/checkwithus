@@ -30,7 +30,8 @@ The older adult frames use 22px body copy, 38px headlines and 80px primary
 buttons. The native implementation must continue to honor Dynamic Type and
 56pt minimum tap targets. Family screens use explicit state words and separate
 Deny/Approve actions; Guardian mode displays its approval instruction instead
-of a dashboard Approve button. More than $1,000 requires two different approvers.
+of a dashboard Approve button. By default, more than $1,000 requires two different approvers;
+families can change the amount or turn it off on the dashboard.
 
 Rebuild from the repository root:
 

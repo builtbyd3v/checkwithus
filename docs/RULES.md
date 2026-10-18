@@ -3,8 +3,8 @@
 - **Every agent reads this before building, submitting or writing Devpost text.** If a task would break a rule here, stop and ask the team.
 - All code is written during the event (Oct 16, 8:30 PM to Oct 18). Anything built before is disqualified.
 - AI tools are allowed but must be disclosed on Devpost. The project must not be a reskin of an existing AI tool.
-- **At most ONE specialized track.** Confirmed by organizers (Discord, Oct 16): the 4 specialized tracks are Hardware & Physical Computing, Entertainment & Creative Technology, Best AI/ML, and First Timers. We enter **Best Use of AI/ML**. Challenges (sponsor, MLH, SwampHacks-specific) can be several.
-- Devpost due **Sun Oct 18, 8:00 AM ET**. Live demo max 3 minutes (+1 minute questions). Demo video max 2 minutes.
+- **At most ONE specialized track.** Confirmed by organizers (Discord, Oct 16): the 4 specialized tracks are Hardware & Physical Computing, Entertainment & Creative Technology, Best AI/ML, and First Timers. We enter **Best First Timers** (two of our four teammates are at their first hackathon; eligibility confirmed with organizers on Oct 18). Challenges (sponsor, MLH, SwampHacks-specific) can be several.
+- Devpost due **Sun Oct 18, 7:30 AM EDT** (the Devpost page; the hacker rules say 8:30, so use the earlier time). Live demo max 3 minutes (+1 minute questions). Demo video max 2 minutes.
 
 ## Official rules (Devpost)
 Source: https://swamphacks-xii.devpost.com/rules (read 2026-10-16)
@@ -21,7 +21,7 @@ Source: https://swamphacks-xii.devpost.com/rules (read 2026-10-16)
 10. Public frameworks, libraries, APIs and open-source tools are allowed but must be credited (README "Credits" section).
 11. AI/LLM tools may be used but must be disclosed. No simple reskins of existing AI tools.
 12. Judging is in person, science-fair style, at the Project Expo.
-13. Demographic challenges (for example First Timers) need the stated eligibility.
+13. Demographic challenges (for example First Timers) need the stated eligibility. First Timers: at least 50% of members at their first hackathon.
 14. Live demo: 3 minutes max, plus 1 minute for judge questions. Devpost demo video: 2 minutes max.
 
 ## General judging criteria (all projects)
@@ -39,7 +39,7 @@ Source: SwampHacks XII hacker guide (Notion) and Devpost, read 2026-10-16.
 | Entry | Type | What judges want | Prize |
 |---|---|---|---|
 | Overall (Hack of the Year) | Automatic | Innovation, technical achievement, impact, execution | $1,000 / $750 / $500, split across the team |
-| Best Use of AI/ML (UF Data Science & Informatics) | **Our one specialized track** | AI central to the project: fine-tuning, RAG, agents, custom models, evals. **Public repo with a README. Judges read the code.** Depth over polish. Clean, documented code. Explain design choices and tradeoffs. | To be announced |
+| Best First Timers | **Our one specialized track** | First-time hackers and what they build. Working demo, a true learning story, general criteria. | Logitech Keyboard & Mouse Bundle |
 | Capital One: Best Use of Nessie | Sponsor challenge | Creative use of Nessie's endpoints (accounts, merchants, bills, peer-to-peer) to improve people's finances | $250 per team member |
 | Easy On The Eyes (Best UI/UX) | SwampHacks challenge | Outstanding user experience, interface design and polish | Acer 27" monitor each |
 | MLH: Best Use of Auth0 | MLH challenge | Real use of Auth0 APIs; Auth0 for AI Agents is called out | Wireless headphones |
@@ -47,9 +47,9 @@ Source: SwampHacks XII hacker guide (Notion) and Devpost, read 2026-10-16.
 | MLH: Best Domain Name from GoDaddy Registry | MLH challenge | Register the domain with GoDaddy Registry (use the MLH code) | Digital gift card |
 | MLH: DEV Writing Challenge | MLH challenge | A written post about our build on DEV (exact rules on Devpost / from MLH) | See Devpost |
 
-**Devpost opt-ins (exact names):** Best Use of AI/ML; Capital One - The Best Use of Nessie!; MLH Prize: Best Domain Name from GoDaddy Registry; MLH Prize: Best Use of Auth0; MLH Prize: Best Use of Tiger Data; Easy On the Eyes Award - Best UI/UX Design; MLH - DEV Writing Challenge.
+**Devpost opt-ins (exact names):** Best First Timers; Capital One - The Best Use of Nessie!; MLH Prize: Best Domain Name from GoDaddy Registry; MLH Prize: Best Use of Auth0; MLH Prize: Best Use of Tiger Data; Easy On the Eyes Award - Best UI/UX Design; MLH - DEV Writing Challenge.
 
-**Not entering:** Hardware, Entertainment, First Timers (specialized tracks; we use our one on AI), Least Vibe Coded (we use AI tools), DeepSpace, Sperry Tech, Gemini, Vultr, Solana, Roblox.
+**Not entering:** Hardware, Entertainment, Best Use of AI/ML (specialized tracks; we use our one on First Timers), Least Vibe Coded (we use AI tools), DeepSpace, Sperry Tech, Gemini, Vultr, Solana, Roblox.
 
 ## MLH Code of Conduct (summary)
 Source: https://github.com/MLH/mlh-policies/blob/main/code-of-conduct.md (updated 2026-04-16)
@@ -70,5 +70,11 @@ Source: https://github.com/MLH/mlh-policies/blob/main/code-of-conduct.md (update
 7. Keep demo flows under 3 minutes and the video under 2 minutes.
 8. Do not spam or load-test sponsor APIs (Nessie, Auth0, Tiger Data). Use test tenants and test data.
 
-## Could not verify
-- The SwampHacks hacker rules page on Notion did not load (it may be last year's link). Ask organizers in #ask-staff if a rule here seems to conflict with something they announce.
+## Hacker rules (Notion)
+Source: https://swamphack.notion.site/swamphacks-xi-hacker-rules (loaded Oct 18; it is the XII rules page)
+
+- Five equal criteria: Technical Execution, Innovation & Creativity, Impact & Purpose, Clarity & Communication, Completion & Scope.
+- "You are judged on what you built." Judges do not consider how good the code is, how well you pitch, how good the idea is, or how well the project solves a problem.
+- A demo is strongly encouraged. A broken demo is fine.
+- Teams may not submit to more than one additional track. A prize needs one teammate at judging and at the closing ceremony.
+- Ask organizers in #ask-staff if a rule here seems to conflict with something they announce.

@@ -22,7 +22,7 @@ type Kind = { id: string; label: string; payee: string; category: Category; paye
 const KINDS: Kind[] = [
   { id: 'electric', label: 'Electric bill', payee: 'City Electric', category: 'utilities', payeeKind: 'biller' },
   { id: 'groceries', label: 'Groceries', payee: 'Corner Market', category: 'groceries', payeeKind: 'merchant' },
-  { id: 'gift', label: 'Gift cards', payee: 'Gift card rack', category: 'gift_cards', payeeKind: 'merchant' },
+  { id: 'gift', label: 'Gift cards', payee: 'Gift card store', category: 'gift_cards', payeeKind: 'merchant' },
   { id: 'wire', label: 'Wire transfer', payee: 'A caller named Officer Reed', category: 'wire_transfer', payeeKind: 'person' },
 ];
 const AMOUNTS = [8_400, 25_000, 50_000, 150_000];

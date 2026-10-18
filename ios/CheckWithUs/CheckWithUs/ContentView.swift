@@ -111,9 +111,9 @@ struct HomeView: View {
             // The other buttons scroll at this size; this says so and takes you there.
             if typeSize.isAccessibilitySize { MoreBelowButton() } else { more }
         }
-        // Text size sits top right, as a settings button, so it never competes with the main action.
+        // Settings sits top right, small, so it never competes with the main action.
         .safeAreaInset(edge: .top, spacing: 0) {
-            HStack { Spacer(); TextSizeButton() }.background(Color.bg)
+            HStack { Spacer(); SettingsButton() }.background(Color.bg)
         }
     }
 
@@ -381,7 +381,7 @@ struct MoreBelowButton: View {
     var body: some View {
         Button { scrollToBottom() } label: {
             Label("More below", systemImage: "chevron.down")
-                .frame(maxWidth: .infinity, minHeight: 44)
+                .frame(maxWidth: .infinity, minHeight: 56)
                 .contentShape(.rect)
         }
         .modifier(ShapeWhenAsked())
@@ -463,7 +463,28 @@ struct AppIconTile: View {
     }
 }
 
-/// Top right on Pair and Home: the older adult's only setting. Nothing in it leads to the family side.
+/// Top right on Home: text size, light or dark, who the family is. Nothing in it leads to the family side.
+struct SettingsButton: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var model = model
+        Button { model.settingsOpen = true } label: {
+            Image(systemName: "gearshape")
+                .font(.brand(.title2, weight: .semibold))
+                .foregroundStyle(Color.secondaryText)
+                .frame(minWidth: 56, minHeight: 56)
+                .contentShape(.rect)
+        }
+        .modifier(ShapeWhenAsked())
+        .padding(.trailing, 8)
+        .accessibilityLabel("Settings")
+        .accessibilityInputLabels(["Settings", "Text size"])
+        .sheet(isPresented: $model.settingsOpen) { ElderSettingsView() }
+    }
+}
+
+/// Top right on Pair, before the phone is connected: only text size, since there is no family to show yet.
 struct TextSizeButton: View {
     @State private var choosing = false
 

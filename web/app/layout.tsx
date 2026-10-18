@@ -18,9 +18,16 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const title = "checkwith.us | Before money moves, check with us.";
+const description = "An iPhone app for older adults. It hides scam texts, labels scam calls and pauses risky payments until someone in the family says yes.";
+
+// The share image comes from app/opengraph-image.tsx; Next adds og:image for it.
 export const metadata: Metadata = {
+  metadataBase: new URL("https://www.checkwith.us"),
   title: "checkwith.us | Family payment protection",
   description: "Family approval for risky payments, with scam detection on the phone.",
+  openGraph: { type: "website", siteName: "checkwith.us", url: "/", title, description },
+  twitter: { card: "summary_large_image", title, description },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

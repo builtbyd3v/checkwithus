@@ -100,7 +100,7 @@ Done-checks before calling a task done:
 
 ```bash
 cd web && npm run typecheck && npm run build   # web
-cd ml && python eval.py                          # ml: prints scores (script name TBD)
+python3 -I ml/guard_check.py ml/data/test.csv    # ml: prints scores (stdlib, under 1 s)
 # ios: the app builds and the feature works on a real iPhone
 ```
 
@@ -139,4 +139,4 @@ Only Dev deploys to production. Do not paste secrets in issues, PRs, or chat log
   team chat rather than guessing and building the wrong thing twice.
 - Hackathon rules: all code is written during the event (after Friday 8:30 PM), and
   AI tool use must be disclosed on Devpost. Note the AI tools you used in each PR.
-- Devpost is due Sunday 8:00 AM ET. The expo is Sunday 10 AM to noon.
+- Devpost is due Sunday 7:30 AM EDT. The expo is Sunday 10 AM to noon.
