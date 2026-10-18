@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
-import { useCurrentFrame } from "remotion";
+import { Img, interpolate, staticFile, useCurrentFrame } from "remotion";
 import { C, FONT } from "../theme";
 import { usePop } from "../ui";
 
@@ -70,3 +70,19 @@ export const ScreenCard = ({ bg, color, title, body, icon, inset = 16, pad = 22,
     <div style={{ fontSize: bodySize, fontWeight: 600, lineHeight: 1.25 }}>{body}</div>
   </div>
 );
+
+/** A real screenshot of the older adult app (public/app/<name>.png), with an optional finger tap on its big button. */
+export const AppShot = ({ name, f, tapAt }: { name: string; f: number; tapAt?: number }) => {
+  const t = tapAt === undefined ? 0 : interpolate(f, [tapAt, tapAt + 14], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  return (
+    <div style={{ position: "absolute", inset: 0 }}>
+      <Img src={staticFile(`app/${name}.png`)} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+      {t > 0 && t < 1 && (
+        <div style={{
+          position: "absolute", left: "50%", top: "86%", width: 90, height: 90, marginLeft: -45, marginTop: -45, borderRadius: 99,
+          background: "rgba(255,255,255,0.55)", border: "3px solid rgba(42,18,64,0.35)", transform: `scale(${0.4 + t * 0.9})`, opacity: 1 - t,
+        }} />
+      )}
+    </div>
+  );
+};

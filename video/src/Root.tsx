@@ -1,6 +1,6 @@
 import { Composition, Sequence } from "remotion";
 import "./theme";
-import { FPS, H, W } from "./theme";
+import { FPS, H, TAGLINE, W } from "./theme";
 import { DEVPOST_DUR, JUDGE_DUR, LOGO_DEVPOST, LOGO_JUDGE, PIPE_DUR, STORY_DUR } from "./timeline";
 import { Logo } from "./ui";
 import { Story } from "./Story";
@@ -12,7 +12,7 @@ import { J45_DUR } from "./timeline";
 const Judge30 = () => (
   <>
     <Sequence durationInFrames={STORY_DUR}><Story /></Sequence>
-    <Sequence from={STORY_DUR} durationInFrames={LOGO_JUDGE}><Logo line="Rosa does nothing. The family does the work." /></Sequence>
+    <Sequence from={STORY_DUR} durationInFrames={LOGO_JUDGE}><Logo line={TAGLINE} /></Sequence>
     <Sound cut="judge" />
   </>
 );
@@ -21,7 +21,7 @@ const Devpost = () => (
   <>
     <Sequence durationInFrames={STORY_DUR}><Story /></Sequence>
     <Sequence from={STORY_DUR} durationInFrames={PIPE_DUR}><Pipeline /></Sequence>
-    <Sequence from={STORY_DUR + PIPE_DUR} durationInFrames={LOGO_DEVPOST}><Logo line="Before money moves, check with the family." /></Sequence>
+    <Sequence from={STORY_DUR + PIPE_DUR} durationInFrames={LOGO_DEVPOST}><Logo line={TAGLINE} /></Sequence>
     <Sound cut="devpost" />
   </>
 );

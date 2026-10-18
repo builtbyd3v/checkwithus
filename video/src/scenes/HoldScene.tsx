@@ -4,7 +4,7 @@ import { Rosa } from "../Rosa";
 import { C, FONT } from "../theme";
 import { BEAT, HOLD_DENY_AT, STORY } from "../timeline";
 import { Badge, Phone, usePop } from "../ui";
-import { Bg, INK, Room, ScreenCard } from "./kit";
+import { AppShot, Bg, INK, Room, ScreenCard } from "./kit";
 
 const PAUSE = BEAT.holdPause - STORY.hold.from;
 const GRUMBLE = BEAT.rosaGrumble - STORY.hold.from;
@@ -89,15 +89,10 @@ export const HoldScene = () => {
         steam={angry} squash={deflate + (angry && stomp < 0.2 ? 0.05 : 0)} />
       {/* Rosa's phone, zoomed so the screen is readable */}
       <div style={{ position: "absolute", left: 0, top: 0, transform: `translateY(${(1 - up) * 1100}px)` }}>
-        <Phone x={598} y={124} width={330}>
+        <Phone x={556} y={40} width={384}>
           <div style={{ position: "absolute", inset: 0, transform: `scale(${screenScale})` }}>
-            {f < PAUSE ? (
-              <PayScreen f={f} />
-            ) : f < DENY ? (
-              <ScreenCard bg={C.yellow} color={C.ink} icon={<PauseIcon />} title="Paused, waiting for family" body="Your money is safe. Nothing was sent." />
-            ) : (
-              <ScreenCard bg={C.purpleDeep} color={C.white} icon={<StopIcon />} title="Stopped. Your family said no." body="Your money is safe. Your family will call you." />
-            )}
+            {/* Real app screenshots (public/app), captured from the iPhone app on main. */}
+            <AppShot f={f} name={f < PAUSE ? "gift-confirm" : f < DENY ? "gift-waiting" : "gift-denied"} tapAt={f < PAUSE ? TAP : undefined} />
           </div>
         </Phone>
       </div>

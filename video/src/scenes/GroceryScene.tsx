@@ -5,7 +5,7 @@ import { C, FONT } from "../theme";
 import { GROCERY } from "../timeline";
 import { Phone, Sticker, usePop } from "../ui";
 import { CheckBurst, CheckIcon, ICON_AT, PayScreen } from "./BillScene";
-import { Bg, INK, Room, ScreenCard } from "./kit";
+import { AppShot, Bg, INK, Room, ScreenCard } from "./kit";
 
 // Frames 60-89 ping-pong while the family decides: only looping motion (bob, "?" sway) lives there.
 const { tap: TAP, pause: PAUSE, approve: APPROVE } = GROCERY;
@@ -127,16 +127,10 @@ export const GroceryScene = () => {
       )}
       {/* Rosa's phone, zoomed so the screen is readable */}
       <div style={{ position: "absolute", left: 0, top: 0, transform: `translateY(${(1 - up) * 1100}px)` }}>
-        <Phone x={598} y={124} width={330}>
+        <Phone x={556} y={40} width={384}>
           <div style={{ position: "absolute", inset: 0, transform: `scale(${screenScale})` }}>
-            {f < PAUSE ? (
-              <PayScreen f={f} tap={TAP} label="Groceries" amount="$420"
-                art={<BagArt />} />
-            ) : !approved ? (
-              <ScreenCard bg={C.yellow} color={C.ink} icon={<PauseIcon />} title="Paused, waiting for family" body="Your money is safe. Nothing was sent." />
-            ) : (
-              <ScreenCard bg={C.green} color={C.white} icon={<CheckIcon ring={C.white} mark={C.green} />} title="Your family said yes" body="Approved and sent." />
-            )}
+            {/* Real app screenshots (public/app), captured from the iPhone app on main. */}
+            <AppShot f={f} name={f < PAUSE ? "grocery-confirm" : !approved ? "grocery-waiting" : f < APPROVE + 40 ? "grocery-approved" : "grocery-paid"} tapAt={f < PAUSE ? TAP : undefined} />
           </div>
         </Phone>
       </div>
