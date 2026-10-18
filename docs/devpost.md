@@ -7,7 +7,7 @@ Recording plan: [two-minute video script](video-script.md). Upload captions and 
 Everything here is on `main` and live at checkwith.us.
 
 - **Project name:** checkwith.us
-- **Elevator pitch (max 200 characters):** Scam protection where the older adult does nothing and the family does the work. Scam texts filtered on the phone, scam calls labeled, risky payments paused for family approval.
+- **Elevator pitch (max 200 characters):** Before money moves, check with us. Scam texts filtered on the phone, scam calls labeled, risky payments paused until the family says yes.
 - **Links:** https://checkwith.us and https://github.com/builtbyd3v/checkwithus
 - **Video (max 2 minutes):** [38-second synthetic dashboard backup clip](gallery/dashboard-backup.webm), with [captions](gallery/dashboard-backup.srt). This is UI-only backup footage; upload the complete team/device demo and add its public link before submission.
 - **Opt in to all 7 (exact names):** Best First Timers; Capital One - The Best Use of Nessie!; MLH Prize: Best Domain Name from GoDaddy Registry; MLH Prize: Best Use of Auth0; MLH Prize: Best Use of Tiger Data; Easy On the Eyes Award - Best UI/UX Design; MLH - DEV Writing Challenge.

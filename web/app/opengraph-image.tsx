@@ -16,7 +16,7 @@ export default async function OpengraphImage() {
         <img src={icon} width={150} height={150} alt="" style={{ borderRadius: 34 }} />
         <div style={{ fontSize: 112, fontWeight: 800, letterSpacing: -4 }}>checkwith.us</div>
       </div>
-      <div style={{ marginTop: 44, fontSize: 52, fontWeight: 600, lineHeight: 1.2 }}>Scam protection the family runs.</div>
+      <div style={{ marginTop: 44, fontSize: 52, fontWeight: 600, lineHeight: 1.2 }}>Before money moves, check with us.</div>
       <div style={{ marginTop: 52, width: 220, height: 16, borderRadius: 8, background: '#fbc02d' }} />
     </div>,
     size,

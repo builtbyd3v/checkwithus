@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const title = "checkwith.us | Scam protection the family runs";
+const title = "checkwith.us | Before money moves, check with us.";
 const description = "An iPhone app for older adults. It hides scam texts, labels scam calls and pauses risky payments until someone in the family says yes.";
 
 // The share image comes from app/opengraph-image.tsx; Next adds og:image for it.
