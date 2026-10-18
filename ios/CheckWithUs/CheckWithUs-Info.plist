@@ -6,5 +6,15 @@
 	     already one action each with big buttons (docs/accessibility.md). -->
 	<key>UISupportsFullScreenInAssistiveAccess</key>
 	<true/>
+	<!-- Brand type, bundled in CheckWithUs/Fonts (OFL). Font.brand and Font.display in AppTheme.swift use them. -->
+	<key>UIAppFonts</key>
+	<array>
+		<string>Figtree-Regular.ttf</string>
+		<string>Figtree-SemiBold.ttf</string>
+		<string>Figtree-Bold.ttf</string>
+		<string>Figtree-ExtraBold.ttf</string>
+		<string>Gabarito-SemiBold.ttf</string>
+		<string>Gabarito-ExtraBold.ttf</string>
+	</array>
 </dict>
 </plist>

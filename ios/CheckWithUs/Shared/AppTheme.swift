@@ -44,3 +44,40 @@ nonisolated private func theme(_ light: UInt32, _ dark: UInt32, hc: (UInt32, UIn
         return UIColor(red: CGFloat(hex >> 16 & 0xFF) / 255, green: CGFloat(hex >> 8 & 0xFF) / 255, blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
     })
 }
+
+/// Brand type: Figtree for text, Gabarito for titles, the same pair as the web. Each one scales with
+/// Dynamic Type (and the app's own Text size) like the system style it stands in for. The fonts ship in
+/// the main app only; anywhere else (the widget) Font.custom falls back to the system font.
+extension Font {
+    static func brand(_ style: TextStyle, weight: Weight = .regular) -> Font {
+        let name = switch weight {
+        case .heavy, .black: "Figtree-ExtraBold"
+        case .bold: "Figtree-Bold"
+        case .medium, .semibold: "Figtree-SemiBold"
+        default: "Figtree-Regular"
+        }
+        return .custom(name, size: style.baseSize, relativeTo: style)
+    }
+
+    static func display(_ style: TextStyle, weight: Weight = .heavy) -> Font {
+        .custom(weight == .semibold || weight == .medium ? "Gabarito-SemiBold" : "Gabarito-ExtraBold", size: style.baseSize, relativeTo: style)
+    }
+}
+
+private extension Font.TextStyle {
+    /// Point sizes at the default text size (Large), from Apple's type ramp.
+    var baseSize: CGFloat {
+        switch self {
+        case .largeTitle: 34
+        case .title: 28
+        case .title2: 22
+        case .title3: 20
+        case .callout: 16
+        case .subheadline: 15
+        case .footnote: 13
+        case .caption: 12
+        case .caption2: 11
+        default: 17
+        }
+    }
+}
