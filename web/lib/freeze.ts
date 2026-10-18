@@ -44,11 +44,14 @@ export function createFreezeService(deps: { pool: pg.Pool; nessie: NessieClient 
 
   /** Locks the circle and reads what a tap needs. Call inside a transaction. */
   async function lockCircle(q: pg.PoolClient, circleId: string) {
+    // Lock first, then read the sums in a new statement: under Read Committed a statement that waited for
+    // the lock keeps its older snapshot, so sums read in it could miss a payment that committed meanwhile.
+    await q.query('select 1 from circles where id = $1 for update', [circleId]);
     const circle = await q.query<CircleRow>(
       `select c.frozen, c.nessie_account_id, c.vault_account_id, c.time_zone,
          ${AVAILABLE_CENTS_SQL} as spendable,
          ${VAULT_CENTS_SQL} as vault
-       from circles c where c.id = $1 for update`,
+       from circles c where c.id = $1`,
       [circleId],
     );
     const last = await q.query<Transfer>(
@@ -78,8 +81,8 @@ export function createFreezeService(deps: { pool: pg.Pool; nessie: NessieClient 
     await pool.query(`update vault_transfers set status = 'failed', failure = $2 where id = $1`, [transfer.id, failure]);
   }
 
-  /** Sends a claimed transfer once. False when Nessie definitely refused it. */
-  async function send(transfer: Transfer, from: string, label: string, timeZone: string): Promise<boolean> {
+  /** Sends a claimed transfer once: 'sent', 'unknown' (may have landed; never resent) or 'failed' (definitely refused). */
+  async function send(transfer: Transfer, from: string, label: string, timeZone: string): Promise<'sent' | 'unknown' | 'failed'> {
     let nessieId: string;
     try {
       nessieId = await nessie.createTransfer(from, transferBody({
@@ -90,13 +93,13 @@ export function createFreezeService(deps: { pool: pg.Pool; nessie: NessieClient 
       // Unknown outcome: it may have landed, so it stays 'sending', counts as
       // moved, and is never sent again.
       // ponytail: no lookup at Nessie to settle it; its transfers list answers 404 when empty.
-      if (error instanceof NessieError && error.outcomeUnknown) return true;
+      if (error instanceof NessieError && error.outcomeUnknown) return 'unknown';
       await markFailed(transfer, error);
-      return false;
+      return 'failed';
     }
     // If this write fails the row stays 'sending': still counted, never resent.
     await pool.query(`update vault_transfers set status = 'sent', nessie_id = $2 where id = $1`, [transfer.id, nessieId]);
-    return true;
+    return 'sent';
   }
 
   async function freeze(sub: string, circleId: string): Promise<FreezeResult> {
@@ -125,7 +128,8 @@ export function createFreezeService(deps: { pool: pg.Pool; nessie: NessieClient 
       } catch (error) {
         await markFailed(transfer, error);
       }
-      if (!vault || !(await send(transfer, circle.nessie_account_id, `Freeze: to vault ${vault}`, circle.time_zone))) {
+      // An unknown outcome counts as moved: spending is frozen either way, so payments stay held.
+      if (!vault || (await send(transfer, circle.nessie_account_id, `Freeze: to vault ${vault}`, circle.time_zone)) === 'failed') {
         // Spending stays frozen, so payments are still held. Tapping again retries the move.
         throw new HttpError(502, 'bank_error', 'Spending is frozen, but the bank did not move the money yet. Try again.');
       }
@@ -172,15 +176,20 @@ export function createFreezeService(deps: { pool: pg.Pool; nessie: NessieClient 
       return { transfer, moved: transfer.amount_cents, circle };
     });
     const { transfer, circle } = tap;
-    if (transfer?.status === 'sending'
-      && !(await send(transfer, circle.vault_account_id!, `Unfreeze: to spending ${circle.nessie_account_id}`, circle.time_zone))) {
-      // Nothing moved and the flag was never lifted: still frozen, and tapping again retries.
-      throw new HttpError(502, 'bank_error', 'The bank did not move the money back, so spending is still frozen. Try again.');
+    if (transfer?.status === 'sending') {
+      const outcome = await send(transfer, circle.vault_account_id!, `Unfreeze: to spending ${circle.nessie_account_id}`, circle.time_zone);
+      if (outcome === 'failed') {
+        // Nothing moved and the flag was never lifted: still frozen, and tapping again retries.
+        throw new HttpError(502, 'bank_error', 'The bank did not move the money back, so spending is still frozen. Try again.');
+      }
+      if (outcome === 'unknown') {
+        // It may still be in the vault: stay frozen rather than let payments pass. Never resent.
+        throw new HttpError(502, 'unfreeze_unconfirmed', 'The bank has not confirmed the unfreeze, so spending stays frozen.');
+      }
     }
     let frozen = false;
     if (transfer) {
-      // The money is back (or may be: an unknown outcome counts). Lift the freeze unless a newer freeze took
-      // over; answer with what was saved, not what was hoped.
+      // The money is back. Lift the freeze unless a newer freeze took over; answer with what was saved.
       const lifted = await pool.query(
         `update circles set frozen = false where id = $1
            and (select direction from vault_transfers where circle_id = $1 order by id desc limit 1) = 'unfreeze'`,

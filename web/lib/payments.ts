@@ -314,9 +314,11 @@ export function createPaymentService(deps: PaymentServiceDeps) {
 
     const inserted = await transaction(pool, async q => {
     // The row lock also orders this payment against a Freeze tap.
+    // Lock first, then read the balance in a new statement, so it sees every payment committed while we waited.
+    await q.query('select 1 from circles where id = $1 for update', [circle.id]);
     const policy = await q.query<{ two_approvals_over_cents: number; hold_over_cents: number; frozen: boolean; available: number }>(
       `select two_approvals_over_cents, hold_over_cents, frozen, ${AVAILABLE_CENTS_SQL} as available
-         from circles c where c.id = $1 for update`, [circle.id],
+         from circles c where c.id = $1`, [circle.id],
     );
     const duplicate = await q.query('select 1 from payments where circle_id = $1 and idempotency_key = $2', [circle.id, input.idempotencyKey]);
     const allowance = await q.query<{ id: string }>(
@@ -469,8 +471,9 @@ export function createPaymentService(deps: PaymentServiceDeps) {
       if (row.status !== 'held') return null;
       // The circle lock orders this against a Freeze tap. While frozen the
       // spending money is in the vault, so an approval would pay from nothing.
+      await client.query('select 1 from circles where id = $1 for update', [row.circle_id]);
       const circle = await client.query<{ frozen: boolean; available: number }>(
-        `select frozen, ${AVAILABLE_CENTS_SQL} as available from circles c where c.id = $1 for update`, [row.circle_id],
+        `select frozen, ${AVAILABLE_CENTS_SQL} as available from circles c where c.id = $1`, [row.circle_id],
       );
       if (input.decision === 'approve' && circle.rows[0]?.frozen) {
         throw new PaymentError('frozen', 'Spending is frozen. Unfreeze first.', toPayment(row));

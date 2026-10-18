@@ -436,6 +436,12 @@ describe('the ledger balance', () => {
       ['test-account-' + crypto.randomUUID()],
     );
     const id = fresh.rows[0]!.id;
+    // A known biller, so the bill would pay straight away and only the balance can stop it.
+    await pool.query(
+      `insert into payees (circle_id, name, normalized_name, kind, category)
+       values ($1, 'City Power & Light', $2, 'biller', 'utilities')`,
+      [id, normalizeName('City Power & Light')],
+    );
     const writesBefore = fake.paymentWrites().length;
     try {
       await expect(service.createPayment(id, { ...electricBill, idempotencyKey: key() })).rejects.toMatchObject({ code: 'insufficient_funds' });
