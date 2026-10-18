@@ -1,3 +1,4 @@
+import GuardKit
 import SwiftUI
 
 /// The family side: standard iOS screens, plain words. Polls the server while open.
@@ -88,16 +89,14 @@ struct JoinCircleView: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("Invite code", text: $code)
-                        .textInputAutocapitalization(.characters)
-                        .autocorrectionDisabled()
+                    CodeEntryField(label: "Invite code", code: $code, large: false)
                     TextField("Your name, like Maria", text: $name)
                 } footer: {
                     Text("Ask the person who set up Check With Us for the invite code on their dashboard.")
                 }
                 if let error = model.error { Text(error).foregroundStyle(Color.errorText) }
-                Button("Join") { Task { await model.join(code: code.trimmingCharacters(in: .whitespaces), name: name) } }
-                    .disabled(model.busy || code.count < 8 || name.isEmpty)
+                Button("Join") { Task { if let canonical = ShortCode.canonical(code) { await model.join(code: canonical, name: name) } } }
+                    .disabled(model.busy || ShortCode.canonical(code) == nil || name.isEmpty)
                 Button("Sign out", role: .destructive) { model.signOut() }
             }
             .navigationTitle("Join your family")

@@ -1,3 +1,4 @@
+import GuardKit
 import SwiftUI
 
 /// One screen at a time, one main action per screen. Text uses Dynamic Type styles so it grows with the
@@ -43,13 +44,7 @@ struct PairView: View {
                 .font(.largeTitle.bold())
             Text("Ask your family for the code on their screen. Type it here.")
                 .font(.title2)
-            TextField("Code", text: $code, prompt: Text("Code").foregroundStyle(Color.secondaryText))
-                .font(.largeTitle.monospaced())
-                .textInputAutocapitalization(.characters)
-                .autocorrectionDisabled()
-                .padding(20)
-                .background(Color.surface, in: .rect(cornerRadius: 20))
-                .accessibilityLabel("Family code")
+            CodeEntryField(label: "Family code", code: $code) { Task { await pair() } }
             ErrorText()
             // Very large text: Connect scrolls with the page, so the code box is fully in view at first.
             if typeSize.isAccessibilitySize { connect }
@@ -59,8 +54,12 @@ struct PairView: View {
     }
 
     private var connect: some View {
-        BigButton("Connect", symbol: "link") { await model.pair(code: code.trimmingCharacters(in: .whitespaces)) }
-            .disabled(code.trimmingCharacters(in: .whitespaces).count < 8)
+        BigButton("Connect", symbol: "link") { await pair() }
+            .disabled(ShortCode.canonical(code) == nil)
+    }
+
+    private func pair() async {
+        if let canonical = ShortCode.canonical(code) { await model.pair(code: canonical) }
     }
 }
 

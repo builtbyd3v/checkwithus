@@ -5,6 +5,7 @@ import { toCents } from '@/lib/money';
 import { PaymentCard, type ReviewPayment } from '../payment-card';
 import { DecisionForm, DecisionStatus } from '../decision-ui';
 import { Countdown } from '../deadline';
+import { JoinForm } from '../controls';
 import type { FormState } from '../actions';
 import Link from 'next/link';
 import { PROTECTED_NAME } from './fixtures';
@@ -60,6 +61,11 @@ export function DashboardPreview() {
         {status === 'held' && viewer && <p className="mt-6 font-semibold">An approver in your family decides this.</p>}
         {status === 'expired' && <p className="mt-4">Nobody answered in time, so it was blocked.</p>}
       </PaymentCard></div>
+    </section>
+    <section aria-labelledby="join-preview-title" className="mt-10 max-w-xl">
+      <h2 id="join-preview-title" className="text-2xl font-semibold">Join form</h2>
+      <p className="mt-1 text-muted">What a signed-in member with no circle sees. Joining here needs a real sign-in.</p>
+      <JoinForm />
     </section>
   </main>;
 }

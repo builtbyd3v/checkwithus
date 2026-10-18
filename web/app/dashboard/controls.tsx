@@ -1,8 +1,10 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
+import { canonicalCode } from '@/lib/short-code';
 import { addPayeeAction, decideAction, freezeAction, inviteAction, joinAction, pairingAction, saveSettingsAction, unfreezeAction, unpairAction, type FormState } from './actions';
 
+import { CodeInput } from './code-input';
 import { DecisionForm } from './decision-ui';
 
 const initial: FormState = { message: '' };
@@ -20,12 +22,14 @@ function Feedback({ state }: { state: FormState }) {
 
 export function JoinForm() {
   const [state, action, pending] = useActionState(joinAction, initial);
+  const [code, setCode] = useState('');
+  // Join stays disabled until all 8 are in, so Return in either field does nothing before that.
   return <form action={action} className="mt-8 space-y-4">
     <div><label htmlFor="inviteCode" className={labelClass}>Family invite code</label>
-      <input id="inviteCode" name="inviteCode" autoComplete="off" required className={inputClass} placeholder="XXXX-XXXX" /></div>
+      <CodeInput id="inviteCode" name="inviteCode" value={code} onChange={setCode} /></div>
     <div><label htmlFor="displayName" className={labelClass}>Your name</label>
       <input id="displayName" name="displayName" autoComplete="name" required maxLength={80} className={inputClass} /></div>
-    <button disabled={pending} className={buttonClass}>{pending ? 'Joining…' : 'Join family circle'}</button>
+    <button disabled={pending || !canonicalCode(code)} className={buttonClass}>{pending ? 'Joining…' : 'Join family circle'}</button>
     <Feedback state={state} />
   </form>;
 }
