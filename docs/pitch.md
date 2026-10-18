@@ -121,7 +121,7 @@ Each sponsor block has a **20 s** version for the default order and a **60 s** v
 
 ## Unverified: cut or verify before the expo
 
-1. **Bill-pay agent:** the live Machine-to-Machine sign-in works (Oct 17: the live tenant gives the agent a token with only `pay:bills`). A full live `npm run agent:bills` payment is not run yet, because it needs `demo:reset -- --live` first. Until Dev runs it, say "the agent signs in live; we tested its payments against a fake Auth0".
+1. **Bill-pay agent: verified.** Oct 17, live Auth0 tenant: the agent signed in with only `pay:bills` and paid a $350 water bill under the utilities allowance. Each run pays the due bill, so run `demo:reset -- --live` again before a judge sees "Show me the agent".
 2. **CIBA Guardian push:** built and tested against a fake Auth0 (`web/test/fake-auth0.ts`), not verified live. Do not say "live". Mention it only if a judge asks.
 3. **`approve:payments` on stage:** RBAC is on for the live Auth0 API (Oct 17, `npm run check:auth0`: tokens carry a `permissions` claim), so the server checks this permission on every Approve. If the approver account lacks it in Auth0, Approve fails. Do one test Approve on iPhone B before the expo.
 4. **Freeze on stage:** Freeze needs an Auth0 sign-in from the last 5 minutes. If iPhone B signed in earlier, tapping Freeze opens the Auth0 login sheet first. Sign in again on iPhone B just before a judge arrives.

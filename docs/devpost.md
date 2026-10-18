@@ -100,7 +100,7 @@ Rosa's bill-pay agent has its own Auth0 identity: a Machine-to-Machine client wh
 - The same rules decide, the same path as Rosa's phone. Inside the family's expiring allowance, the bill pays with no push. Outside it, the payment is held and the family is asked once (family app, or Guardian push in CIBA mode).
 - Least privilege: it acts only where the family granted a live allowance, never pays a cycle twice, and never asks again after a no. Every family route rejects machine tokens, so it can never approve, freeze or grant itself more. Revoking the allowance stops it.
 - The dashboard labels its payments ("Paid by the bill agent under your Utilities allowance").
-- The M2M grant works on the live tenant (the agent gets only `pay:bills`). TODO(Dev): verify one full `npm run agent:bills` payment, or say "its payments were tested against a fake Auth0".
+- Verified on the live Auth0 tenant: the agent signs in with only `pay:bills` and pays a due bill under the family allowance.
 
 ### Capital One: Best Use of Nessie
 Nessie is the bank in every step. Each endpoint has a job:

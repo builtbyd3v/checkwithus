@@ -67,7 +67,7 @@ Rosa's bill-pay agent has its own Auth0 identity: a Machine-to-Machine app that 
 - **Least privilege.** It acts only in circles with a live allowance. The route checks RS256, our issuer and audience, `gty = client-credentials`, the agent's own `sub`, and `pay:bills`. Every family route rejects machine tokens (`403 agent_not_allowed`), so the agent can never approve, deny, freeze, unfreeze, grant allowances or change policy. Revoking the allowance stops it.
 - **Visible.** Each agent payment stores `initiated_by = 'agent'`; the dashboard shows "Paid by the bill agent under your Utilities allowance" or "Asked by the bill agent".
 
-The M2M grant works on the live Auth0 tenant: the agent gets a token with only `pay:bills` (Oct 17). TODO(Dev): run `npm run agent:bills -- --within 14` once after `demo:reset -- --live`, then delete this line. Until then, say "its payments were tested against a fake Auth0".
+Verified on the live Auth0 tenant on Oct 17: the agent got a token with only `pay:bills` and paid a $350 water bill under the utilities allowance.
 
 ### Sponsor tech doing real work
 
