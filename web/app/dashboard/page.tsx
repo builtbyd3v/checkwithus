@@ -55,7 +55,8 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
          from spending_daily where circle_id = $1 and day >= now() - interval '90 days'
         order by day`, [active.circleId],
     ),
-    weeklySpending(db(), active.circleId),
+    // A missing spending_weekly migration shows an empty chart, not a 500.
+    weeklySpending(db(), active.circleId).catch((): Awaited<ReturnType<typeof weeklySpending>> => []),
     db().query<CircleRow>(`select protected_name, hold_over_cents::text, frozen, ${VAULT_CENTS_SQL} as vault_cents
       from circles c where c.id = $1`, [active.circleId]),
     db().query<MemberRow>('select id, display_name from circle_members where circle_id = $1 order by created_at', [active.circleId]),

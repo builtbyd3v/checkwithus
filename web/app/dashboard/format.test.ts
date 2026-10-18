@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { usualLabel } from '@/lib/usual';
-import { alertHeadline, dayHeading, moneyProtected, timeAgo, timeOfDay, usualWeekCents } from './format';
+import { alertHeadline, dayHeading, moneyProtected, speedHeadline, timeAgo, timeOfDay, usualWeekCents } from './format';
 
 it('words each alert kind and skips unknown ones', () => {
   expect(alertHeadline({ kind: 'bank_during_call', detail: 'At a bank (Seven Corners 1 ATM) while on a phone call.' }, 'Rosa'))
@@ -52,4 +52,13 @@ it('takes the usual week from finished weeks only', () => {
   expect(usualWeekCents([100, 200, 300, 9999])).toBe(200);
   expect(usualWeekCents([0, 0, 1])).toBe(0);
   expect(usualWeekCents([])).toBe(0);
+});
+
+it('claims a speedup only from 1.5x, otherwise says both are fast', () => {
+  expect(speedHeadline({ aggregateMs: 0.84, rawMs: 37.9 })).toBe('45.1x faster.');
+  expect(speedHeadline({ aggregateMs: 1, rawMs: 1.5 })).toBe('1.5x faster.');
+  expect(speedHeadline({ aggregateMs: 1.2, rawMs: 1.4 })).toBe('Both under 2 ms at this size.');
+  expect(speedHeadline({ aggregateMs: 1, rawMs: 1 })).toBe('Both under 2 ms at this size.');
+  expect(speedHeadline({ aggregateMs: 3.1, rawMs: 2.5 })).toBe('Both under 4 ms at this size.');
+  expect(speedHeadline({ aggregateMs: 0.3, rawMs: 0.2 })).toBe('Both under 1 ms at this size.');
 });

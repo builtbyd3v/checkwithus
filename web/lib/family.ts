@@ -154,7 +154,7 @@ export async function createPairingCode(pool: pg.Pool, sub: string, circleId: st
 
 /**
  * Releases the older adult's phone. Only an approver can, after a fresh sign-in: a scammer
- * who talks her into it has nothing to tap. Her phone's next request gets 401 and the app
+ * who talks them into it has nothing to tap. Their phone's next request gets 401 and the app
  * goes back to its first screen.
  */
 export async function unpairDevices(q: Queryable, sub: string, authTime: unknown, circleId: string) {

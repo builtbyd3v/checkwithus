@@ -7,7 +7,7 @@ import type { familyPaymentView } from '@/lib/views';
 import type { FormState } from './actions';
 import { Countdown, DecisionButtons, DecisionStatus, FreezeControl, HoldLimitForm, InviteForm, PairingForm, PayeeForm } from './controls';
 import { DecisionForm } from './decision-ui';
-import { alertHeadline, dayHeading, localDay, moneyProtected, monthOf, timeAgo, timeOfDay, usualWeekCents } from './format';
+import { alertHeadline, dayHeading, localDay, moneyProtected, monthOf, speedHeadline, timeAgo, timeOfDay, usualWeekCents } from './format';
 import { OverviewSummary, type Stat } from './overview-summary';
 import { PaymentCard, type Usual } from './payment-card';
 
@@ -138,7 +138,9 @@ export function DashboardView(data: DashboardData) {
     ? { chip: <SafeChip label="Frozen" tone="pause" />, title: `${firstName}’s money is frozen.`,
       lead: `${money(data.vaultCents)} is safe in the vault. Every payment waits for the family until you unfreeze.` }
     : held.length
-      ? { chip: <SafeChip label="Safe" tone="safe" />, title: `${firstName} is safe.`,
+      ? { chip: <SafeChip label={role === 'approver' ? 'Needs you' : 'Waiting'} tone="pause" />, title: role === 'approver'
+        ? (held.length === 1 ? 'One payment needs your answer.' : `${held.length} payments need your answer.`)
+        : (held.length === 1 ? 'One payment is waiting.' : `${held.length} payments are waiting.`),
         lead: `${held.length === 1 ? 'One payment is' : `${held.length} payments are`} paused and ${waitingLabel}. The money stays put until someone in the family decides.` }
       : alertsToday.length
         ? { chip: <SafeChip label="Check in" tone="pause" />, title: `${firstName} may need a call.`,
@@ -211,7 +213,7 @@ export function DashboardView(data: DashboardData) {
 
       <OverviewSummary stats={stats} className="sm:hidden" />
 
-      <aside id="activity" aria-labelledby="activity-title" className={`${panel} flex scroll-mt-6 flex-col lg:col-span-5 lg:row-span-2 lg:self-stretch`}>
+      <aside id="activity" aria-labelledby="activity-title" className={`${panel} flex scroll-mt-6 flex-col lg:col-span-5`}>
         <h2 id="activity-title" className={panelTitle}>Activity</h2>
         {days.length ? days.map((group) => <div key={group.day}>
           <h3 className="mb-1.5 mt-4 text-base font-semibold text-muted">{group.day}</h3>
@@ -228,7 +230,7 @@ export function DashboardView(data: DashboardData) {
             <span className="whitespace-nowrap font-semibold tabular-nums max-sm:col-start-2">{event.cents !== undefined ? money(event.cents) : ''}</span>
           </li>)}</ol>
         </div>) : <p className="mt-3 text-muted">Nothing yet. Payments and alerts from {firstName}’s phone show up here.</p>}
-        <p className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-1 pt-[18px] text-sm text-muted">
+        <p className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-[18px] text-sm text-muted">
           {(['side', 'family', 'agent'] as const).map((who) => <span key={who} className="inline-flex items-center gap-2">
             <span aria-hidden="true" className={`size-3 rounded-full ${DOTS[who]}`} />{who === 'side' ? `${firstName}’s side` : whoName[who]}</span>)}
         </p>
@@ -296,7 +298,7 @@ export function DashboardView(data: DashboardData) {
           <div><dt className="text-muted">Same answer from raw payments</dt><dd className="mt-1 grid gap-1">
             <Meter percent={(data.speed.rawMs / Math.max(data.speed.rawMs, data.speed.aggregateMs)) * 100} className="fill-muted" /><strong className="text-base font-semibold tabular-nums">{ms(data.speed.rawMs)} ms</strong></dd></div>
         </dl>
-        <p className="mt-[18px]"><strong className="font-semibold">{(data.speed.rawMs / data.speed.aggregateMs).toFixed(1)}x faster.</strong>{' '}
+        <p className="mt-[18px]"><strong className="font-semibold">{speedHeadline(data.speed)}</strong>{' '}
           {data.speed.compression ? `Compressed history, all families: ${(data.speed.compression.beforeBytes / data.speed.compression.afterBytes).toFixed(1)}x smaller.` : 'Nothing compressed yet.'}</p>
         <p className="mt-3 text-sm text-muted">One run each, at most once a minute. {data.benchmarkLine}</p>
       </section>}
