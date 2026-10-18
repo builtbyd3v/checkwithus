@@ -5,12 +5,10 @@
   "scripts": {
     "studio": "remotion studio src/index.ts",
     "render:judge": "remotion render src/index.ts Judge30 out/judge-30s.mp4",
-    "render:j45": "remotion render src/index.ts Judge45 out/judge-45s.mp4 && remotion render src/index.ts Judge45Live out/judge-45s-live.mp4",
+    "render:j45": "remotion render src/index.ts Judge45 out/judge-45s.mp4",
     "render:devpost": "remotion render src/index.ts Devpost out/devpost.mp4",
     "render": "npm run render:judge && npm run render:devpost",
-    "typecheck": "tsc --noEmit",
-    "cues": "node scripts/cues.mjs",
-    "player": "npm run cues && python3 -m http.server 4545"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@remotion/cli": "4.0.536",

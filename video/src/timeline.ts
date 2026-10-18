@@ -51,25 +51,25 @@ export const LOGO_DEVPOST = 150;
 export const JUDGE_DUR = STORY_DUR + LOGO_JUDGE;
 export const DEVPOST_DUR = STORY_DUR + PIPE_DUR + LOGO_DEVPOST;
 
-// 45 s interactive judge cut. Absolute frames. HOLD segments are where the live family actor acts:
-// the player page loops them until the presenter presses Space; the plain MP4 just plays them once.
+// 45 s judge cut. Absolute frames. GAP segments are where the team's filmed family clips go (left half);
+// the right half keeps Rosa waiting, so the clips can be spliced in without retiming anything.
 export const J45 = {
-  hook: { from: 0, dur: 105 }, // $7.7B lost, scammers talk past warnings
-  promise: { from: 105, dur: 75 }, // risky payments wait for family; sponsor bar arrives
-  text: { from: 180, dur: 105 }, // TextScene, trimmed
-  call: { from: 285, dur: 105 }, // CallScene, trimmed
-  atm: { from: 390, dur: 105 }, // AtmScene, trimmed. Nessie lights up
-  holdA: { from: 495, dur: 150 }, // HoldScene 0-150: paused, Rosa frustrated. Tiger Data + Easy On The Eyes light up
-  hold1: { from: 645, dur: 60 }, // PAUSE 1: family reviews, Face ID, taps Deny
-  holdB: { from: 705, dur: 90 }, // HoldScene 150-240: "Stopped". Auth0 lights up
-  freezeA: { from: 795, dur: 25 }, // FreezeScene 0-25
-  hold2: { from: 820, dur: 60 }, // PAUSE 2: family taps Freeze
-  freezeB: { from: 880, dur: 105 }, // FreezeScene 25-130: coins to the vault
-  table: { from: 985, dur: 270 }, // "Not just ___" sponsor table, rows build up
-  end: { from: 1255, dur: 120 }, // logo wall + tagline
+  hook: { from: 0, dur: 90 }, // $7.7B lost, scammers talk past warnings
+  promise: { from: 90, dur: 75 }, // risky payments wait for family
+  text: { from: 165, dur: 90 }, // TextScene, trimmed
+  call: { from: 255, dur: 90 }, // CallScene, trimmed
+  atm: { from: 345, dur: 90 }, // AtmScene, trimmed. Nessie lights up
+  holdA: { from: 435, dur: 150 }, // HoldScene 0-150: paused, Rosa frustrated. Tiger Data + Easy On The Eyes light up
+  gap1: { from: 585, dur: 150 }, // CLIP J1 (5 s): family reviews the hold, Face ID, taps Deny
+  holdB: { from: 735, dur: 90 }, // HoldScene 150-240: "Stopped". Auth0 lights up
+  freezeA: { from: 825, dur: 25 }, // FreezeScene 0-25
+  gap2: { from: 850, dur: 90 }, // CLIP J2 (3 s): family taps Freeze
+  freezeB: { from: 940, dur: 90 }, // FreezeScene 25-115: coins to the vault
+  table: { from: 1030, dur: 270 }, // "Not just ___" sponsor table, rows build up
+  end: { from: 1300, dur: 100 }, // logo wall + tagline
 };
-export const J45_DUR = 1375;
-// The live camera covers this rect of the left half during the split section (player page).
+export const J45_DUR = 1400;
+// Where the filmed clips sit in the left half (video pixels): under the sponsor bar, above the captions.
 export const CAM = { x: 0, y: 100, w: 960, h: 800 };
 export const SPLIT_FROM = J45.text.from;
 export const SPLIT_TO = J45.freezeB.from + J45.freezeB.dur;

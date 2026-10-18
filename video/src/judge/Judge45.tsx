@@ -63,22 +63,35 @@ const SponsorBar = () => {
   );
 };
 
-/** Left half: the player page lays the live over-the-shoulder camera over CAM. Black in the plain MP4. */
+/** Left half: black until the team's clips are spliced into CAM. A dim label names the clip for each gap. */
+const CLIPS: [{ from: number; dur: number }, string][] = [
+  [J45.gap1, "J1 · 5 s · review the hold, Face ID, tap Deny"],
+  [J45.gap2, "J2 · 3 s · tap Freeze"],
+];
 const LeftHalf = () => (
   <AbsoluteFill style={{ width: HALF, background: "#000" }}>
-    <div style={{ position: "absolute", left: CAM.x, top: CAM.y, width: CAM.w, height: CAM.h, display: "grid", placeItems: "center", color: "#4A4256", fontFamily: FONT, fontSize: 26, textAlign: "center" }}>
-      LIVE CAMERA
-      <br />
-      family phone, over the shoulder
-    </div>
+    {CLIPS.map(([seg, text]) => (
+      <Sequence key={seg.from} from={seg.from - SPLIT_FROM} durationInFrames={seg.dur} layout="none">
+        <div style={{ position: "absolute", left: CAM.x, top: CAM.y, width: CAM.w, height: CAM.h, display: "grid", placeItems: "center", color: "#4A4256", fontFamily: FONT, fontSize: 28, textAlign: "center" }}>
+          {text}
+        </div>
+      </Sequence>
+    ))}
   </AbsoluteFill>
 );
 
+/** Plays frames a..b of a scene back and forth, so Rosa keeps moving while the family clip runs. */
+const PingPong = ({ S, a, b }: { S: ComponentType; a: number; b: number }) => {
+  const n = b - a;
+  const k = useCurrentFrame() % (2 * n);
+  return <Freeze frame={a + (k < n ? k : 2 * n - k)}><S /></Freeze>;
+};
+
 /** Right half: an existing story scene, shrunk to sit under the bar. `skip` starts the scene that many frames in. */
-const Scene = ({ C: S, from, dur, skip = 0, freezeAt, slide = false }: {
-  C: ComponentType; from: number; dur: number; skip?: number; freezeAt?: number; slide?: boolean;
+const Scene = ({ C: S, from, dur, skip = 0, loop, slide = false }: {
+  C: ComponentType; from: number; dur: number; skip?: number; loop?: [number, number]; slide?: boolean;
 }) => {
-  const inner = freezeAt !== undefined ? <Freeze frame={freezeAt}><S /></Freeze> : <Sequence from={-skip} layout="none"><S /></Sequence>;
+  const inner = loop ? <PingPong S={S} a={loop[0]} b={loop[1]} /> : <Sequence from={-skip} layout="none"><S /></Sequence>;
   const body = (
     <AbsoluteFill style={{ width: HALF, height: H, transform: `scale(${SCALE})`, transformOrigin: "top center" }}>
       <AbsoluteFill>{inner}</AbsoluteFill>
@@ -87,25 +100,14 @@ const Scene = ({ C: S, from, dur, skip = 0, freezeAt, slide = false }: {
   return <Sequence from={from} durationInFrames={dur}>{slide ? <SlideIn>{body}</SlideIn> : body}</Sequence>;
 };
 
-/** "Your turn" pill during a hold. The player page loops this segment until the presenter presses Space. */
-const HoldPrompt = ({ text }: { text: string }) => {
-  const f = useCurrentFrame();
-  const s = 1 + 0.04 * Math.sin((f / 30) * Math.PI * 2);
-  return (
-    <div style={{ position: "absolute", left: 0, right: 0, bottom: 50, display: "flex", justifyContent: "center" }}>
-      <div style={{ transform: `scale(${s})`, background: C.yellow, color: C.purpleInk, fontFamily: FONT, fontWeight: 800, fontSize: 46, padding: "14px 34px", borderRadius: 999, boxShadow: "0 0 0 8px rgba(251,192,45,0.25)" }}>
-        YOUR TURN · {text}
-      </div>
-    </div>
-  );
-};
-
 const CAPTIONS: [number, number, string][] = [
   [J45.text.from, J45.text.dur, "Scam text: sent to Junk. Checked on the phone, never uploaded."],
   [J45.call.from, J45.call.dur, "Scam call: labeled \"Possible scam.\" Rosa answers anyway."],
   [J45.atm.from, J45.atm.dur, "The caller sends Rosa to the ATM for cash."],
   [J45.holdA.from, J45.holdA.dur, "Then a gift card. Cash, then a gift card: a scam. Paused."],
+  [J45.gap1.from, J45.gap1.dur, "The family gets the alert. Reviews it. Face ID. Deny."],
   [J45.holdB.from, J45.holdB.dur, "The family said no. Rosa's money never moved."],
+  [J45.gap2.from, J45.gap2.dur, "Then the family taps Freeze."],
   [J45.freezeB.from, J45.freezeB.dur, "One tap: Rosa's balance moves to a vault."],
 ];
 
@@ -117,7 +119,7 @@ const SFX: [number, string][] = [
   [J45.atm.from + 50, "sfx-cash"],
   [J45.holdA.from + 60, "sfx-pause"],
   [J45.holdA.from + 90, "sfx-grumble"],
-  [J45.hold1.from - 8, "sfx-buzz"], // family phone buzzes right before pause 1 (kept outside the looped hold)
+  [J45.gap1.from, "sfx-buzz"], // the family phone buzzes as clip J1 starts
   [J45.holdB.from + 15, "sfx-ping"],
   [J45.freezeA.from + 5, "sfx-buzz"],
   [J45.freezeB.from + 5, "sfx-coins"],
@@ -126,8 +128,7 @@ const SFX: [number, string][] = [
   [J45.end.from, "sfx-chime"],
 ];
 
-/** `music` is off for the live player version: the player plays music separately so holds can loop. */
-export const Judge45 = ({ music }: { music: boolean }) => (
+export const Judge45 = () => (
   <AbsoluteFill style={{ background: "#000" }}>
     <Sequence durationInFrames={J45.hook.dur}><HookCard /></Sequence>
     <Sequence from={J45.promise.from} durationInFrames={J45.promise.dur}><PromiseCard /></Sequence>
@@ -144,10 +145,10 @@ export const Judge45 = ({ music }: { music: boolean }) => (
         <Scene C={CallScene} from={J45.call.from} dur={J45.call.dur} slide />
         <Scene C={AtmScene} from={J45.atm.from} dur={J45.atm.dur} slide />
         <Scene C={HoldScene} from={J45.holdA.from} dur={J45.holdA.dur} slide />
-        <Scene C={HoldScene} from={J45.hold1.from} dur={J45.hold1.dur} freezeAt={J45.holdA.dur - 1} />
+        <Scene C={HoldScene} from={J45.gap1.from} dur={J45.gap1.dur} loop={[J45.holdA.dur - 30, J45.holdA.dur - 1]} />
         <Scene C={HoldScene} from={J45.holdB.from} dur={J45.holdB.dur} skip={J45.holdA.dur} />
         <Scene C={FreezeScene} from={J45.freezeA.from} dur={J45.freezeA.dur} slide />
-        <Scene C={FreezeScene} from={J45.hold2.from} dur={J45.hold2.dur} freezeAt={J45.freezeA.dur - 1} />
+        <Scene C={FreezeScene} from={J45.gap2.from} dur={J45.gap2.dur} loop={[0, J45.freezeA.dur - 1]} />
         <Scene C={FreezeScene} from={J45.freezeB.from} dur={J45.freezeB.dur} skip={J45.freezeA.dur} />
       </BadgesOn.Provider>
     </AbsoluteFill>
@@ -159,18 +160,14 @@ export const Judge45 = ({ music }: { music: boolean }) => (
     {CAPTIONS.map(([from, dur, text]) => (
       <Sequence key={from} from={from} durationInFrames={dur}><Caption text={text} /></Sequence>
     ))}
-    <Sequence from={J45.hold1.from} durationInFrames={J45.hold1.dur}><HoldPrompt text="Family: review, Face ID, tap Deny" /></Sequence>
-    <Sequence from={J45.hold2.from} durationInFrames={J45.hold2.dur}><HoldPrompt text="Family: tap Freeze" /></Sequence>
 
     <Sequence from={J45.table.from} durationInFrames={J45.table.dur}><TableCard /></Sequence>
     <Sequence from={J45.end.from} durationInFrames={J45.end.dur}><EndCard /></Sequence>
 
-    {music && (
-      <Audio
-        src={sfx("music-j45")}
-        volume={(f) => 0.45 * interpolate(f, [0, 15, J45_DUR - 30, J45_DUR], [0, 1, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })}
-      />
-    )}
+    <Audio
+      src={sfx("music-j45")}
+      volume={(f) => 0.45 * interpolate(f, [0, 15, J45_DUR - 30, J45_DUR], [0, 1, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })}
+    />
     {SFX.map(([from, name]) => (
       <Sequence key={`${from}-${name}`} from={from} layout="none"><Audio src={sfx(name)} /></Sequence>
     ))}

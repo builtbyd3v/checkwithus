@@ -1,12 +1,16 @@
-# Judge video at the table (45 s, live)
+# Judge video (46.7 s): 2 clips to film
 
-- Start: `cd video && npm run player`, then open http://localhost:4545/player/ in Chrome. Press F for fullscreen.
-- Camera: press C and pick the camera teammate's iPhone (Continuity Camera, same Apple ID as the laptop) or a USB webcam. Point it over the family actor's shoulder at the family phone.
-- The video stops twice and shows "YOUR TURN". The family actor acts on the real phone, says one short line, then the presenter presses Space (or the clicker).
-  1. Pause 1: review the held payment, Face ID, tap **Deny**. Line: "It's asking me. I say no."
-  2. Pause 2: tap **Freeze**. Line: "One tap. Money's in the vault."
-- Backup if anything fails: http://localhost:4545/player/?plain=1 plays the 45 s MP4 straight through.
-- Before judges arrive: sign in to Auth0 again on the family phone (Freeze needs a sign-in from the last 5 minutes), and seed a held gift card payment.
+The left half stays black except for two gaps. Film these two clips, drop them in `video/public/clips/`, and I splice them in.
+
+| Clip | Length | Starts at | What happens |
+| --- | --- | --- | --- |
+| J1.mov | 5 s | 19.5 s | Over the shoulder: the family phone buzzes. Read the held payment, Face ID, tap **Deny**. |
+| J2.mov | 3 s | 28.3 s | Over the shoulder: tap **Freeze**. |
+
+- Film landscape, 1080p or 4K, 30 fps. Keep the phone screen in the center. The clip fills a 960 x 800 box, so the outer edges get cropped.
+- Record 2 extra seconds before and after each action. I trim each clip to its gap.
+- No talking needed. The video has music and captions.
+- Before filming: sign in to Auth0 again on the family phone (Freeze needs a sign-in from the last 5 minutes), and seed a held gift card payment.
 
 # Filming script: the real half of the split screen (30 s and Devpost cuts)
 
