@@ -66,8 +66,8 @@ export const J45 = {
   end: { from: 1140, dur: 180 }, // tagline collapses into checkwith.us + GoDaddy line + logo wall
 };
 export const J45_DUR = 1320;
-// Where the filmed clips sit in the left half (video pixels): under the sponsor bar, above the captions.
-export const CAM = { x: 0, y: 100, w: 960, h: 800 };
+// Where the filmed clips sit in the left half (video pixels): under the sponsor bar, down to the bottom edge (captions overlay it).
+export const CAM = { x: 0, y: 100, w: 960, h: 980 };
 export const SPLIT_FROM = J45.atm.from;
 export const SPLIT_TO = J45.groB.from + J45.groB.dur;
 // The filmed clips fill the whole left half. Each is trimmed so its tap lands just before the right half shows
