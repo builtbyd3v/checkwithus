@@ -33,10 +33,13 @@ struct FamilyTabs: View {
             Tab("Approvals", systemImage: "hand.raised.fill", value: .holds) { HoldsView() }
                 .badge(model.held.count)
             Tab("Alerts", systemImage: "bell.fill", value: .alerts) { AlertsView() }
+                .badge(model.newAlertCount)
+                .accessibilityValue(model.newAlertCount == 0 ? "" : "\(model.newAlertCount) new \(model.newAlertCount == 1 ? "alert" : "alerts")")
             Tab("Money", systemImage: "banknote.fill", value: .money) { MoneyView() }
             Tab("Allowances", systemImage: "checkmark.seal.fill", value: FamilyModel.Tab.allowances) { AllowancesView() }
             Tab("Settings", systemImage: "gearshape.fill", value: .settings) { FamilySettingsView() }
         }
+        .task { await model.askForNotifications() }
     }
 }
 
@@ -944,6 +947,7 @@ enum AllowanceWords {
 struct FamilySettingsView: View {
     @Environment(FamilyModel.self) private var model
     @State private var confirmUnpair = false
+    @AppStorage("appearance") private var appearance = "system"
     @ScaledMetric(relativeTo: .title) private var avatar = 56
     @ScaledMetric(relativeTo: .body) private var memberAvatar = 34
 
@@ -1019,6 +1023,20 @@ struct FamilySettingsView: View {
                     SectionTitle("Text size")
                 } footer: {
                     Foot("Changes only this app. \"Same as iPhone\" uses your iPhone's text size.")
+                }
+                .listRowBackground(Color.surface)
+                Section {
+                    Picker("Appearance", selection: $appearance) {
+                        Text("System").tag("system")
+                        Text("Light").tag("light")
+                        Text("Dark").tag("dark")
+                    }
+                    .pickerStyle(.inline)
+                    .labelsHidden()
+                } header: {
+                    SectionTitle("Appearance")
+                } footer: {
+                    Foot("Changes only this app.")
                 }
                 .listRowBackground(Color.surface)
                 Section {
