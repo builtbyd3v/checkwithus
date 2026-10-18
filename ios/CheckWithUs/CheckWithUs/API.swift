@@ -145,7 +145,9 @@ func cents(fromDollars text: String) -> Int? {
 
 /// "$84.12", or "$500" for whole dollars.
 func dollars(_ cents: Int) -> String {
-    cents % 100 == 0 ? "$\(cents / 100)" : String(format: "$%d.%02d", cents / 100, cents % 100)
+    // US dollars, so a US thousands separator whatever the phone's region: $2,412.88.
+    let whole = (cents / 100).formatted(.number.locale(Locale(identifier: "en_US")))
+    return cents % 100 == 0 ? "$\(whole)" : "$\(whole)." + String(format: "%02d", cents % 100)
 }
 
 /// The device token is a credential, so it lives in the Keychain, not UserDefaults. The family app keeps its
