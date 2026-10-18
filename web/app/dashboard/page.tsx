@@ -21,8 +21,10 @@ import { DashboardView } from './view';
 const benchmark = perfReportSchema.parse(recordedBenchmark);
 
 type SpendRow = { day: Date; category: Category; total_cents: string };
-type CircleRow = { hold_over_cents: string; protected_name: string; frozen: boolean; vault_cents: number };
-type MemberRow = { id: string; display_name: string };
+type CircleRow = { hold_over_cents: string; two_approvals_over_cents: string; protected_name: string; frozen: boolean; vault_cents: number };
+type MemberRow = { id: string; display_name: string; role: 'approver' | 'viewer' };
+
+const toDollars = (cents: bigint) => `${cents / 100n}.${(cents % 100n).toString().padStart(2, '0')}`;
 type PayeeRow = { id: string; name: string; kind: string; category: Category };
 
 export default function Dashboard(props: { searchParams: Promise<{ circle?: string }> }) {
@@ -57,9 +59,9 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
     ),
     // A missing spending_weekly migration shows an empty chart, not a 500.
     weeklySpending(db(), active.circleId).catch((): Awaited<ReturnType<typeof weeklySpending>> => []),
-    db().query<CircleRow>(`select protected_name, hold_over_cents::text, frozen, ${VAULT_CENTS_SQL} as vault_cents
+    db().query<CircleRow>(`select protected_name, hold_over_cents::text, two_approvals_over_cents::text, frozen, ${VAULT_CENTS_SQL} as vault_cents
       from circles c where c.id = $1`, [active.circleId]),
-    db().query<MemberRow>('select id, display_name from circle_members where circle_id = $1 order by created_at', [active.circleId]),
+    db().query<MemberRow>('select id, display_name, role from circle_members where circle_id = $1 order by created_at', [active.circleId]),
     db().query<PayeeRow>('select id, name, kind, category from payees where circle_id = $1 order by name', [active.circleId]),
     familyAlerts(db(), session.user.sub, active.circleId),
     // The card is a bonus: if timing fails, the dashboard still loads.
@@ -86,11 +88,12 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
   for (const row of weekResult) {
     if (row.weeks_ago >= 0 && row.weeks_ago < weeks.length) weeks[12 - row.weeks_ago] = Number(row.total_cents);
   }
-  const holdCents = BigInt(circle.hold_over_cents);
 
   return <DashboardView now={new Date()} firstName={firstName} role={active.role} canApproveHere={!approvalsUseCiba()}
     circles={circles} activeCircleId={active.circleId} frozen={circle.frozen} vaultCents={Number(circle.vault_cents)}
-    holdDollars={`${holdCents / 100n}.${(holdCents % 100n).toString().padStart(2, '0')}`}
+    holdDollars={toDollars(BigInt(circle.hold_over_cents))}
+    twoApprovalsDollars={toDollars(BigInt(circle.two_approvals_over_cents))}
+    approverCount={memberResult.rows.filter((member) => member.role === 'approver').length}
     held={held} recent={recent} alerts={alerts} weeks={weeks}
     categories={[...categories].sort((x, y) => y[1] - x[1]).map(([category, cents]) => ({ label: CATEGORY_LABELS[category] ?? category, cents }))}
     usual={usual} sequences={sequences} speed={speed} benchmarkLine={benchmarkSummary(benchmark)}

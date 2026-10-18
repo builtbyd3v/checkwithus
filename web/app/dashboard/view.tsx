@@ -25,6 +25,8 @@ export type DashboardData = {
   frozen: boolean;
   vaultCents: number;
   holdDollars: string;
+  twoApprovalsDollars: string;
+  approverCount: number;
   held: ViewPayment[];
   recent: ViewPayment[];
   alerts: ViewAlert[];
@@ -318,8 +320,8 @@ export function DashboardView(data: DashboardData) {
         </section>
         <section aria-labelledby="rules-title" className={panel}>
           <h3 id="rules-title" className={`${panelTitle} mb-4`}>Rules</h3>
-          <HoldLimitForm circleId={data.activeCircleId} holdDollars={data.holdDollars} />
-          <p className="mt-3">Payments above this amount wait for family review.</p>
+          <HoldLimitForm circleId={data.activeCircleId} holdDollars={data.holdDollars}
+            twoApprovalsDollars={data.twoApprovalsDollars} approverCount={data.approverCount} />
           <div className="mt-6"><PayeeForm circleId={data.activeCircleId} /></div>
         </section>
         <section aria-labelledby="people-title" className={panel}>
