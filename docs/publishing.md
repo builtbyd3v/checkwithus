@@ -7,11 +7,10 @@ is the current work-status record; this page explains how to publish the assets.
 
 ## Select the demonstrated build
 
-Choose a reviewed `rishon` commit from PR #54, record its SHA, and use it for the
-server and both iPhones. Main was intentionally restored; publishing these docs
-does not authorize merging or deploying. Keep the branch-scope notice until the
-described build has actually been verified. Remove claims for features omitted
-from the demonstrated build. A successful health endpoint alone is insufficient.
+Everything in these docs is on `main` and live at checkwith.us. Pin one `main`
+commit, record its SHA, and use it for the server and both iPhones. Remove claims
+for any feature the demo does not show. A successful health endpoint alone is
+not enough; check the Vercel deployment commit too.
 
 The model scores link to saved evaluation outputs in the README. Performance
 numbers come from the recorded benchmark JSON; `cd web && npm run perf:report`
@@ -43,9 +42,9 @@ or third-party imagery requiring additional permission.
 
 Copy the title, tags and Markdown from `dev-post.md` into the team's DEV editor.
 Keep `published: false` for any import until the author has reviewed the preview.
-Check the current challenge instructions through the event's official page,
-including any required tags. The existing tags are editorial suggestions, not
-a claim of challenge eligibility. A cover image is optional unless those rules
+The MLH x DEV Writing Challenge template requires the tags `mlhacks`,
+`devchallenge` and `hackathon`, and the first line "This is a submission for the
+MLH x DEV Writing Challenge". Check the official page for any change. A cover image is optional unless those rules
 require it; use an original gallery asset with its accurate caption if desired.
 
 Verify links, tables, code formatting and AI disclosure in the preview. Check
@@ -61,7 +60,7 @@ separate SRT are supporting footage, not a complete end-to-end submission.
 
 Paste the prepared sections into their matching Devpost fields, add the public
 video and DEV URLs, upload the selected gallery images, and review the seven
-entry names in `devpost.md`. Best Use of AI/ML is the single specialized track;
+entry names in `devpost.md`. Best First Timers is the single specialized track;
 the other listed entries are challenges. Confirm team membership, licenses,
 AI disclosure and demonstrated behavior before submitting. Follow the event
 deadline in [RULES.md](RULES.md). After publication, verify the public project

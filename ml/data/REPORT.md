@@ -76,5 +76,5 @@ v2 (current). Threshold set on val for 97% scam recall; test scored once. Full n
 | probe v1 (synthetic, held-out templates) | 40 | toll 100%, investment 13% | 100% | 0% | |
 
 - Misses the 95% test target by about 1 point. The weakest types are `delivery` (88.6%) and `prize` (91.2%).
-- Investment: real crypto texts in test are caught (6 of 6), but pig-butchering openers ("sorry, wrong number") are not (2 of 15 probe rows caught). Pitch limit: the text filter will miss many of these; the payment hold and the crypto app lock are the real catch.
+- Investment: real crypto texts in test are caught (6 of 6), but pig-butchering openers ("sorry, wrong number") are not (2 of 15 probe rows caught). Pitch limit: the text filter will miss many of these; the payment hold is the real catch.
 - Core ML: 8-bit weights, 67 MB, 1 decision of 884 differs from PyTorch.

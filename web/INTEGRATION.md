@@ -27,7 +27,7 @@ All paths below are relative to the base URL.
 | `GET /family/me` | Family | Circles the signed-in member belongs to |
 | `POST /family/join` | Family | Join with `{inviteCode, displayName}` |
 | `POST /family/circles/:id/pairing-code` | Family | Generate a one-time device pairing code |
-| `POST /family/circles/:id/unpair` | Family (approver, fresh login) | `{}` -> `{unpaired: n}`: revokes the older adult's device token; her app hears 401 and returns to its first screen |
+| `POST /family/circles/:id/unpair` | Family (approver, fresh login) | `{}` -> `{unpaired: n}`: revokes the older adult's device token; their app hears 401 and returns to its first screen |
 | `GET /family/alerts` | Family | Recent alerts from the member's circles |
 | `GET /family/payments` | Family | Latest 50 payments across the member's circles |
 | `GET /family/payments?status=held` | Family | Pending payments, independently of recent completed payments |
@@ -84,7 +84,7 @@ In CIBA mode an API approval returns `403 approve_in_guardian`. The member must 
 
 ## Demo setup and boundaries
 
-Run `npm run db:migrate` and `npm run seed:demo` from `web/` with local environment variables configured. The seed creates synthetic Rosa data, known payees, historical spending, the Freeze vault account, and an invite. Sign in, join with that invite, then generate a pairing code in the dashboard for the iPhone.
+Run `npm run db:migrate` and `npm run seed:demo` from `web/` with local environment variables configured. The seed creates synthetic demo data, known payees, historical spending, the Freeze vault account, and an invite. Sign in, join with that invite, then generate a pairing code in the family app (Settings) or the dashboard for the iPhone.
 
 `npm run check:nessie` reads the synthetic account on both supported Nessie hosts. Add `-- --write` to verify one $1 utility payment per host through the normal rules and ledger. Fixed idempotency keys make repeat checks read the same payments rather than resend. The check prints statuses and synthetic balance amounts, never API keys. Both hosts were verified on October 17, 2026. Nessie's reported account balance did not change after those payments, so it is not currently an authoritative spendable balance; payment accounting remains in Tiger Data.
 
@@ -127,7 +127,9 @@ step-up is required. Dashboard allowance display/forms are still to be wired by
 the UI owner.
 
 Amounts strictly above the circle's threshold (default $1,000) always hold and
-require two distinct current approvers; one denial blocks. Repeated votes do not
+require two distinct current approvers; one denial blocks. Families can change the
+amount or turn the rule off on the dashboard. The hold limit (default $300) can be
+changed or turned off the same way. Repeated votes do not
 count twice. Fewer than two approvers cannot release a two-approval payment.
 The requirement is captured when the payment is created. Family payment views
 include `approvalsRequired` and `allowanceId`. Guardian approvals count through
@@ -148,8 +150,8 @@ one. Fixed rules decide, and Auth0 decides who may override them.
 | --- | --- | --- |
 | A payment inside an allowance (known payee, matching payee or category, at or under the cap, before expiry, granted by a current approver, no scam reason, under the two-approval threshold) | Nobody: it pays at once | The payment stores `allowanceId` |
 | Any held payment (new payee, gift card, crypto, wire, during a call, Guard flag, over the hold limit, unusual spending, ATM cash then gift card, frozen) | One approver | CIBA push to every approver's Auth0 Guardian (`APPROVAL_MODE=ciba`), or the family app (`app` mode) |
-| A held payment over the two-approval threshold (default $1,000) | Two distinct approvers; one Deny stops it | Same channels; one tally across them |
-| Grant an allowance, change the threshold or roles, unfreeze, unpair her phone | One approver with a fresh login (`auth_time` within 5 minutes) | `max_age=0` sign-in |
+| A held payment over the two-approval threshold (default $1,000; families can change it or turn it off) | Two distinct approvers; one Deny stops it | Same channels; one tally across them |
+| Grant an allowance, change the threshold or roles, unfreeze, unpair their phone | One approver with a fresh login (`auth_time` within 5 minutes) | `max_age=0` sign-in |
 | Deny, freeze, revoke an allowance | One approver, no fresh login | These only stop money |
 
 Approver means the circle role in our database. Approving also needs Auth0's
@@ -157,7 +159,8 @@ Approver means the circle role in our database. Approving also needs Auth0's
 claim, or always when `AUTH0_RBAC=true` (then a missing claim is a no). The
 family API decision route returns `403 permission_required` otherwise. Deny is
 not gated on the permission: it only stops money, so the circle role is enough.
-Without the claim and without `AUTH0_RBAC`, the circle role alone decides. Other
+Without the claim and without `AUTH0_RBAC`, the circle role alone decides.
+Dashboard approvals check the circle role only. Other
 approver routes (allowances, freeze, policy) check the circle role only.
 
 Guardian approvals are permission-checked only when `AUTH0_CIBA_RAR=true`:
@@ -191,8 +194,10 @@ any other `circleId` answers `403 agent_not_invited`.
   twice. A fixed rule, no AI model; bill data never leaves our server.
 - Who decides: nobody new. Each proposal goes through `createPayment`, the same
   rules as the phone. Inside an allowance it pays with no push and stores
-  `allowanceId`; otherwise it is held and the family is asked (CIBA push with
-  `APPROVAL_MODE=ciba`, the family app otherwise). One proposal per biller per
+  `allowanceId`. Otherwise the normal rules decide: a known biller under the
+  hold limit pays without an allowance, and a bill over the limit or far above
+  usual is held and the family is asked (CIBA push with `APPROVAL_MODE=ciba`,
+  the family app otherwise). One proposal per biller per
   due date: a rerun replays a held or paid one. A denied, expired or failed one
   is not asked again: it is listed with `status: "skipped"` and `skipped`
   (`family_said_no`, `expired`, `failed`). A payment error on one bill is listed
@@ -235,15 +240,15 @@ Auth0 dashboard steps (Dev):
 
 Agent story (README/Devpost):
 
-> Rosa's bill-pay agent has its own Auth0 identity: an M2M client whose token holds one scope, `pay:bills`.
-> It can only ask. Fixed rules decide, the same rules as Rosa's phone.
+> The bill-pay agent has its own Auth0 identity: an M2M client whose token holds one scope, `pay:bills`.
+> It can only ask. Fixed rules decide, the same rules as the older adult's phone.
 > Inside the family's expiring allowance, the bill pays with no push.
-> Over it, the payment is held and the family gets a Guardian push (CIBA).
-> The agent can never approve, freeze or grant itself more; revoking the allowance stops it. No AI model sees Rosa's bills.
+> Outside it, the normal rules decide; a held bill asks the family (family app, or a Guardian push in CIBA mode).
+> The agent can never approve, freeze or grant itself more; revoking the allowance stops it. No AI model sees the older adult's bills.
 
 ### CIBA push details (`AUTH0_CIBA_RAR`)
 
-Every push has a binding message such as `Rosa: 1,500.00 USD to QuickGift
+Every push has a binding message such as `Sam: 1,500.00 USD to QuickGift
 Cards` (letters, digits, whitespace and `+-_.,:#`, at most 64 characters).
 
 With `AUTH0_CIBA_RAR=true`, `bc-authorize` also sends `audience=AUTH0_AUDIENCE`
@@ -348,7 +353,7 @@ so once Nessie confirms it (`sent`) it raises `ledgerBalanceCents` and a later F
 Verified live on October 17 on a synthetic circle: one transfer listed on the member's
 account for three calls with the same key. `demo:reset` deletes last demo's top-ups.
 
-The seed records Rosa's monthly pension ($1,500 on August 2, September 1 and October 1)
+The seed records the older adult's monthly pension ($1,500 on August 2, September 1 and October 1)
 as Nessie deposits (`POST /accounts/:id/deposits`) and as deposit credits in the same
 ledger, so the balance includes them. A rerun finds each deposit by its seed marker.
 
