@@ -67,6 +67,18 @@ struct API {
         try await send("GET", "device/config", body: Optional<String>.none, token: token)
     }
 
+    /// One person in the family, for the older adult's Settings. role: approver or viewer.
+    struct FamilyMember: Decodable, Hashable {
+        let displayName: String
+        let role: String
+    }
+
+    static func family(token: String) async throws -> [FamilyMember] {
+        struct List: Decodable { let family: [FamilyMember] }
+        let list: List = try await send("GET", "device/family", body: Optional<String>.none, token: token)
+        return list.family
+    }
+
     static func askFamily(token: String) async throws {
         struct Created: Decodable { let id: String }
         let _: Created = try await send("POST", "device/alerts", body: ["kind": "ask_family"], token: token)
