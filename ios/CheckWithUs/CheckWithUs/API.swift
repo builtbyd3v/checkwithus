@@ -25,6 +25,7 @@ struct API {
 
     struct Pairing: Decodable { let deviceToken: String }
     struct ServerError: Decodable { let message: String }
+    private struct ServerCode: Decodable { let error: String }
 
     struct Config: Decodable {
         struct Member: Decodable { let displayName: String }
@@ -112,9 +113,11 @@ struct API {
         }
         guard let (data, response) = try? await URLSession.shared.data(for: request),
               let status = (response as? HTTPURLResponse)?.statusCode else { throw Failure.offline }
-        // Every call with a token is a device route, so 401 means the family revoked it. Deleted here so the
-        // bank watcher and Siri stop using it too; AppModel.forget() then shows the first screen.
-        if status == 401, token != nil {
+        // Every call with a token is a device route, so our own 401 means the family revoked it. Deleted here so the
+        // bank watcher and Siri stop using it too; AppModel.forget() then shows the first screen. Only our JSON
+        // counts: a 401 from a proxy or captive portal must not unlock the phone.
+        if status == 401, token != nil,
+           (try? JSONDecoder().decode(ServerCode.self, from: data))?.error == "unauthorized" {
             TokenStore.delete(service: "us.checkwith.device")
             throw Unpaired()
         }

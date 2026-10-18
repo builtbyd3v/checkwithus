@@ -16,6 +16,8 @@ import SwiftUI
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { model.keepPollingInBackground() }
             if phase == .active {
+                // A background relaunch before first unlock cannot read the Keychain; try again once unlocked.
+                if model.token == nil { model.token = TokenStore.load() }
                 // resume() picks up a held payment that an offline launch could not load.
                 Task { await model.resume(); await model.watch() }
                 Task { await model.installScamNumbers() }
