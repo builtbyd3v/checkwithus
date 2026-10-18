@@ -116,7 +116,7 @@ async function main() {
       params: [circleId],
     },
     {
-      name: '"Her usual" at one payee (1 circle, 1 year)',
+      name: '"Usual spending" at one payee (1 circle, 1 year)',
       raw: `select sum(amount_cents) / count(*) from spending
              where circle_id = $1 and payee_name = 'Payee 0' and occurred_at >= now() - interval '1 year'`,
       agg: `select sum(total_cents) / sum(payments) from spending_payee_daily
