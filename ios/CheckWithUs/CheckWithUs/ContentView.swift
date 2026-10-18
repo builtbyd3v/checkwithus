@@ -381,7 +381,7 @@ struct MoreBelowButton: View {
     var body: some View {
         Button { scrollToBottom() } label: {
             Label("More below", systemImage: "chevron.down")
-                .frame(maxWidth: .infinity, minHeight: 44)
+                .frame(maxWidth: .infinity, minHeight: 56)
                 .contentShape(.rect)
         }
         .modifier(ShapeWhenAsked())

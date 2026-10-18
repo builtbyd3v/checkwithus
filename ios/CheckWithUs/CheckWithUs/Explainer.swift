@@ -28,7 +28,7 @@ enum Explainer {
         }
     }
 
-    private static let log = Logger(subsystem: "us.checkwith.app", category: "Explainer")
+    nonisolated private static let log = Logger(subsystem: "us.checkwith.app", category: "Explainer")
     /// The default guardrails refuse anything about scams, which is the whole topic here. This mode lets the
     /// model rewrite text about it; a refusal or a dropped fact falls back to the plain facts.
     private static let model = SystemLanguageModel(guardrails: .permissiveContentTransformations)

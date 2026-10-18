@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Who uses this phone: "protected" (the older adult) or "family". A paired phone is the older adult's, whatever
-/// the role says, so a scammer cannot talk her into the family side. Only the family can release it (unpair).
+/// the role says, so a scammer cannot talk them into the family side. Only the family can release it (unpair).
 struct RootView: View {
     @Environment(AppModel.self) private var model
     @AppStorage("role") private var role = ""
