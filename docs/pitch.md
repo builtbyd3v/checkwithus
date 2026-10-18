@@ -82,7 +82,7 @@ Each sponsor block has a **20 s** version for the default order and a **60 s** v
 > "Auth0 decides who can say yes to Rosa's money. The family app signs in with Authorization Code plus PKCE, and the server checks the signature, issuer and audience of every token. Approvers and viewers are separate roles. Over $1,000, two approvers must agree, and a single no stops it. **[iPhone B: Approve a held payment, Face ID.]** Approve needs Face ID on the phone. Riskier changes, like Freeze or a new allowance, need a fresh Auth0 sign-in from the last five minutes. For AI agents, our bill-pay agent signs in as its own Machine-to-Machine client with exactly one scope, `pay:bills`. It can only ask. **[iPhone B: Allowances tab.]** Inside the family's allowance, utilities up to $400 until November 30th, a bill pays. Outside it, the bill waits for the family. And every family route rejects machine tokens, so the agent can never approve, freeze or change a rule."
 
 **Proof:** approve with Face ID on iPhone B; the Allowances tab.
-**If asked:** the Guardian push (CIBA) with the payment details is built and tested against a fake Auth0, not verified live; say exactly that. Only say "Auth0 RBAC" or "`approve:payments` permission" once RBAC is confirmed on the live API (see "Unverified").
+**If asked:** the Guardian push (CIBA) with the payment details is built and tested against a fake Auth0, not verified live; say exactly that. Auth0 RBAC is on for the live API (checked Oct 17), so approving needs the `approve:payments` permission in the token.
 
 ### Tiger Data
 
@@ -121,9 +121,9 @@ Each sponsor block has a **20 s** version for the default order and a **60 s** v
 
 ## Unverified: cut or verify before the expo
 
-1. **Bill-pay agent:** the code is on main (PR #46 itself was closed unmerged), but the real Auth0 Machine-to-Machine grant is not tested on the live tenant. Ask Dev for one live `npm run agent:bills` run. If it does not run, say "tested against a fake Auth0".
+1. **Bill-pay agent: verified.** Oct 17, live Auth0 tenant: the agent signed in with only `pay:bills` and paid a $350 water bill under the utilities allowance. Each run pays the due bill, so run `demo:reset -- --live` again before a judge sees "Show me the agent".
 2. **CIBA Guardian push:** built and tested against a fake Auth0 (`web/test/fake-auth0.ts`), not verified live. Do not say "live". Mention it only if a judge asks.
-3. **`approve:payments`:** the server checks this Auth0 permission only when the token carries a `permissions` claim or `AUTH0_RBAC=true`. Otherwise the circle's approver role alone decides. Before saying "Auth0 RBAC", confirm RBAC is on for the live Auth0 API.
+3. **`approve:payments` on stage:** RBAC is on for the live Auth0 API (Oct 17, `npm run check:auth0`: tokens carry a `permissions` claim), so the server checks this permission on every Approve. If the approver account lacks it in Auth0, Approve fails. Do one test Approve on iPhone B before the expo.
 4. **Freeze on stage:** Freeze needs an Auth0 sign-in from the last 5 minutes. If iPhone B signed in earlier, tapping Freeze opens the Auth0 login sheet first. Sign in again on iPhone B just before a judge arrives.
 
 Checked against `main` on Oct 17 (Hitesh, with Claude Code): the 10 Nessie resource types, Freeze exactly once, `demo:atm`, PKCE, token checks, roles, the 2-approver rule, the agent's scope and machine-token rejection, the hypertable, compression, the three continuous aggregates, the 2-hour window, the [perf.md](perf.md) numbers, the speed card, the screen wording, the accessibility list and the model numbers in the README.

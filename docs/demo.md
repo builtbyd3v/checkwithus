@@ -24,7 +24,7 @@ One build for everything
 - [ ] Migrations on the live database: `cd web && npm run db:migrate` (014 freeze, 015 ATM cash, 016 weekly and per-payee aggregates, 017 ledger credits, 020 payment initiator).
 - [ ] `DEMO_BANK_LOCATIONS` is set on Vercel to a spot at the expo table, for example `[{"name":"SwampHacks Demo Bank","lat":29.6463,"lng":-82.3478}]`. TODO(Dev): confirm the coordinates on site, redeploy after changing it, then relaunch the app on iPhone A.
 - [ ] `npm run smoke:demo` passes (a $350 City Power & Light bill pays with no push while the allowance exists, and holds when it is revoked; runs on a throwaway schema).
-- [ ] If showing the bill-pay agent: `AUTH0_AGENT_CLIENT_ID` and `AUTH0_AGENT_CLIENT_SECRET` are in the MacBook's `.env.local`, and a second terminal has `npm run agent:bills -- --within 14` typed, not run. Run it only after `demo:reset`. TODO(Dev): one live run on the real Auth0 tenant first.
+- [ ] If showing the bill-pay agent: `AUTH0_AGENT_CLIENT_ID` and `AUTH0_AGENT_CLIENT_SECRET` are in the MacBook's `.env.local`, and a second terminal has `npm run agent:bills -- --within 14` typed, not run. Run it only after `demo:reset`. Verified live on Oct 17 (it paid the $350 water bill).
 - [ ] `npm run demo:reset -- --live` on the real demo circle (only there; without `--live` it refuses anything but a throwaway `wt_*` schema). It reseeds Rosa, clears held payments, unfreezes, clears recent ATM cash, and grants the utilities allowance up to $400 until Nov 30.
 - [ ] Do NOT run `npm run demo:atm` after the reset until the ATM step. If you do, the first gift card also shows the ATM reason.
 - [ ] `APPROVAL_MODE=app` on Vercel (the default). The family approves in the family app, which asks for Face ID first. The Guardian push (`ciba`) is not verified live, so do not use it.
@@ -81,7 +81,7 @@ Use these when a judge asks to see something during the talk or the questions. E
 | "Show me the approval" | iPhone A: Pay a bill, Neighborhood Pharmacy, 350, Yes, pay. It holds (over the $300 limit). iPhone B: Approve, Face ID. iPhone A shows "Paid". | Auth0 |
 | "Show me Nessie" | Freeze on iPhone B (one Nessie transfer to the vault). Or press Enter on `npm run demo:atm` (a real sandbox withdrawal). | Nessie |
 | "Show me the allowance" | iPhone B: Allowances shows "Utilities, up to $400, until Nov 30". iPhone A: Pay a bill, City Power & Light, 350, Yes, pay. It shows "Paid", with no hold and no push. Revoke the allowance and pay again: now it holds. | Auth0, Nessie |
-| "Show me the agent" | MacBook: press Enter on `npm run agent:bills -- --within 14`. It prints "Signed in as the bill-pay agent (scope: pay:bills)". Reload the dashboard: "Paid by the bill agent under your Utilities allowance". Only after a verified live run. | Auth0 |
+| "Show me the agent" | MacBook: press Enter on `npm run agent:bills -- --within 14`. It prints "Signed in as the bill-pay agent (scope: pay:bills)". Reload the dashboard: "Paid by the bill agent under your Utilities allowance". | Auth0 |
 | "Show me Tiger Data" | MacBook: the dashboard speed card, then the README "Tiger Data performance" table. | Tiger Data |
 | "Show me the bank alert" | During a call, with Check With Us open on iPhone A: iPhone B, Alerts, pull down. "At a bank (SwampHacks Demo Bank branch) while on a phone call." | Nessie |
 | "Show me the model" | MacBook: the README "Model evaluation" table. | AI/ML |
