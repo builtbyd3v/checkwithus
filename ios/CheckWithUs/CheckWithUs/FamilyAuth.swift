@@ -93,8 +93,9 @@ enum FamilyAuth {
             if (try? JSONDecoder().decode(ErrorBody.self, from: data))?.error == "invalid_grant" { throw Rejected() }
             throw API.Failure(message: "Sign-in failed. Please try again.")
         }
-        // Auth0 may rotate the refresh token; keep the old one (and the old ID token) when it does not send a new one.
-        return Tokens(access: body.access_token, refresh: body.refresh_token ?? old?.refresh, id: body.id_token ?? old?.id)
+        // Auth0 may rotate the refresh token; keep the old one when it does not send a new one. The ID token
+        // comes only from a real sign-in: a refresh must never look like a fresh sign-in to the server.
+        return Tokens(access: body.access_token, refresh: body.refresh_token ?? old?.refresh, id: old == nil ? body.id_token : old?.id)
     }
 
     private static func randomString() -> String {

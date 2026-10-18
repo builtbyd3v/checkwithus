@@ -221,6 +221,10 @@ struct PaymentDetailView: View {
                         LabeledContent("Blocked if no answer in") { Text(expires, style: .timer).monospacedDigit() }
                     }
                 }
+                // A held payment shows its error next to the buttons instead.
+                if payment.status != "held", let error = model.error {
+                    Text(error).foregroundStyle(Color.errorText)
+                }
             }
             .navigationTitle(payment.payee.name)
             .navigationBarTitleDisplayMode(.inline)
