@@ -9,6 +9,7 @@ struct RootView: View {
     var body: some View {
         if model.token != nil || role == "protected" {
             ContentView()
+                .fontDesign(.rounded)
                 // A bar above the page, not an overlay, so very large text never runs under it.
                 .safeAreaInset(edge: .top, spacing: 0) {
                     // Before pairing only: back to the first screen. Once paired there is no way out on this phone.
@@ -23,13 +24,14 @@ struct RootView: View {
                             .padding(.leading, 24)
                             Spacer()
                         }
-                        .background(.background)
+                        .background(Color.bg)
                     }
                 }
         } else if role == "family" {
             FamilyRootView()
         } else {
             RolePickerView()
+                .fontDesign(.rounded)
         }
     }
 }
@@ -45,9 +47,9 @@ struct RolePickerView: View {
                 .font(.title2)
         } action: {
             // Any role choice starts the family side signed out (see FamilyAuth.forget).
-            BigButton("I have a code from my family", symbol: "number.circle.fill") { FamilyAuth.forget(); role = "protected" }
+            BigButton("I have a code from my family", symbol: "number.circle.fill", sun: true) { FamilyAuth.forget(); role = "protected" }
                 .accessibilityInputLabels(["I have a code", "Code", "I have a code from my family"])
-            BigButton("I'm family: Sign in", symbol: "person.2.fill", prominent: false) { FamilyAuth.forget(); role = "family" }
+            BigButton("I'm family: Sign in", symbol: "person.2.fill") { FamilyAuth.forget(); role = "family" }
                 .accessibilityInputLabels(["Sign in", "I'm family", "Family"])
         }
     }

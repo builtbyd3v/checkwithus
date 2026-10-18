@@ -45,9 +45,18 @@ enum OutcomeText {
 
     static func color(_ outcome: String) -> Color {
         switch outcome {
-        case "waiting": .orange
-        case "sending", "sent": .green
-        default: .red
+        case "waiting": .pause
+        case "sending", "sent": .safe
+        default: .stop
+        }
+    }
+
+    /// The whole-page color behind each status, so the state shows as color, icon and words together.
+    static func field(_ outcome: String) -> Color {
+        switch outcome {
+        case "waiting": .pauseField
+        case "sending", "sent": .safeField
+        default: .stopField
         }
     }
 }

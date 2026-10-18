@@ -50,9 +50,9 @@ struct FamilySignInView: View {
                     .font(.system(size: 72))
                     .foregroundStyle(.tint)
                     .accessibilityHidden(true)
-                Text("Sign in to help your family").font(.title.bold())
+                Text("Sign in to help your family").font(.title.bold()).fontDesign(.serif)
                 Text("You will approve payments, see alerts and freeze money if something looks wrong.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.secondaryText)
                 if let error = model.error { Text(error).foregroundStyle(Color.errorText) }
                 // Very large text: only Sign in stays pinned.
                 if typeSize.isAccessibilitySize { SwitchRoleButton() }
@@ -67,6 +67,8 @@ struct FamilySignInView: View {
                     Text("Sign in").font(.headline).frame(maxWidth: .infinity, minHeight: 50)
                 }
                 .buttonStyle(.borderedProminent)
+                .tint(Color.action)
+                .buttonBorderShape(.capsule)
                 .disabled(model.busy)
                 if !typeSize.isAccessibilitySize { SwitchRoleButton() }
             }
@@ -93,7 +95,7 @@ struct JoinCircleView: View {
                 } footer: {
                     Text("Ask the person who set up Check With Us for the invite code on their dashboard.")
                 }
-                if let error = model.error { Text(error).foregroundStyle(.red) }
+                if let error = model.error { Text(error).foregroundStyle(Color.errorText) }
                 Button("Join") { Task { await model.join(code: code.trimmingCharacters(in: .whitespaces), name: name) } }
                     .disabled(model.busy || code.count < 8 || name.isEmpty)
                 Button("Sign out", role: .destructive) { model.signOut() }
@@ -115,8 +117,12 @@ struct HoldsView: View {
             List {
                 Section("Waiting for you") {
                     if model.held.isEmpty {
+                        // Her status card in her color: ink on yellow, 10.9:1.
                         Label("Nothing is waiting. \(model.protectedName) is safe.", systemImage: "checkmark.shield")
-                            .foregroundStyle(.secondary)
+                            .font(.title3).fontDesign(.serif)
+                            .foregroundStyle(Color.onSun)
+                            .padding(.vertical, 8)
+                            .listRowBackground(Color.sun)
                     }
                     ForEach(model.held) { PaymentRow(payment: $0) }
                 }
@@ -145,7 +151,7 @@ struct PaymentRow: View {
                     Text(payment.payee.name).font(.headline)
                     Text(payment.holdReasons.first?.label ?? payment.category.label)
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.secondaryText)
                         // Very large text: the whole reason, not "Gift card pur...".
                         .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
                 }
@@ -173,10 +179,11 @@ struct PaymentDetailView: View {
                         StatusBadge(status: payment.status)
                         Text(dollars(payment.amountCents))
                             .font(.system(size: 48, weight: .bold).monospacedDigit())
+                            .fontDesign(.serif)
                         Text("\(payment.protectedName) wants to pay \(payment.payee.name)")
                             .font(.title3)
                         Text(StatusWords.detail(payment))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.secondaryText)
                     }
                     .padding(.vertical, 6)
                 }
@@ -209,7 +216,7 @@ struct PaymentDetailView: View {
                     }
                 }
                 if let error = model.error {
-                    Text(error).foregroundStyle(.red)
+                    Text(error).foregroundStyle(Color.errorText)
                 }
             }
             .navigationTitle(payment.payee.name)
@@ -220,7 +227,7 @@ struct PaymentDetailView: View {
                         if (payment.approvalsRequired ?? 1) > 1 {
                             Text("This needs \(payment.approvalsRequired ?? 2) family approvals.")
                                 .font(.footnote)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.secondaryText)
                         }
                         // Very large text: stacked, so "Approve" and "Deny" are not broken mid-word.
                         let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 8)) : AnyLayout(HStackLayout(spacing: 12))
@@ -229,12 +236,14 @@ struct PaymentDetailView: View {
                                 Label("Deny", systemImage: "xmark").font(.headline).frame(maxWidth: .infinity, minHeight: 50)
                             }
                             .buttonStyle(.bordered)
-                            .tint(.red)
+                            .tint(Color.errorText)
+                            .buttonBorderShape(.capsule)
                             Button { Task { await model.decide(payment, approve: true) } } label: {
                                 Label("Approve", systemImage: "checkmark").font(.headline).frame(maxWidth: .infinity, minHeight: 50)
                             }
                             .buttonStyle(.borderedProminent)
-                            .tint(.green)
+                            .tint(Color.action)
+                            .buttonBorderShape(.capsule)
                         }
                         .disabled(model.busy)
                     }
@@ -253,12 +262,13 @@ struct StatusBadge: View {
     let status: String
 
     var body: some View {
-        // Dark text on a tinted capsule: colored caption text on its own tint is under 3:1.
+        // Ink on the status field color: colored caption text on its own tint is under 3:1.
         Text(StatusWords.label(status))
             .font(.caption.weight(.semibold))
+            .foregroundStyle(Color.ink)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(StatusWords.color(status).opacity(0.25), in: .capsule)
+            .background(StatusWords.color(status), in: .capsule)
     }
 }
 
@@ -276,10 +286,10 @@ enum StatusWords {
 
     static func color(_ status: String) -> Color {
         switch status {
-        case "held": .orange
-        case "approved", "paying", "paid": .green
-        case "expired": .gray
-        default: .red
+        case "held": .pauseField
+        case "approved", "paying", "paid": .safeField
+        case "expired": .surface
+        default: .stopField
         }
     }
 
@@ -314,14 +324,14 @@ struct AlertsView: View {
                     HStack(alignment: .top, spacing: 12) {
                         Image(systemName: AlertWords.symbol(alert.kind))
                             .font(.title2)
-                            .foregroundStyle(alert.kind == "bank_during_call" ? .red : .orange)
+                            .foregroundStyle(alert.kind == "bank_during_call" ? Color.stop : Color.pause)
                             .frame(width: 32)
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(AlertWords.title(alert.kind, name: alert.protectedName) ?? "").font(.headline)
                             if let detail = alert.detail { Text(detail).font(.subheadline) }
                             if let date = isoDate(alert.createdAt) {
-                                Text(date.formatted(.relative(presentation: .named))).font(.caption).foregroundStyle(.secondary)
+                                Text(date.formatted(.relative(presentation: .named))).font(.caption).foregroundStyle(Color.secondaryText)
                             }
                         }
                     }
@@ -364,14 +374,14 @@ struct MoneyView: View {
                 Section {
                     if let balance = model.balance {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Available").foregroundStyle(.secondary)
-                            Text(dollars(balance.availableCents)).font(.system(size: 44, weight: .bold).monospacedDigit())
+                            Text("Available").foregroundStyle(Color.secondaryText)
+                            Text(dollars(balance.availableCents)).font(.system(size: 44, weight: .bold).monospacedDigit()).fontDesign(.serif)
                         }
                         .padding(.vertical, 4)
                         LabeledContent("In the account", value: dollars(balance.ledgerBalanceCents))
                         LabeledContent("Set aside for approved payments", value: dollars(balance.reservedCents))
                     } else {
-                        Text("Loading balance").foregroundStyle(.secondary)
+                        Text("Loading balance").foregroundStyle(Color.secondaryText)
                     }
                 } header: {
                     Text("\(model.protectedName)'s account")
@@ -396,8 +406,8 @@ struct MoneyView: View {
                         }
                         .accessibilityInputLabels(["Freeze money now", "Freeze"])
                     }
-                    if let notice = model.notice { Text(notice).foregroundStyle(.secondary) }
-                    if let error = model.error { Text(error).foregroundStyle(.red) }
+                    if let notice = model.notice { Text(notice).foregroundStyle(Color.secondaryText) }
+                    if let error = model.error { Text(error).foregroundStyle(Color.errorText) }
                 } header: {
                     Text("Freeze")
                 } footer: {
@@ -435,14 +445,14 @@ struct AllowancesView: View {
             List {
                 Section {
                     if model.allowances.isEmpty {
-                        Text("None yet. Every risky payment asks you first.").foregroundStyle(.secondary)
+                        Text("None yet. Every risky payment asks you first.").foregroundStyle(Color.secondaryText)
                     }
                     ForEach(model.allowances) { allowance in
                         VStack(alignment: .leading, spacing: 2) {
                             Text("\(AllowanceWords.scope(allowance)) up to \(dollars(allowance.maxAmountCents))").font(.headline)
                             if let until = isoDate(allowance.expiresAt) {
                                 Text("Until \(until.formatted(date: .abbreviated, time: .omitted))")
-                                    .font(.subheadline).foregroundStyle(.secondary)
+                                    .font(.subheadline).foregroundStyle(Color.secondaryText)
                             }
                         }
                         .swipeActions {
@@ -452,7 +462,7 @@ struct AllowancesView: View {
                 } footer: {
                     Text("Inside an allowance, payments to people \(model.protectedName) has paid before go through without asking you. Gift cards, crypto, wires and payments during a call always ask. Swipe left to revoke.")
                 }
-                if let error = model.error { Text(error).foregroundStyle(.red) }
+                if let error = model.error { Text(error).foregroundStyle(Color.errorText) }
             }
             .navigationTitle("Allowances")
             .toolbar {
@@ -489,7 +499,7 @@ struct GrantAllowanceView: View {
                 DatePicker("Until", selection: $until, in: Date.now.addingTimeInterval(3600)...Date.now.addingTimeInterval(364 * 86400),
                            displayedComponents: .date)
                 Section {
-                    if let error = model.error { Text(error).foregroundStyle(.red) }
+                    if let error = model.error { Text(error).foregroundStyle(Color.errorText) }
                 } footer: {
                     Text("To keep this safe, you will sign in again before it is saved.").foregroundStyle(Color.secondaryText)
                 }
@@ -546,8 +556,8 @@ struct FamilySettingsView: View {
                     Section {
                         Button("Unpair \(model.protectedName)'s phone", role: .destructive) { confirmUnpair = true }
                             .accessibilityInputLabels(["Unpair \(model.protectedName)'s phone", "Unpair"])
-                        if let notice = model.notice { Text(notice).foregroundStyle(.secondary) }
-                        if let error = model.error { Text(error).foregroundStyle(.red) }
+                        if let notice = model.notice { Text(notice).foregroundStyle(Color.secondaryText) }
+                        if let error = model.error { Text(error).foregroundStyle(Color.errorText) }
                     } footer: {
                         Text("Only family can do this. \(model.protectedName)'s phone goes back to its first screen until you pair it again with a new code.")
                     }
@@ -573,7 +583,7 @@ struct FamilyStatus: View {
 
     var body: some View {
         if let error = model.error {
-            Label(error, systemImage: "wifi.exclamationmark").font(.footnote).foregroundStyle(.secondary)
+            Label(error, systemImage: "wifi.exclamationmark").font(.footnote).foregroundStyle(Color.secondaryText)
         }
     }
 }

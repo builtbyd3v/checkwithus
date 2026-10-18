@@ -11,7 +11,8 @@ import SwiftUI
         WindowGroup {
             RootView()
                 .environment(model)
-                .tint(Color.action)
+                // Purple as text everywhere; filled buttons set the brand fill themselves.
+                .tint(Color.link)
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { model.keepPollingInBackground() }
