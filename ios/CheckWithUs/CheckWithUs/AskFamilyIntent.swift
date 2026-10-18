@@ -21,6 +21,9 @@ struct AskFamilyIntent: AppIntent {
     }
 }
 
+// The Family test copy (BUNDLE_SUFFIX=.Family) registers no phrase: with both copies on one phone, Siri
+// picked the Family copy for "Ask my family in Check With Us", and that copy is never paired.
+#if !COPY_Family
 struct CheckWithUsShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
@@ -30,3 +33,4 @@ struct CheckWithUsShortcuts: AppShortcutsProvider {
             systemImageName: "person.2.fill")
     }
 }
+#endif
