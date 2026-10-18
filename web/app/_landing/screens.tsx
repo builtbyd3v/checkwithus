@@ -1,122 +1,116 @@
 import type { ReactNode } from 'react';
 
-// Fragments of the older adult's iPhone app, built in HTML (no device frame, no screenshots).
-// Plain components with no hooks, so both server and client components can render them.
+// Screens from the iPhone app, drawn in HTML at phone scale. The words match the app's own strings
+// (ios/CheckWithUs). Plain components with no hooks, so server and client components can both render them.
 
-type PhoneScreenProps = { children: ReactNode; dark?: boolean; className?: string };
+const ICONS = {
+  phone: 'M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2',
+  pause: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18M10 9v6M14 9v6',
+  stop: 'M8 3h8l5 5v8l-5 5H8l-5-5V8zM8.5 12h7',
+  tray: 'M3 13l3-8h12l3 8v6H3zM3 13h5l1 2h6l1-2h5',
+  check: 'M5 12.5l4.5 4.5L19 7.5',
+  arrow: 'M5 12h14M13 6l6 6-6 6',
+} as const;
+export type IconName = keyof typeof ICONS;
 
-/** `className` replaces the default height, so pass one (for example h-[400px]) when overriding. */
-export function PhoneScreen({ children, dark = false, className = 'h-[600px]' }: PhoneScreenProps) {
+export function Icon({ name, className = 'size-[1.25em]' }: { name: IconName; className?: string }) {
   return (
-    <div
-      data-ui
-      className={`flex w-[340px] max-w-full flex-col rounded-[44px] px-7 pt-5 pb-8 font-sans ${dark ? 'bg-ink text-paper' : 'bg-screen text-ink'} ${className}`}
-    >
-      <div className="flex justify-between text-[15px] font-semibold">
-        <span>9:41</span>
-        <span>checkwith.us</span>
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={`shrink-0 ${className}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d={ICONS[name]} />
+    </svg>
+  );
+}
+
+export function Logo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 100 100" aria-hidden="true" className={className}>
+      <circle cx="20" cy="44" r="9.5" fill="#FBC02D" />
+      <path d="M18 63 L42 93" stroke="#FBC02D" strokeWidth="17" />
+      <circle cx="18" cy="63" r="8.5" fill="#FBC02D" />
+      <circle cx="78" cy="14" r="10.5" fill="#A62FEA" />
+      <path d="M84 37 L52 81" stroke="#A62FEA" strokeWidth="21" />
+      <circle cx="84" cy="37" r="10.5" fill="#A62FEA" />
+    </svg>
+  );
+}
+
+type PhoneProps = { label: string; children: ReactNode; className?: string };
+
+/**
+ * A 390 x 844 iPhone, sized in em: set the font size with `className` to scale it (1em = 16pt at 16px).
+ * It is one image to assistive tech, described by `label`.
+ */
+export function Phone({ label, children, className = 'text-[10px]' }: PhoneProps) {
+  return (
+    <div role="img" aria-label={label} className={`relative h-[52.75em] w-[24.375em] shrink-0 rounded-[3.375em] bg-[#0d0b11] p-[0.7em] shadow-[0_0_0_0.14em_#2c2733,0_2.2em_4em_-1.6em_rgb(30_10_50/0.5)] ${className}`}>
+      <div className="relative flex h-full flex-col gap-[1em] overflow-hidden rounded-[2.7em] bg-card px-[1.5em] pt-[4.6em] pb-[1.75em] text-left leading-[1.25] text-foreground [font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif]">
+        <span className="absolute top-[0.7em] left-1/2 h-[2.3em] w-[7.8em] -translate-x-1/2 rounded-[1.2em] bg-black" />
+        <span className="absolute top-[1.2em] left-[2.4em] text-[1.05em] font-semibold tabular-nums">9:41</span>
+        {children}
       </div>
-      {children}
     </div>
   );
 }
 
-function AskButton() {
+const TONES = {
+  safe: 'bg-safe-field text-safe',
+  pause: 'bg-pause-field text-pause',
+  stop: 'bg-stop-field text-stop',
+} as const;
+
+function Disk({ tone, icon }: { tone: keyof typeof TONES; icon: IconName }) {
   return (
-    <span className="mt-auto flex h-16 shrink-0 items-center justify-center rounded-full bg-sage text-xl font-semibold text-white">
-      Ask my family
+    <span className={`mt-[1em] grid size-[4.6em] shrink-0 place-items-center rounded-full ${TONES[tone]}`}>
+      <Icon name={icon} className="size-[2.4em]" />
     </span>
   );
 }
 
-export function SafeScreen() {
+const title = 'text-[2.125em] leading-[1.08] font-extrabold tracking-[-0.01em]';
+const body = 'text-[1.375em] leading-[1.3]';
+
+function Button({ alt = false, icon, children }: { alt?: boolean; icon?: IconName; children: ReactNode }) {
   return (
-    <PhoneScreen>
-      <span aria-hidden="true" className="mt-12 flex size-16 items-center justify-center rounded-full bg-sage text-white">
-        <svg viewBox="0 0 24 24" className="size-8" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
-      </span>
-      <p className="mt-6 text-[44px] leading-none font-semibold tracking-tight">You&rsquo;re safe.</p>
-      <p className="mt-4 text-xl leading-snug">Nothing is waiting for you. Your family is here if you need them.</p>
-      <AskButton />
-    </PhoneScreen>
+    <span className={`flex min-h-[2.95em] shrink-0 items-center justify-center gap-[0.4em] rounded-[0.8em] text-[1.375em] font-bold ${alt ? 'bg-foreground/10' : 'bg-action text-white'}`}>
+      {icon && <Icon name={icon} />}
+      {children}
+    </span>
   );
 }
 
-const MESSAGES = [
-  { from: 'Sarah', text: 'Dinner on Sunday? I will bring the pie.', at: '9:12' },
-  { from: 'Pharmacy', text: 'Your prescription is ready for pickup.', at: '8:40' },
-  { from: 'Dr. Lee’s office', text: 'Reminder: checkup on Tuesday at 10 AM.', at: 'Mon' },
-];
+const Grow = () => <span className="flex-1" />;
+const AskButton = () => <Button icon="phone">Ask my family</Button>;
 
-export function TextsScreen() {
+export function AskScreen({ className }: { className?: string }) {
   return (
-    <PhoneScreen>
-      <p className="mt-8 text-[34px] leading-none font-semibold tracking-tight">Messages</p>
-      <ul className="mt-6 space-y-5">
-        {MESSAGES.map((m) => (
-          <li key={m.from} className="flex gap-3">
-            <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-field text-lg font-semibold">{m.from[0]}</span>
-            <span className="min-w-0">
-              <span className="flex justify-between gap-2 text-lg font-semibold">{m.from}<span className="text-[15px] font-normal text-soft">{m.at}</span></span>
-              <span className="block text-[17px] leading-snug text-soft">{m.text}</span>
-            </span>
-          </li>
-        ))}
-      </ul>
-      <p className="mt-auto rounded-3xl bg-panel px-5 py-4 text-[17px] leading-snug">
-        2 scam texts went to Junk. They were checked on this iPhone.
+    <Phone className={className} label="Their iPhone: Pay $500 to Gift card store? You are on a phone call. We will ask your family first. Buttons: Yes, pay. No, go back.">
+      <Disk tone="pause" icon="phone" />
+      <p className={title}>Pay $500 to Gift card store?</p>
+      <p className={body}>You are on a phone call. We will ask your family first.</p>
+      <Grow />
+      <Button>Yes, pay</Button>
+      <Button alt>No, go back</Button>
+    </Phone>
+  );
+}
+
+type PaymentScreenProps = { held: boolean; amount: string; payee: string; className?: string };
+
+/** Their screen right after a payment in the "Try a payment" widget: paused for the family, or paid. */
+export function PaymentScreen({ held, amount, payee, className }: PaymentScreenProps) {
+  const head = held ? 'Paused, waiting for family' : 'Paid';
+  const detail = held ? 'Your money is safe. Your family will call you.' : 'Sent. It did not need an OK.';
+  return (
+    <Phone className={className} label={`Their iPhone: ${head}. ${detail} ${amount} to ${payee}.`}>
+      <Disk tone={held ? 'pause' : 'safe'} icon={held ? 'pause' : 'check'} />
+      <p className={title}>{head}</p>
+      <p className={body}>{detail}</p>
+      <p className="rounded-[1em] bg-foreground/6 px-[1em] py-[0.9em] text-[1.25em] leading-snug">
+        <b className="block text-[1.4em] tabular-nums">{amount}</b>
+        to {payee}
       </p>
-    </PhoneScreen>
+      <Grow />
+      {held ? <AskButton /> : <Button alt>OK</Button>}
+    </Phone>
   );
 }
-
-export function CallScreen() {
-  return (
-    <PhoneScreen dark>
-      <p className="mt-16 text-center text-lg text-paper/80">+1 (202) 555-0148</p>
-      <p className="mt-2 text-center text-[44px] leading-none font-semibold tracking-tight">Possible scam</p>
-      <p className="mt-4 text-center text-lg text-paper/80">This number is on a scam list.</p>
-      <div className="mt-auto flex justify-between px-4 text-center text-[15px]">
-        <span>
-          <span className="mb-2 flex size-[72px] items-center justify-center rounded-full bg-decline text-white">
-            <svg viewBox="0 0 24 24" className="size-8 rotate-[135deg]" fill="currentColor" aria-hidden="true"><path d="M6.6 10.8a15 15 0 006.6 6.6l2.2-2.2a1 1 0 011-.25 11.4 11.4 0 003.6.57 1 1 0 011 1V20a1 1 0 01-1 1A17 17 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1c0 1.25.2 2.45.57 3.57a1 1 0 01-.25 1z" /></svg>
-          </span>
-          Decline
-        </span>
-        <span>
-          <span className="mb-2 flex size-[72px] items-center justify-center rounded-full bg-answer text-white">
-            <svg viewBox="0 0 24 24" className="size-8" fill="currentColor" aria-hidden="true"><path d="M6.6 10.8a15 15 0 006.6 6.6l2.2-2.2a1 1 0 011-.25 11.4 11.4 0 003.6.57 1 1 0 011 1V20a1 1 0 01-1 1A17 17 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1c0 1.25.2 2.45.57 3.57a1 1 0 01-.25 1z" /></svg>
-          </span>
-          Answer
-        </span>
-      </div>
-    </PhoneScreen>
-  );
-}
-
-type PaymentScreenProps = { held: boolean; amount: string; payee: string; reasons: string[]; className?: string };
-
-/** The older adult's screen after a payment: paid, or paused for the family. */
-export function PaymentScreen({ held, amount, payee, reasons, className }: PaymentScreenProps) {
-  return (
-    <PhoneScreen className={className}>
-      <p className="mt-12 text-[44px] leading-none font-semibold tracking-tight">{held ? 'Paused.' : 'Paid.'}</p>
-      <p className="mt-4 text-xl leading-snug">{held ? 'Your family will call you soon.' : 'This one went through as usual.'}</p>
-      <div className="mt-8 rounded-3xl bg-panel px-5 py-4">
-        <p className="text-[32px] leading-none font-semibold tracking-tight">{amount}</p>
-        <p className="mt-2 text-lg">{payee}</p>
-        {held && <p className="mt-2 text-[17px] leading-snug text-soft">{reasons[0]}{reasons.length > 1 ? ` and ${reasons.length - 1} more` : ''}</p>}
-      </div>
-      {held ? <AskButton /> : <span className="mt-auto text-center text-lg text-soft">You&rsquo;re safe.</span>}
-    </PhoneScreen>
-  );
-}
-
-/** One screen per story step: the hero, then each block in "What your parent sees". */
-export const SCREENS = [
-  <SafeScreen key="safe" />,
-  <TextsScreen key="texts" />,
-  <CallScreen key="call" />,
-  <PaymentScreen key="paused" held amount="$500.00" payee="Gift cards" reasons={['Gift card purchase', 'Paid while on a phone call']} />,
-  <SafeScreen key="safe-again" />,
-];

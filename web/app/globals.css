@@ -16,6 +16,10 @@
   --brand-pause-field: #fdedd6;
   --brand-stop: #b3261e;
   --brand-stop-field: #fce6e3;
+  /* Landing page (app/page.tsx): soft lane tints, yellow for the older adult, lilac for the family. */
+  --brand-lane-them: #fff3d0;
+  --brand-lane-family: #f4eef9;
+  --brand-rule: #bfaad6;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -33,6 +37,9 @@
     --brand-pause-field: #2c1c08;
     --brand-stop: #ff9c93;
     --brand-stop-field: #33130f;
+    --brand-lane-them: #2a2111;
+    --brand-lane-family: #1d1528;
+    --brand-rule: #56446e;
   }
 }
 
@@ -52,6 +59,10 @@
   --color-stop-field: var(--brand-stop-field);
   --color-sun: #fbc02d;
   --color-on-sun: #1b1420;
+  --color-lane-them: var(--brand-lane-them);
+  --color-lane-family: var(--brand-lane-family);
+  --color-rule: var(--brand-rule);
+  --font-print: var(--font-atkinson);
   --font-sans: var(--font-figtree);
   --font-heading: var(--font-gabarito);
   --font-mono: var(--font-geist-mono);
@@ -61,49 +72,6 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-figtree), system-ui, -apple-system, sans-serif;
-}
-
-/* Landing page tokens (app/page.tsx). Three stones palette, sage accent. */
-@theme {
-  --color-paper: #eeecea;
-  --color-panel: #e4e1dd;
-  --color-field: #cdc3b6;
-  --color-ink: #2e2d2c;
-  --color-soft: #5e5a56;
-  --color-sage: #56654e;
-  --color-sage-deep: #45523f;
-  --color-screen: #fbfaf8;
-  --color-decline: #c4352b;
-  --color-answer: #3a7d44;
-}
-
-@theme inline {
-  --font-display: var(--font-newsreader);
-}
-
-@keyframes rise {
-  from { opacity: 0; transform: translateY(24px); }
-  to { opacity: 1; transform: none; }
-}
-
-/* Entrance tied to scroll. Browsers without view timelines, and reduced motion, show content as is. */
-@utility rise {
-  @media (prefers-reduced-motion: no-preference) {
-    @supports (animation-timeline: view()) {
-      animation: rise linear both;
-      animation-timeline: view();
-      animation-range: entry 0% entry 70%;
-    }
-  }
-}
-@utility rise-late {
-  @media (prefers-reduced-motion: no-preference) {
-    @supports (animation-timeline: view()) {
-      animation: rise linear both;
-      animation-timeline: view();
-      animation-range: entry 15% entry 90%;
-    }
-  }
 }
 
 /* Family workspace tokens from the supplied DESIGN.md. */
