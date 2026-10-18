@@ -1,20 +1,15 @@
 import type { ReactNode } from 'react';
-import { HOLD_REASON_LABELS } from '@/lib/rules';
 
 // Screens from the iPhone app, drawn in HTML at phone scale. The words match the app's own strings
 // (ios/CheckWithUs). Plain components with no hooks, so server and client components can both render them.
 
 const ICONS = {
-  shield: 'M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6zM8.5 12l2.5 2.5 4.5-5',
   phone: 'M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2',
   pause: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18M10 9v6M14 9v6',
   stop: 'M8 3h8l5 5v8l-5 5H8l-5-5V8zM8.5 12h7',
   tray: 'M3 13l3-8h12l3 8v6H3zM3 13h5l1 2h6l1-2h5',
   check: 'M5 12.5l4.5 4.5L19 7.5',
   arrow: 'M5 12h14M13 6l6 6-6 6',
-  gift: 'M3 8h18v4H3zM5 12h14v9H5zM12 8v13M12 8c-2-4-6-4-5.5-1.5S12 8 12 8s5-.5 5.5-1.5S14 4 12 8',
-  person: 'M9 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8M2 21c0-4 3-6.5 7-6.5s7 2.5 7 6.5M19 8v6M16 11h6',
-  trend: 'M3 17l6-6 4 4 8-8M15 7h6v6',
 } as const;
 export type IconName = keyof typeof ICONS;
 
@@ -73,7 +68,6 @@ function Disk({ tone, icon }: { tone: keyof typeof TONES; icon: IconName }) {
 
 const title = 'text-[2.125em] leading-[1.08] font-extrabold tracking-[-0.01em]';
 const body = 'text-[1.375em] leading-[1.3]';
-const small = 'text-[1em] text-muted';
 
 function Button({ alt = false, icon, children }: { alt?: boolean; icon?: IconName; children: ReactNode }) {
   return (
@@ -87,19 +81,6 @@ function Button({ alt = false, icon, children }: { alt?: boolean; icon?: IconNam
 const Grow = () => <span className="flex-1" />;
 const AskButton = () => <Button icon="phone">Ask my family</Button>;
 
-export function SafeScreen({ className }: { className?: string }) {
-  return (
-    <Phone className={className} label="Their iPhone home screen: You're safe. Your family is looking out for you. Buttons: Pay a bill, Ask my family.">
-      <Disk tone="safe" icon="shield" />
-      <p className={title}>You&rsquo;re safe</p>
-      <p className={body}>Your family is looking out for you.</p>
-      <Grow />
-      <Button alt>Pay a bill</Button>
-      <AskButton />
-    </Phone>
-  );
-}
-
 export function AskScreen({ className }: { className?: string }) {
   return (
     <Phone className={className} label="Their iPhone: Pay $500 to Gift card store? You are on a phone call. We will ask your family first. Buttons: Yes, pay. No, go back.">
@@ -109,62 +90,6 @@ export function AskScreen({ className }: { className?: string }) {
       <Grow />
       <Button>Yes, pay</Button>
       <Button alt>No, go back</Button>
-    </Phone>
-  );
-}
-
-export function PausedScreen({ className }: { className?: string }) {
-  return (
-    <Phone className={className} label="Their iPhone: Paused, waiting for family. Your money is safe. Your family will call you.">
-      <Disk tone="pause" icon="pause" />
-      <p className={title}>Paused, waiting for family</p>
-      <p className={body}>Your money is safe. Your family will call you.</p>
-      <Grow />
-      <AskButton />
-    </Phone>
-  );
-}
-
-export function StoppedScreen({ className }: { className?: string }) {
-  return (
-    <Phone className={className} label="Their iPhone: Stopped. Your family said no. Your money is safe. Nothing was sent.">
-      <Disk tone="stop" icon="stop" />
-      <p className={title}>Stopped. Your family said no.</p>
-      <p className={body}>Your money is safe. Nothing was sent.</p>
-      <Grow />
-      <AskButton />
-    </Phone>
-  );
-}
-
-// The reasons the real rules give a $500 gift card at a new store, paid during a call.
-const APPROVE_REASONS: { icon: IconName; text: string }[] = [
-  { icon: 'gift', text: HOLD_REASON_LABELS.gift_card },
-  { icon: 'person', text: HOLD_REASON_LABELS.new_payee },
-  { icon: 'trend', text: HOLD_REASON_LABELS.over_limit },
-  { icon: 'phone', text: HOLD_REASON_LABELS.during_call },
-];
-
-export function ApproveScreen({ className }: { className?: string }) {
-  return (
-    <Phone className={className} label={`Your iPhone, family app: Approve $500.00 to Gift card store? Why we paused it: ${APPROVE_REASONS.map((r) => r.text).join('. ')}. No answer means no payment. Buttons: Deny, Approve.`}>
-      <p className={small}>Approvals</p>
-      <p className="text-[1.6em] leading-[1.15] font-extrabold">Approve $500.00 to Gift card store?</p>
-      <p className={small}>Why we paused it</p>
-      <ul className="-mt-[0.5em]">
-        {APPROVE_REASONS.map((r) => (
-          <li key={r.icon} className="flex items-center gap-[0.6em] border-t border-foreground/12 py-[0.7em] text-[1.1em]">
-            <Icon name={r.icon} />
-            {r.text}
-          </li>
-        ))}
-      </ul>
-      <Grow />
-      <p className={small}>No answer means no payment.</p>
-      <div className="grid grid-cols-2 gap-[0.6em] text-[0.88em]">
-        <Button alt>Deny</Button>
-        <Button>Approve</Button>
-      </div>
     </Phone>
   );
 }

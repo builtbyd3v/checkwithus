@@ -103,23 +103,23 @@ export function Tryout() {
 
         <div className="flex flex-col items-center gap-8 sm:flex-row sm:items-start lg:flex-col lg:items-stretch xl:flex-row xl:items-start">
           <PaymentScreen held={held} amount={money} payee={kind.payee} className="self-center text-[10px] sm:text-[11px] lg:self-auto" />
-          <div className="w-full max-w-[24rem] rounded-2xl bg-band p-6 text-white sm:p-7">
-            <p className="text-xl font-bold text-white/85">In your family app</p>
+          <div className="w-full max-w-[24rem] rounded-2xl bg-lane-family p-6 sm:p-7">
+            <p className="text-xl font-bold text-muted">In your family app</p>
             <div aria-live="polite">
               {held ? (
                 <>
                   <p className="mt-3 text-2xl leading-snug font-extrabold">Approve {money} to {kind.payee}?</p>
                   <ul className="mt-4 text-xl leading-snug">
                     {reasons.map((r) => (
-                      <li key={r} className="flex gap-3 border-t-2 border-white/25 py-3"><Icon name="pause" className="mt-0.5 size-6" />{r}</li>
+                      <li key={r} className="flex gap-3 border-t-2 border-rule py-3"><Icon name="pause" className="mt-0.5 size-6 text-pause" />{r}</li>
                     ))}
                   </ul>
-                  <p className="mt-3 text-xl leading-snug text-white/85">{amount > TWO_APPROVALS_OVER ? 'Over $1,000, two people must say yes. One no stops it.' : 'One person in the family can decide.'} No answer means no payment.</p>
+                  <p className="mt-3 text-xl leading-snug text-muted">{amount > TWO_APPROVALS_OVER ? 'Over $1,000, two people must say yes. One no stops it.' : 'One person in the family can decide.'} No answer means no payment.</p>
                 </>
               ) : (
                 <>
                   <p className="mt-3 text-2xl leading-snug font-extrabold">Nothing to approve. It paid.</p>
-                  <p className="mt-4 text-xl leading-snug text-white/85">No rule fired, so nothing waits for you. It shows in their spending history.</p>
+                  <p className="mt-4 text-xl leading-snug text-muted">No rule fired, so nothing waits for you. It shows in their spending history.</p>
                 </>
               )}
             </div>

@@ -16,12 +16,10 @@
   --brand-pause-field: #fdedd6;
   --brand-stop: #b3261e;
   --brand-stop-field: #fce6e3;
-  /* Landing page (app/page.tsx): the yellow hero is a fill; its text and button stay dark. */
-  --brand-hero: #fbc02d;
-  --brand-on-hero: #1b1420;
-  --brand-hero-button: #1b1420;
-  --brand-on-hero-button: #ffffff;
-  --brand-band: #5e1690;
+  /* Landing page (app/page.tsx): soft lane tints, yellow for the older adult, lilac for the family. */
+  --brand-lane-them: #fff3d0;
+  --brand-lane-family: #f4eef9;
+  --brand-rule: #bfaad6;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -39,11 +37,9 @@
     --brand-pause-field: #2c1c08;
     --brand-stop: #ff9c93;
     --brand-stop-field: #33130f;
-    --brand-hero: #211906;
-    --brand-on-hero: #f7f3f9;
-    --brand-hero-button: #fbc02d;
-    --brand-on-hero-button: #1b1420;
-    --brand-band: #33104f;
+    --brand-lane-them: #2a2111;
+    --brand-lane-family: #1d1528;
+    --brand-rule: #56446e;
   }
 }
 
@@ -63,11 +59,9 @@
   --color-stop-field: var(--brand-stop-field);
   --color-sun: #fbc02d;
   --color-on-sun: #1b1420;
-  --color-hero: var(--brand-hero);
-  --color-on-hero: var(--brand-on-hero);
-  --color-hero-button: var(--brand-hero-button);
-  --color-on-hero-button: var(--brand-on-hero-button);
-  --color-band: var(--brand-band);
+  --color-lane-them: var(--brand-lane-them);
+  --color-lane-family: var(--brand-lane-family);
+  --color-rule: var(--brand-rule);
   --font-print: var(--font-atkinson);
   --font-sans: var(--font-figtree);
   --font-heading: var(--font-gabarito);
