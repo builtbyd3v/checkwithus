@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
-import { addPayeeAction, decideAction, freezeAction, inviteAction, joinAction, pairingAction, saveSettingsAction, unfreezeAction, type FormState } from './actions';
+import { addPayeeAction, decideAction, freezeAction, inviteAction, joinAction, pairingAction, saveSettingsAction, unfreezeAction, unpairAction, type FormState } from './actions';
 
 import { DecisionForm } from './decision-ui';
 
@@ -65,6 +65,7 @@ export function SettingsForms({ circleId, holdDollars }: { circleId: string; hol
   const [payee, addPayee, payeePending] = useActionState(addPayeeAction, initial);
   const [invite, makeInvite, invitePending] = useActionState(inviteAction, initial);
   const [pairing, makePairing, pairingPending] = useActionState(pairingAction, initial);
+  const [unpair, unpairNow, unpairPending] = useActionState(unpairAction, initial);
   return <div className="grid gap-6 lg:grid-cols-2">
     <section className="rounded-xl border border-family-line bg-white p-5">
       <h3 className="text-lg font-semibold">Payment hold limit</h3>
@@ -105,6 +106,9 @@ export function SettingsForms({ circleId, holdDollars }: { circleId: string; hol
         <button disabled={pairingPending} className={buttonClass}>Create pairing code</button></form>
       <Feedback state={pairing} />
       {pairing.code && <p className="mt-3 rounded-lg bg-teal-50 p-3 font-mono text-xl tracking-wider text-family-ink">{pairing.code}</p>}
+      <form action={unpairNow} onSubmit={(event) => { if (!confirm('Unpair their phone? It stops checking payments until you pair it again.')) event.preventDefault(); }} className="mt-4"><input type="hidden" name="circleId" value={circleId} />
+        <button disabled={unpairPending} className={buttonClass}>Unpair their phone</button></form>
+      <Feedback state={unpair} />
     </section>
   </div>;
 }

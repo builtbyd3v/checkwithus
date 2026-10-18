@@ -6,7 +6,7 @@
  */
 import 'server-only';
 import type pg from 'pg';
-import { transaction } from '@/lib/db';
+import { transaction, type Queryable } from '@/lib/db';
 import { PAIRING_CODE_MINUTES } from '@/lib/auth/device';
 import { hashShortCode, newShortCode, normalizeShortCode } from '@/lib/auth/tokens';
 import { codeHashKey } from '@/lib/env';
@@ -15,7 +15,7 @@ import { issueInviteCode } from '@/lib/invites';
 export { issueInviteCode } from '@/lib/invites';
 import type { PaymentService } from '@/lib/payments';
 import { familyPaymentView } from '@/lib/views';
-import { requirePermission } from '@/lib/permissions';
+import { requireFreshLogin, requirePermission } from '@/lib/permissions';
 
 export type Membership = {
   circleId: string;
@@ -150,6 +150,21 @@ export async function createPairingCode(pool: pg.Pool, sub: string, circleId: st
     [hashShortCode(code, codeHashKey()), circleId, PAIRING_CODE_MINUTES],
   );
   return { code, expiresAt: rows[0]!.expires_at.toISOString() };
+}
+
+/**
+ * Releases the older adult's phone. Only an approver can, after a fresh sign-in: a scammer
+ * who talks her into it has nothing to tap. Her phone's next request gets 401 and the app
+ * goes back to its first screen.
+ */
+export async function unpairDevices(q: Queryable, sub: string, authTime: unknown, circleId: string) {
+  await requirePermission(q, sub, circleId, 'approve:payments');
+  requireFreshLogin(authTime);
+  const { rows } = await q.query(
+    'update devices set revoked_at = now() where circle_id = $1 and revoked_at is null returning id',
+    [circleId],
+  );
+  return { unpaired: rows.length };
 }
 
 /** A fresh invite code for the circle; the old one stops working. */
