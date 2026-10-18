@@ -12,7 +12,7 @@ import { FreezeScene } from "./scenes/FreezeScene";
 const WIPE = 9;
 
 /** New scene slides in from the right with a purple leading edge, over the old one. */
-const SlideIn = ({ children }: { children: ReactNode }) => {
+export const SlideIn = ({ children }: { children: ReactNode }) => {
   const f = useCurrentFrame();
   const x = interpolate(f, [0, WIPE], [960, 0], { extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
   return (

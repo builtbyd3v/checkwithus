@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CheckWith.us Expo Player</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; font-family: system-ui, sans-serif; color: #fff; }
+  body.live:not(.panel) { cursor: none; }
+  #stage { position: absolute; inset: 0; margin: auto; width: min(100vw, calc(100vh * 16 / 9)); aspect-ratio: 16 / 9; background: #000; }
+  #main { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; }
+  body.live #main { opacity: 1; }
+  #camwrap { position: absolute; overflow: hidden; background: #000; opacity: 0; transition: opacity 200ms; pointer-events: none; }
+  #camwrap.on { opacity: 1; }
+  #cam { width: 100%; height: 100%; object-fit: cover; }
+  #cam.contain { object-fit: contain; }
+  #cam.mirror { transform: scaleX(-1); }
+  #start { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.2em; font-size: clamp(16px, 2.4vw, 40px); }
+  #start small { font-size: 0.5em; opacity: 0.5; }
+  body.live #start { display: none; }
+  #hint { position: absolute; right: 1.2%; bottom: 1.2%; font-size: clamp(9px, 0.8vw, 14px); color: rgba(255,255,255,0.25); display: none; }
+  #hint.on { display: block; }
+  #panel { position: fixed; top: 16px; left: 16px; z-index: 9; background: rgba(20,20,20,0.92); border: 1px solid #444; border-radius: 8px; padding: 14px; font-size: 14px; display: none; flex-direction: column; gap: 10px; min-width: 260px; }
+  body.panel #panel { display: flex; }
+  #panel select { max-width: 320px; font-size: 14px; }
+  #panel .msg { opacity: 0.6; font-size: 12px; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <video id="main" preload="auto" playsinline></video>
+  <audio id="music" preload="auto"></audio>
+  <div id="camwrap"><video id="cam" muted playsinline autoplay></video></div>
+  <div id="start"><div id="startmsg">Click or press Space to start</div><small>C: camera settings</small></div>
+  <div id="hint">Space to continue</div>
+</div>
+<div id="panel">
+  <strong>Camera (C to close)</strong>
+  <select id="dev"></select>
+  <label><input type="checkbox" id="mirror"> Mirror</label>
+  <label><input type="checkbox" id="zoom" checked> Zoom (fill rect)</label>
+  <div class="msg" id="cammsg"></div>
+</div>
+<script>
+(async () => {
+  const $ = (id) => document.getElementById(id);
+  const main = $("main"), cam = $("cam"), camwrap = $("camwrap"), hint = $("hint");
+  const q = new URLSearchParams(location.search);
+  const plain = q.get("plain") === "1";
+  // Live mode: video has sound effects only, music runs on its own so holds can loop without it.
+  const videoUrl = q.get("src") || (plain ? "../out/judge-45s.mp4" : "../out/judge-45s-live.mp4");
+  const musicUrl = plain ? "" : "../public/audio/music-j45.mp3";
+  const music = $("music");
+  const MUSIC_VOL = 0.45;
+  music.volume = MUSIC_VOL;
+  let fade;
+  const musicPlay = () => { if (music.src) music.play().catch(() => {}); };
+  main.addEventListener("ended", () => {
+    clearInterval(fade);
+    fade = setInterval(() => {
+      music.volume = Math.max(0, music.volume - MUSIC_VOL / 20);
+      if (music.volume === 0) { clearInterval(fade); music.pause(); }
+    }, 50);
+  });
+
+  // Settings, remembered per browser. ponytail: localStorage is enough for one expo laptop.
+  const KEY = "cwu-player";
+  let prefs = { deviceId: "", mirror: false, zoom: true };
+  try { prefs = { ...prefs, ...JSON.parse(localStorage.getItem(KEY) || "{}") }; } catch {}
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch {} };
+  const applyLook = () => { cam.classList.toggle("mirror", prefs.mirror); cam.classList.toggle("contain", !prefs.zoom); };
+  $("mirror").checked = prefs.mirror; $("zoom").checked = prefs.zoom; applyLook();
+
+  // Cues.
+  let cues;
+  try { cues = await (await fetch("cues.json", { cache: "no-store" })).json(); }
+  catch { $("startmsg").textContent = "cues.json missing: run npm run player"; return; }
+  const holds = plain ? [] : cues.holds;
+  const fps = cues.fps || 30;
+  const r = cues.cam;
+  Object.assign(camwrap.style, { left: r.x * 100 + "%", top: r.y * 100 + "%", width: r.w * 100 + "%", height: r.h * 100 + "%" });
+
+  // Camera. Never blocks playback: on failure the rect just stays black.
+  let stream;
+  async function startCam() {
+    if (stream) stream.getTracks().forEach((t) => t.stop());
+    stream = null; cam.srcObject = null;
+    try {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: prefs.deviceId ? { deviceId: { exact: prefs.deviceId }, width: 1920, height: 1080 } : { width: 1920, height: 1080 } });
+      } catch (e) {
+        if (!prefs.deviceId) throw e;
+        stream = await navigator.mediaDevices.getUserMedia({ video: true }); // saved camera gone: any camera
+      }
+      cam.srcObject = stream;
+      $("cammsg").textContent = stream.getVideoTracks()[0]?.label || "";
+    } catch (e) {
+      $("cammsg").textContent = "Camera off: " + (e.name || e);
+    }
+    listDevices();
+  }
+  async function listDevices() {
+    try {
+      const devs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "videoinput");
+      const cur = stream?.getVideoTracks()[0]?.getSettings().deviceId || prefs.deviceId;
+      $("dev").innerHTML = "";
+      devs.forEach((d, i) => $("dev").add(new Option(d.label || "Camera " + (i + 1), d.deviceId, false, d.deviceId === cur)));
+    } catch {}
+  }
+  $("dev").onchange = (e) => { prefs.deviceId = e.target.value; save(); e.target.blur(); startCam(); };
+  $("mirror").onchange = (e) => { prefs.mirror = e.target.checked; save(); applyLook(); e.target.blur(); };
+  $("zoom").onchange = (e) => { prefs.zoom = e.target.checked; save(); applyLook(); e.target.blur(); };
+  navigator.mediaDevices?.addEventListener?.("devicechange", listDevices);
+  startCam();
+
+  // Load media into memory: python http.server has no Range support, so streamed mp4s cannot seek.
+  // ponytail: blob URLs also mean no network stall at a hold loop point.
+  const load = async (el, url) => {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(res.status + " " + url);
+    el.src = URL.createObjectURL(await res.blob());
+  };
+  $("startmsg").textContent = "Loading video...";
+  const [ok] = await Promise.all([
+    load(main, videoUrl).then(() => true, () => false),
+    musicUrl ? load(music, musicUrl).catch(() => {}) : null, // missing music: play on without it
+  ]);
+  if (!ok) { $("startmsg").textContent = "Video failed to load: " + videoUrl; return; }
+  $("startmsg").textContent = "Click or press Space to start";
+
+  // Playback and holds.
+  let started = false, active = -1;
+  const done = new Set();
+  function check(t) {
+    camwrap.classList.toggle("on", t >= cues.camera.start && t < cues.camera.end);
+    if (active < 0) active = holds.findIndex((h, i) => !done.has(i) && t >= h.start);
+    if (active >= 0) {
+      const h = holds[active];
+      // Loop once the last frame of the hold is on screen (or we overshot).
+      if (t >= h.end - 1.5 / fps) main.currentTime = h.start;
+    }
+    hint.classList.toggle("on", active >= 0);
+  }
+  const raf = () => { check(main.currentTime); requestAnimationFrame(raf); };
+  requestAnimationFrame(raf);
+  if (main.requestVideoFrameCallback) {
+    const vfc = (_, m) => { check(m.mediaTime); main.requestVideoFrameCallback(vfc); };
+    main.requestVideoFrameCallback(vfc);
+  }
+
+  const play = () => main.play().catch(() => {});
+  function start() { started = true; document.body.classList.add("live"); play(); musicPlay(); }
+  function advance() {
+    if (!started) return start();
+    if (active < 0) return false;
+    done.add(active);
+    main.currentTime = holds[active].end;
+    active = -1;
+    hint.classList.remove("on");
+    play();
+  }
+  function restart() {
+    done.clear(); active = -1; main.currentTime = 0;
+    clearInterval(fade); music.volume = MUSIC_VOL; music.currentTime = 0;
+    if (started) { play(); musicPlay(); }
+  }
+
+  document.addEventListener("keydown", (e) => {
+    const k = e.key;
+    if (k === "c" || k === "C") { document.body.classList.toggle("panel"); return; }
+    if ($("panel").contains(e.target)) return; // keep keys for the settings controls
+    if (k === "f" || k === "F") {
+      document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {});
+    } else if (k === "r" || k === "R") {
+      restart();
+    } else if (k === " " || k === "ArrowRight" || k === "PageDown" || k === "Enter") {
+      e.preventDefault();
+      if (advance() === false && k === " ") {
+        if (main.paused) { play(); musicPlay(); } else { main.pause(); music.pause(); }
+      }
+    }
+  });
+  $("stage").addEventListener("click", () => advance());
+})();
+</script>
+</body>
+</html>

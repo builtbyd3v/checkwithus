@@ -86,6 +86,7 @@ tts vo11 1.0 "Before money moves, check with us."
 # Music, instrumental only.
 music music-judge 30000 "Playful but calm instrumental, light and friendly, soft marimba and pizzicato strings with warm piano, gentle groove, a soft resolving ending at 29 seconds. No vocals."
 music music-devpost 77000 "Calm, warm, hopeful instrumental, soft piano and light plucked strings, steady and unobtrusive under narration, gentle swell at the end. No vocals."
+music music-j45 90000 "Calm, warm, quietly confident instrumental, soft piano with light marimba and gentle plucked strings, steady even tempo with no big drops or pauses, background level under captions, no ending, it keeps the same calm groove the whole time. No vocals."
 
 # Sound effects: short, clean, cartoonish but not silly.
 sfx sfx-buzz 1 "Smartphone vibrating on a wooden side table, two short buzzes, clean"

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import { AbsoluteFill, Img, Sequence, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { C, FONT, HALF, H } from "./theme";
 import { SHOTS } from "./timeline";
@@ -48,11 +48,15 @@ export const Sticker = ({ text, x, y, delay = 0, tilt = -6, bg = C.purple, color
   );
 };
 
+/** The 45 s cut shows sponsors in its top bar instead, so it turns scene badges off. */
+export const BadgesOn = createContext(true);
+
 /** Sponsor badge: rounded chip with a mark, the sponsor name and what it is doing right now. */
 export const Badge = ({ sponsor, doing, x, y, delay = 0, dark = false }: {
   sponsor: string; doing: string; x: number; y: number; delay?: number; dark?: boolean;
 }) => {
   const p = usePop(delay, 14);
+  if (!useContext(BadgesOn)) return null;
   return (
     <div style={{
       position: "absolute", left: x, top: y, transform: `translateY(${(1 - p) * 30}px)`, opacity: p,
