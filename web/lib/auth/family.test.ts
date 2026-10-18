@@ -60,10 +60,27 @@ function sign(claims: Record<string, unknown> = {}, options: { exp?: string } = 
     .sign(privateKey);
 }
 
-const request = (token?: string) =>
+const request = (token?: string, idToken?: string) =>
   new Request('https://checkwith.us/api/v1/family/me', {
-    headers: token === undefined ? {} : { authorization: `Bearer ${token}` },
+    headers: {
+      ...(token === undefined ? {} : { authorization: `Bearer ${token}` }),
+      ...(idToken === undefined ? {} : { 'x-id-token': idToken }),
+    },
   });
+
+const IOS_CLIENT_ID = 'GTknuXEohQaPK6TzgzEdJoWozbxgQUDh';
+
+/** The ID token Auth0 gives the iPhone app at sign-in: its audience is the app, not the API. */
+function signId(claims: Record<string, unknown> = {}, subject = 'auth0|maria', audience = IOS_CLIENT_ID) {
+  return new SignJWT(claims)
+    .setProtectedHeader({ alg: 'RS256', kid: 'k1' })
+    .setSubject(subject)
+    .setIssuer(ISSUER)
+    .setAudience(audience)
+    .setIssuedAt()
+    .setExpirationTime('10h')
+    .sign(privateKey);
+}
 
 describe('requireFamilyUser', () => {
   it('accepts a genuine Auth0 token', async () => {
@@ -173,5 +190,41 @@ describe('requireFamilyUser', () => {
       exp: now + 300,
     })}.`;
     await expect(requireFamilyUser(request(token))).rejects.toBeInstanceOf(AuthError);
+  });
+
+  describe('sign-in time for step-up', () => {
+    const now = Math.floor(Date.now() / 1000);
+
+    it('reads auth_time from the iPhone app\'s ID token when the access token has none', async () => {
+      const user = await requireFamilyUser(request(await sign(), await signId({ auth_time: now - 10 })));
+      expect(user.authTime).toBe(now - 10);
+    });
+
+    it('prefers auth_time on the access token', async () => {
+      const user = await requireFamilyUser(request(await sign({ auth_time: now - 5 }), await signId({ auth_time: now - 99 })));
+      expect(user.authTime).toBe(now - 5);
+    });
+
+    it('ignores an ID token for someone else', async () => {
+      const user = await requireFamilyUser(request(await sign(), await signId({ auth_time: now }, 'auth0|scammer')));
+      expect(user.authTime).toBeUndefined();
+    });
+
+    it('ignores an ID token minted for another app', async () => {
+      const user = await requireFamilyUser(request(await sign(), await signId({ auth_time: now }, 'auth0|maria', AUDIENCE)));
+      expect(user.authTime).toBeUndefined();
+    });
+
+    it('ignores a forged ID token instead of signing the person out', async () => {
+      const forged = await new SignJWT({ auth_time: now })
+        .setProtectedHeader({ alg: 'HS256' })
+        .setSubject('auth0|maria')
+        .setIssuer(ISSUER)
+        .setAudience(IOS_CLIENT_ID)
+        .setExpirationTime('5m')
+        .sign(new TextEncoder().encode('guessable-secret-guessable-secret'));
+      const user = await requireFamilyUser(request(await sign(), forged));
+      expect(user.authTime).toBeUndefined();
+    });
   });
 });

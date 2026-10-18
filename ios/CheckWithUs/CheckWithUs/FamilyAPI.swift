@@ -131,6 +131,8 @@ enum FamilyAPI {
         var request = URLRequest(url: API.base.appending(path: path), timeoutInterval: 15)
         request.httpMethod = method
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        // For step-up routes (unfreeze, unpair, allowances): the server reads the sign-in time from it.
+        if let id = FamilyAuth.load()?.id { request.setValue(id, forHTTPHeaderField: "X-Id-Token") }
         if let body {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = try JSONEncoder().encode(body)

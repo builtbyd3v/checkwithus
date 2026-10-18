@@ -16,6 +16,8 @@ enum FamilyAuth {
     struct Tokens: Codable {
         let access: String
         let refresh: String?
+        /// Auth0 ID token. Its auth_time proves a fresh sign-in to the server (web/lib/auth/family.ts).
+        var id: String? = nil
     }
 
     private static let service = "us.checkwith.family"
@@ -67,7 +69,7 @@ enum FamilyAuth {
         return try await token([
             "grant_type": "authorization_code", "client_id": clientID, "code": code,
             "code_verifier": verifier, "redirect_uri": redirectURI,
-        ], keepingRefresh: nil)
+        ], keeping: nil)
     }
 
     /// A new access token from the refresh token. Throws Rejected when Auth0 says no, and other errors when
@@ -75,11 +77,11 @@ enum FamilyAuth {
     static func refresh(_ tokens: Tokens) async throws -> Tokens {
         guard let refresh = tokens.refresh else { throw Rejected() }
         return try await token(["grant_type": "refresh_token", "client_id": clientID, "refresh_token": refresh],
-                               keepingRefresh: refresh)
+                               keeping: tokens)
     }
 
-    private static func token(_ fields: [String: String], keepingRefresh: String?) async throws -> Tokens {
-        struct Response: Decodable { let access_token: String; let refresh_token: String? }
+    private static func token(_ fields: [String: String], keeping old: Tokens?) async throws -> Tokens {
+        struct Response: Decodable { let access_token: String; let refresh_token: String?; let id_token: String? }
         struct ErrorBody: Decodable { let error: String }
         var request = URLRequest(url: URL(string: "https://\(domain)/oauth/token")!, timeoutInterval: 15)
         request.httpMethod = "POST"
@@ -91,8 +93,8 @@ enum FamilyAuth {
             if (try? JSONDecoder().decode(ErrorBody.self, from: data))?.error == "invalid_grant" { throw Rejected() }
             throw API.Failure(message: "Sign-in failed. Please try again.")
         }
-        // Auth0 may rotate the refresh token; keep the old one when it does not send a new one.
-        return Tokens(access: body.access_token, refresh: body.refresh_token ?? keepingRefresh)
+        // Auth0 may rotate the refresh token; keep the old one (and the old ID token) when it does not send a new one.
+        return Tokens(access: body.access_token, refresh: body.refresh_token ?? old?.refresh, id: body.id_token ?? old?.id)
     }
 
     private static func randomString() -> String {
