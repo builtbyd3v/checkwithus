@@ -12,7 +12,7 @@ This is supporting history reconstructed from the ledger, not a persisted snapsh
 of the exact row read by the payment rule. If no supporting row remains, the stored
 hold reason still displays. No display result can authorize a payment.
 
-Demo setup, against the existing synthetic Rosa circle only:
+Demo setup, against the existing synthetic demo circle only:
 
 ```sh
 cd web
@@ -33,7 +33,7 @@ npm run check:sequence -- <held-payment-uuid>
 ```
 
 This verifier opens a repeatable-read, read-only transaction. It checks that the
-payment belongs to synthetic Rosa, is held and unexpired, has no recorded Nessie
+payment belongs to the synthetic demo circle, is held and unexpired, has no recorded Nessie
 payment ID or payment spending row, and has the stored sequence reason plus
 eligible ATM evidence through the production dashboard query. It creates no
 withdrawal or payment and prints a JSON evidence record. Save its output with

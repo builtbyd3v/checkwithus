@@ -22,7 +22,7 @@ frame in the handoff. Use the team's intended sharing permissions.
 
 ## Capture the three missing native states
 
-Build the selected reviewed commit on a real iPhone with the synthetic Rosa
+Build the selected reviewed commit on a real iPhone with the synthetic demo
 circle. Capture the app itself, without replacing labels or amounts in an image
 editor. Keep pairing codes, account settings and unrelated notifications out.
 
