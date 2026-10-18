@@ -46,6 +46,23 @@ export const HOLD_REASON_LABELS: Record<HoldReason, string> = {
 /** The default "hold anything over" limit: over $300, as in the pitch. Families can change it. */
 export const DEFAULT_HOLD_OVER_CENTS = 30_000 as Cents;
 
+/** Over $1,000, two approvers must say yes (db default of circles.two_approvals_over_cents). Families can change it. */
+export const DEFAULT_TWO_APPROVALS_OVER_CENTS = 100_000 as Cents;
+
+/**
+ * A family turned a limit off. Stored in the limit's column ($1M, the most the
+ * bank API takes) and always compared with `>=`, because bill-agent payments
+ * skip that cap. Off only skips that one limit: every scam rule still holds.
+ */
+export const POLICY_OFF_CENTS = 100_000_000 as Cents;
+
+export const isPolicyOff = (limitCents: number) => limitCents >= POLICY_OFF_CENTS;
+
+/** How many approvers a held payment needs, fixed when it is created. */
+export function approvalsRequired(amountCents: Cents, twoApprovalsOverCents: number): 1 | 2 {
+  return !isPolicyOff(twoApprovalsOverCents) && amountCents > twoApprovalsOverCents ? 2 : 1;
+}
+
 /**
  * The unusual-spending rule reads the Tiger Data baseline: a payment is
  * unusual if it is more than `multiplier` times what they typically spend in
@@ -126,7 +143,7 @@ export function decideHold(input: {
   if (!payment.payeeKnown) reasons.add('new_payee');
 
   // "Over $300" means strictly over: exactly $300.00 does not pause.
-  if (payment.amountCents > holdOverCents) reasons.add('over_limit');
+  if (!isPolicyOff(holdOverCents) && payment.amountCents > holdOverCents) reasons.add('over_limit');
 
   if (isUnusual(payment.amountCents, baseline)) reasons.add('unusual_spending');
 

@@ -7,14 +7,14 @@ import { auth0 } from '@/lib/auth0/web';
 import { CATEGORIES, PAYEE_KINDS } from '@/lib/categories';
 import { db } from '@/lib/db';
 import { createPairingCode, joinCircle, rotateInviteCode, unpairDevices } from '@/lib/family';
-import { formatCents, parseDollars } from '@/lib/money';
+import { formatCents, parseDollars, type Cents } from '@/lib/money';
 import { normalizeName } from '@/lib/names';
-import { requirePermission } from '@/lib/permissions';
-import { allowanceBody, grantAllowance, revokeAllowance } from '@/lib/allowances';
+import { requireFreshLogin, requirePermission } from '@/lib/permissions';
 import { PaymentError } from '@/lib/payments';
+import { POLICY_OFF_CENTS } from '@/lib/rules';
 import { approvalsUseCiba, freeze, payments } from '@/lib/services';
 
-export type FormState = { message: string; code?: string; expiresAt?: string; decided?: boolean };
+export type FormState = { message: string; code?: string; expiresAt?: string; decided?: boolean; signInUrl?: string };
 const fail = (error: unknown): FormState => ({
   message: error instanceof Error ? error.message : 'Please try again.',
 });
@@ -42,17 +42,50 @@ export async function joinAction(_state: FormState, form: FormData): Promise<For
   redirect('/dashboard');
 }
 
-export async function saveSettingsAction(_state: FormState, form: FormData): Promise<FormState> {
-  const parsed = z.object({ circleId: z.uuid(), holdDollars: z.string().trim().regex(/^\d+(\.\d{1,2})?$/) })
-    .safeParse({ circleId: value(form, 'circleId'), holdDollars: value(form, 'holdDollars') });
-  if (!parsed.success) return { message: 'Enter a valid dollar amount.' };
-  const sub = await actor();
+const BAD_AMOUNT = 'Enter an amount from $0 to $999,999.99, in dollars and cents.';
+/** Dollars from the form to whole cents, or null. Off is `POLICY_OFF_CENTS`, so an amount must stay under it. */
+function limitCents(state: 'on' | 'off', dollars: string | undefined): Cents | null {
+  if (state === 'off') return POLICY_OFF_CENTS;
   try {
-    await requirePermission(db(), sub, parsed.data.circleId, 'approve:payments');
-    const cents = parseDollars(parsed.data.holdDollars);
-    await db().query('update circles set hold_over_cents = $2 where id = $1', [parsed.data.circleId, cents]);
+    const cents = parseDollars(dollars ?? '');
+    return cents < POLICY_OFF_CENTS ? cents : null;
+  } catch { return null; }
+}
+
+/** Hold limit and two-approver rule. Loosening either needs a sign-in from the last 5 minutes. */
+export async function saveSettingsAction(_state: FormState, form: FormData): Promise<FormState> {
+  const text = z.string().max(20).optional();
+  const parsed = z.object({
+    circleId: z.uuid(), holdLimit: z.enum(['on', 'off']), holdDollars: text,
+    twoApprovals: z.enum(['on', 'off']).optional(), twoDollars: text,
+  }).safeParse({
+    circleId: value(form, 'circleId'), holdLimit: value(form, 'holdLimit'), holdDollars: value(form, 'holdDollars') ?? undefined,
+    twoApprovals: value(form, 'twoApprovals') ?? undefined, twoDollars: value(form, 'twoDollars') ?? undefined,
+  });
+  if (!parsed.success) return { message: BAD_AMOUNT };
+  const { circleId, holdLimit, holdDollars, twoApprovals, twoDollars } = parsed.data;
+  const hold = limitCents(holdLimit, holdDollars);
+  const two = twoApprovals ? limitCents(twoApprovals, twoDollars) : undefined;
+  if (hold === null || two === null) return { message: BAD_AMOUNT };
+  const session = await auth0.getSession();
+  if (!session?.user.sub) redirect('/auth/login?returnTo=/dashboard');
+  try {
+    await requirePermission(db(), session.user.sub, circleId, 'approve:payments');
+    const { rows } = await db().query<{ hold_over_cents: number; two_approvals_over_cents: number }>(
+      'select hold_over_cents, two_approvals_over_cents from circles where id = $1', [circleId],
+    );
+    if (!rows[0]) return { message: 'Circle not found.' };
+    const nextTwo = two ?? rows[0].two_approvals_over_cents;
+    // A higher amount or a rule turned off lets more money out without the family.
+    if (hold > rows[0].hold_over_cents || nextTwo > rows[0].two_approvals_over_cents) {
+      try { requireFreshLogin(session.user.auth_time); } catch {
+        return { message: 'To loosen a rule, sign in again. Then save within 5 minutes.', signInUrl: '/auth/login?returnTo=/dashboard&max_age=0' };
+      }
+    }
+    // ponytail: read then write, no row lock. A racing save can only write values it already checked.
+    await db().query('update circles set hold_over_cents = $2, two_approvals_over_cents = $3 where id = $1', [circleId, hold, nextTwo]);
     revalidatePath('/dashboard');
-    return { message: 'Hold limit saved.' };
+    return { message: 'Rules saved. Changes apply to new payments.' };
   } catch (error) { return fail(error); }
 }
 
@@ -162,32 +195,5 @@ export async function unfreezeAction(_state: FormState, form: FormData): Promise
     );
     revalidatePath('/dashboard');
     return { message: `Spending is back on. ${formatCents(movedCents)} moved back from the vault.` };
-  } catch (error) { return fail(error); }
-}
-
-export async function grantAllowanceAction(_state: FormState, form: FormData): Promise<FormState> {
-  const session = await auth0.getSession();
-  if (!session?.user.sub) redirect('/auth/login?returnTo=/dashboard');
-  const circle = z.uuid().safeParse(value(form, 'circleId'));
-  const input = allowanceBody.safeParse({
-    payeeId: value(form, 'payeeId') || null, category: value(form, 'category') || null,
-    maxAmountCents: Number(value(form, 'maxAmountCents')), expiresAt: value(form, 'expiresAt'),
-  });
-  if (!circle.success || !input.success) return { message: 'Check the allowance scope, amount, and expiry.' };
-  try {
-    await grantAllowance(db(), session.user.sub, session.user.auth_time, circle.data, input.data);
-    revalidatePath('/dashboard');
-    return { message: 'Allowance granted.' };
-  } catch (error) { return fail(error); }
-}
-
-export async function revokeAllowanceAction(_state: FormState, form: FormData): Promise<FormState> {
-  const sub = await actor();
-  const input = z.object({ circleId: z.uuid(), allowanceId: z.uuid() }).safeParse({ circleId: value(form, 'circleId'), allowanceId: value(form, 'allowanceId') });
-  if (!input.success) return { message: 'Allowance not found.' };
-  try {
-    await revokeAllowance(db(), sub, input.data.circleId, input.data.allowanceId);
-    revalidatePath('/dashboard');
-    return { message: 'Allowance revoked.' };
   } catch (error) { return fail(error); }
 }
