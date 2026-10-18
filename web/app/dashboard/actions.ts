@@ -79,7 +79,7 @@ export async function saveSettingsAction(_state: FormState, form: FormData): Pro
     // A higher amount or a rule turned off lets more money out without the family.
     if (hold > rows[0].hold_over_cents || nextTwo > rows[0].two_approvals_over_cents) {
       try { requireFreshLogin(session.user.auth_time); } catch {
-        return { message: 'To loosen a rule, sign in again. Then save within 5 minutes.', signInUrl: '/auth/login?returnTo=/dashboard&max_age=0' };
+        return { message: 'To loosen a rule, sign in again. Then save within 5 minutes.', signInUrl: `/auth/login?returnTo=${encodeURIComponent(`/dashboard?circle=${circleId}`)}&max_age=0` };
       }
     }
     // ponytail: read then write, no row lock. A racing save can only write values it already checked.
