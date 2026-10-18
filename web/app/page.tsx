@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import type { HoldReason } from '@/lib/rules';
 import { Reveal } from './_landing/reveal';
+import { Tryout } from './_landing/tryout';
 import { ApproveScreen, Icon, NothingWaitingScreen, PausedScreen, SafeScreen, type IconName } from './_landing/screens';
 import { card, display, h3, navLink, nudge, pill, primary, split, sunButton, textLink } from './_landing/ui';
 
@@ -276,6 +277,8 @@ export default function Home() {
             ))}
           </ol>
         </section>
+
+        <Tryout />
 
         <section aria-label="Controls" className="grid lg:grid-cols-[minmax(0,30rem)_1fr]">
           <div className={`bg-lane-them ${pad} py-20 lg:px-14 lg:py-28`}>
