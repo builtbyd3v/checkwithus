@@ -70,6 +70,12 @@ export const J45_DUR = 1320;
 export const CAM = { x: 0, y: 100, w: 960, h: 800 };
 export const SPLIT_FROM = J45.atm.from;
 export const SPLIT_TO = J45.groB.from + J45.groB.dur;
+// The filmed clips fill the whole left half. Each is trimmed so its tap lands just before the right half shows
+// the result: J1 Deny at frame 711 (23.7 s), J2 Face ID check at frame 1050 (35.0 s).
+export const LEFT_CLIPS = [
+  { src: "clips/J1.mp4", from: SPLIT_FROM, dur: 465 },
+  { src: "clips/J2.mp4", from: SPLIT_FROM + 465, dur: SPLIT_TO - SPLIT_FROM - 465 },
+];
 
 // Local beats inside the two new scenes (frames from each scene's own start).
 export const BILL = { tap: 25, paid: 50, dur: 105 };

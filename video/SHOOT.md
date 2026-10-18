@@ -1,16 +1,20 @@
-# Judge video (43 s): 2 clips to film
+# Judge video (44 s): 2 clips to film
 
-The left half stays black except for two gaps. Film these clips, drop them in `video/public/clips/`, and I splice them in.
+The left half is the family phone from 9.0 s to 38.0 s. Film these 2 clips, drop them in `video/public/clips/`, and I splice them in.
 
-| Clip | Length | Starts at | What happens (over the shoulder, on the family phone) |
-| --- | --- | --- | --- |
-| J1.mov | 4 s | 19.5 s | Phone buzzes: the $200 gift card hold. Read it, tap **Deny**. |
-| J2.mov | 4 s | 31.0 s | Phone buzzes: the $420 groceries hold. Read it, Face ID, tap **Approve**. |
+| Clip | Covers | Hold arrives | Tap at | What happens (over the shoulder, on the family phone) |
+| --- | --- | --- | --- | --- |
+| J1.mov | 9.0 to 23.5 s (14.5 s) | 10.5 s in | 14.0 s in | Idle on the home screen. The $200 gift card hold arrives. Read it, tap **Deny**. |
+| J2.mov | 23.5 to 38.0 s (14.5 s) | 7.5 s in | 11.0 s in | Idle on the home screen. The $420 groceries hold arrives. Read it, Face ID, tap **Approve**. Hold the result 3 s. |
+
+The two clips fill the whole left half. I trim the idle start, so its exact length does not matter, but it must be long enough.
 
 - Film landscape, 1080p or 4K, 30 fps. Keep the phone screen in the center. The clip fills a 960 x 800 box, so the outer edges get cropped.
-- Record 2 extra seconds before and after each action. I trim each clip to its gap.
+- Record 2 extra seconds after each clip. I trim each clip to fit.
 - No talking needed. The video has music and captions.
-- Before filming: sign in to Auth0 again on the family phone (Freeze needs a sign-in from the last 5 minutes), and seed a held gift card payment.
+- iPhone camera: Settings > Camera > Record Video: 1080p at 30 fps, HDR Video off (HDR looks washed out in the render).
+- Land each tap about 3.5 s after the hold arrives. The right half shows the result right after the gap.
+- Before filming: sign in to Auth0 on the family phone. During each take, a teammate off camera triggers the payment ($200 gift card for J1, $420 groceries for J2) so the hold arrives live.
 
 # Filming script: the real half of the split screen (30 s and Devpost cuts)
 

@@ -1,7 +1,7 @@
 import type { ComponentType } from "react";
-import { AbsoluteFill, Audio, Easing, Freeze, Img, Sequence, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Audio, Easing, Freeze, Img, OffthreadVideo, Sequence, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { C, FONT, H, HALF } from "../theme";
-import { CAM, GROCERY, HOLD_DENY_AT, J45, J45_DUR, SPLIT_FROM, SPLIT_TO } from "../timeline";
+import { CAM, GROCERY, HOLD_DENY_AT, J45, J45_DUR, LEFT_CLIPS, SPLIT_FROM, SPLIT_TO } from "../timeline";
 import { BadgesOn, Caption } from "../ui";
 import { SlideIn } from "../Story";
 import { AtmScene } from "../scenes/AtmScene";
@@ -60,18 +60,12 @@ const SponsorBar = () => {
   );
 };
 
-/** Left half: black until the team's clips are spliced into CAM. A dim label names the clip for each gap. */
-const CLIPS: [{ from: number; dur: number }, string][] = [
-  [J45.gap1, "J1 · 4 s · gift card hold: tap Deny"],
-  [J45.gap2, "J2 · 4 s · groceries hold: Face ID, tap Approve"],
-];
+/** Left half: the team's over-the-shoulder clips of the family phone, back to back in CAM. */
 const LeftHalf = () => (
   <AbsoluteFill style={{ width: HALF, background: "#000" }}>
-    {CLIPS.map(([seg, text]) => (
-      <Sequence key={seg.from} from={seg.from - SPLIT_FROM} durationInFrames={seg.dur} layout="none">
-        <div style={{ position: "absolute", left: CAM.x, top: CAM.y, width: CAM.w, height: CAM.h, display: "grid", placeItems: "center", color: "#4A4256", fontFamily: FONT, fontSize: 28, textAlign: "center" }}>
-          {text}
-        </div>
+    {LEFT_CLIPS.map((c) => (
+      <Sequence key={c.src} from={c.from - SPLIT_FROM} durationInFrames={c.dur} layout="none">
+        <OffthreadVideo src={staticFile(c.src)} muted style={{ position: "absolute", left: CAM.x, top: CAM.y, width: CAM.w, height: CAM.h, objectFit: "cover" }} />
       </Sequence>
     ))}
   </AbsoluteFill>
