@@ -67,7 +67,7 @@ Rosa's bill-pay agent has its own Auth0 identity: a Machine-to-Machine app that 
 - **Least privilege.** It acts only in circles with a live allowance. The route checks RS256, our issuer and audience, `gty = client-credentials`, the agent's own `sub`, and `pay:bills`. Every family route rejects machine tokens (`403 agent_not_allowed`), so the agent can never approve, deny, freeze, unfreeze, grant allowances or change policy. Revoking the allowance stops it.
 - **Visible.** Each agent payment stores `initiated_by = 'agent'`; the dashboard shows "Paid by the bill agent under your Utilities allowance" or "Asked by the bill agent".
 
-TODO(Dev): the real M2M grant is not verified on the live Auth0 tenant yet. Create the M2M app with only `pay:bills`, set `AUTH0_AGENT_CLIENT_ID`, run `npm run agent:bills -- --within 14` once, then delete this line. Until then, say "tested against a fake Auth0".
+Verified on the live Auth0 tenant on Oct 17: the agent got a token with only `pay:bills` and paid a $350 water bill under the utilities allowance.
 
 ### Sponsor tech doing real work
 
@@ -202,7 +202,7 @@ ml/.venv/bin/python -I ml/export_coreml.py   # Core ML export, writes coreml_eva
 ## Repo layout
 
 Submission materials: [Devpost draft](docs/devpost.md), [DEV article](docs/dev-post.md),
-[three-minute expo demo](docs/demo.md), [two-minute video script](docs/video-script.md),
+[expo pitch](docs/pitch.md), [demo runbook](docs/demo.md), [two-minute video script](docs/video-script.md),
 and [publishing handoff](docs/publishing.md).
 
 ```
@@ -242,7 +242,7 @@ license. Required by Devpost rule 10 and [`docs/RULES.md`](docs/RULES.md).
 | [Auth0](https://auth0.com/) | Family login, API tokens, roles, optional RBAC; CIBA Guardian push implemented, off by default | Auth0 free plan, developer terms |
 | [Tiger Data / Tiger Cloud](https://www.tigerdata.com/) | Spending hypertable, compression, continuous aggregates | Tiger Cloud trial; TimescaleDB |
 | [Vercel](https://vercel.com/) | Hosting for `web/` | Vercel Hobby terms |
-| [GoDaddy Registry](https://registry.godaddy/) | `checkwith.us` domain (.us registry) | TODO(Dev): confirm the MLH code was used (whois registrar: Porkbun) |
+| [GoDaddy Registry](https://registry.godaddy/) | `checkwith.us` domain (.us registry) | Registered with the MLH GoDaddy Registry code, redeemed through Porkbun |
 
 ### `web/` dependencies
 

@@ -1,33 +1,36 @@
-# checkwith.us expo demo (3 minutes)
+# checkwith.us demo runbook: judge video shoot + live "show me" steps
 
-Hard limit: 3 minutes, then 1 minute of judge questions ([RULES.md](RULES.md)).
+- **At the table:** the 30 s judge video plays, then the 2:00 live talk in [pitch.md](pitch.md). That leaves 30 s of buffer inside the 3:00 limit, then 1 minute of judge questions ([RULES.md](RULES.md)).
+- **This file covers:** how to set up the devices, how to film each shot of the 30 s judge video, and the live steps to run when a judge says "show me".
+- **What we say** lives in [pitch.md](pitch.md). The **Devpost video** (1:30 to 2:00) is separate: [video-script.md](video-script.md).
+- **One build:** pin one commit on `main`. Use it for both iPhones and the Vercel deployment.
+- Rosa is synthetic ("Rosa CheckWith (synthetic)"). Never use a real person's name or number.
 
 ## Cast and props
 
 | Who | Device | Shows |
 | --- | --- | --- |
-| Rosa, the older adult | iPhone A: older adult role, built from the reviewed demo commit | Home, Pay a bill, held screen, lock-screen card |
-| Her family | iPhone B: family app (family role), same reviewed demo build, signed in with Auth0 | Approvals, Alerts, Money (Freeze) |
-| Backup for the family | MacBook: checkwith.us/dashboard | Waiting payments, spending chart |
+| Rosa, the older adult | iPhone A: older adult role, built from the pinned `main` commit | Home, Pay a bill, held screen, lock-screen card |
+| Her family | iPhone B: family app (family role), same build, signed in with Auth0 | Approvals, Alerts, Allowances, Money (Freeze) |
+| Backup for the family | MacBook: www.checkwith.us/dashboard | Waiting payments, spending chart, Tiger Data speed card |
 | The scammer | Google Voice (laptop or a third phone) | One scam text, one call |
-
-Rosa is synthetic ("Rosa CheckWith (synthetic)"). Never use a real person's name or number.
 
 ## Pre-demo checklist (do 15 minutes before)
 
 One build for everything
-- [ ] One build: choose a reviewed commit (development work is currently on rishon, PR #54) and use that exact code for both iPhones and the server. Do not merge to main without the user's explicit instruction. Verify migrations and live settings before deploying. Never mix feature branches.
-- [ ] On the selected deployment, `/api/health` prints `{"ok":true,"database":"reachable"}`. Confirm its commit matches both phones and exercise the Freeze route; health alone does not prove the feature build is deployed.
-- [ ] Migrations on the live database: `cd web && npm run db:migrate` (014 freeze, 015 ATM cash, 016 weekly and per-payee aggregates, 017 ledger credits, and 020 payment initiator if #46 is merged).
+- [ ] Pin one commit on `main`. Build both iPhones from it. Deploy that commit to Vercel.
+- [ ] The commit on the Vercel deployment page matches the pinned commit. (`/api/health` does not show a commit.)
+- [ ] `https://www.checkwith.us/api/health` prints `{"ok":true,"database":"reachable"}`. Use `www`: the apex redirects to `www` and drops the app's login token.
+- [ ] Migrations on the live database: `cd web && npm run db:migrate` (014 freeze, 015 ATM cash, 016 weekly and per-payee aggregates, 017 ledger credits, 020 payment initiator).
 - [ ] `DEMO_BANK_LOCATIONS` is set on Vercel to a spot at the expo table, for example `[{"name":"SwampHacks Demo Bank","lat":29.6463,"lng":-82.3478}]`. TODO(Dev): confirm the coordinates on site, redeploy after changing it, then relaunch the app on iPhone A.
-- [ ] `npm run smoke:demo` passes (a $350 City Power & Light bill pays with no push while the allowance exists, and holds when it is revoked; with #46, step 6a: the agent pays the $350 water bill only because of the allowance; runs on a throwaway schema).
-- [ ] If showing the agent: `AUTH0_AGENT_CLIENT_ID` and `AUTH0_AGENT_CLIENT_SECRET` are in the MacBook's `.env.local`, and a second terminal has `npm run agent:bills -- --within 14` typed, not run. Run it only after `demo:reset`.
+- [ ] `npm run smoke:demo` passes (a $350 City Power & Light bill pays with no push while the allowance exists, and holds when it is revoked; runs on a throwaway schema).
+- [ ] If showing the bill-pay agent: `AUTH0_AGENT_CLIENT_ID` and `AUTH0_AGENT_CLIENT_SECRET` are in the MacBook's `.env.local`, and a second terminal has `npm run agent:bills -- --within 14` typed, not run. Run it only after `demo:reset`. Verified live on Oct 17 (it paid the $350 water bill).
 - [ ] `npm run demo:reset -- --live` on the real demo circle (only there; without `--live` it refuses anything but a throwaway `wt_*` schema). It reseeds Rosa, clears held payments, unfreezes, clears recent ATM cash, and grants the utilities allowance up to $400 until Nov 30.
-- [ ] Do NOT run `npm run demo:atm` after the reset until step 5. If you do, step 3 also shows the ATM reason.
-- [ ] `APPROVAL_MODE=app` on Vercel (the default). The family approves in the family app, which asks for Face ID first. The Guardian push (`ciba`) is implemented but not verified live, so do not use it in the demo.
+- [ ] Do NOT run `npm run demo:atm` after the reset until the ATM step. If you do, the first gift card also shows the ATM reason.
+- [ ] `APPROVAL_MODE=app` on Vercel (the default). The family approves in the family app, which asks for Face ID first. The Guardian push (`ciba`) is not verified live, so do not use it.
 
 iPhone A (Rosa)
-- [ ] The selected reviewed demo build installed. A debug build also has the "Make this spot a test bank" and "Pretend I'm on a call" backups.
+- [ ] The pinned build installed. A debug build also has the "Make this spot a test bank" and "Pretend I'm on a call" backups.
 - [ ] Paired: dashboard, make a pairing code, type it on the phone. Home says "You're safe".
 - [ ] Message Filter on: Settings, Apps, Messages, Unknown and Spam, "Check With Us".
 - [ ] Call labels on: Settings, Apps, Phone, Call Blocking and Identification, "Check With Us".
@@ -41,113 +44,75 @@ iPhone B (family)
 - [ ] Family role. Signed in with the Auth0 approver account. Joined Rosa's circle.
 - [ ] Face ID works for the app (passcode is the fallback). The phone has a passcode set.
 - [ ] Money tab says not frozen, and Allowances shows "Utilities, up to $400" (both from `demo:reset`).
+- [ ] Sign in again on iPhone B right before filming or a judge's Freeze step. Freeze needs an Auth0 sign-in from the last 5 minutes; an older one opens the Auth0 login sheet first.
 
 MacBook
-- [ ] checkwith.us/dashboard signed in, on Rosa's circle.
+- [ ] www.checkwith.us/dashboard signed in, on Rosa's circle.
 - [ ] Terminal open in `web/` with `.env.local`. Type `npm run demo:atm` and do not press Enter yet.
 - [ ] A tab with the README "Model evaluation" and "Tiger Data performance" tables.
+- [ ] The 30 s judge video downloaded and open, ready to play full screen with sound off.
 - [ ] Google Voice signed in, with the scam text typed and ready. TODO(Dev): test the exact text on iPhone A once; use one that lands in Spam.
 - [ ] Wi-Fi works on all devices. A phone hotspot is ready as backup.
 
 Suggested scam text (made up, test it first): `FL Toll Services: unpaid toll balance of $6.89. Pay today to avoid a $50 late fee: https://fl-toll-pay.example`
 
-## The script
+## Film the 30 s judge video
 
-Times are cumulative. The script ends at 2:45, so 15 seconds are left as buffer. Say the lines in quotes; do the steps in bold.
+The shot list and captions are in [pitch.md](pitch.md). Film each shot as its own clip on the real phones, then cut them together. Captions only, no voiceover. Run `demo:reset` before you start filming.
 
-### 0:00 Hook (10 s)
-"Every scam tool asks older adults to do something new. checkwith.us asks them to do nothing. The family does the work. This is Rosa's phone, and this is her family's."
+| Shot | Do this |
+| --- | --- |
+| 1. Scam text caught (4 s) | Google Voice: send the scam text to iPhone A. Film iPhone A: open Messages. The inbox has no new text. Open the Spam folder to show it. |
+| 2. Call labeled (4 s) | Open Check With Us on iPhone A. Google Voice: call iPhone A. Film the "Possible scam" call screen. Answer, then go back to Check With Us. Keep the call on. |
+| 3. Paused and denied (8 s) | iPhone A: Pay a bill, Gift card store, 200, Next, Yes, pay. Film "Paused, waiting for family". Film iPhone B: Approvals, the reasons, tap Deny. Film iPhone A's lock screen: "Stopped. Your family said no." Hang up the call. |
+| 4. Cash, then gift card (6 s) | MacBook: press Enter on `npm run demo:atm`. iPhone A: Pay a bill, Gift card store, 200, Yes, pay. Film iPhone B's new reason: "Cash at an ATM, then a gift card." Tap Deny. |
+| 5. Freeze (5 s) | iPhone B: Money tab, "Freeze money now", then "Freeze". Film "Frozen. Money is in the safe account." |
+| 6. Logo (3 s) | The checkwith.us logo card. |
 
-### 0:10 Step 1: a scam text never reaches her (15 s)
-1. **Google Voice: send the scam text to iPhone A.**
-2. **Hold up iPhone A: open Messages.** The inbox has no new text. Open the Spam folder to show it there.
+Film shot 4 at least 2 hours after any earlier `demo:atm`, or run `demo:reset` first. Otherwise shot 3 also shows the ATM reason.
 
-"Our own scam model runs inside the Message Filter, on the phone. It is 1 MB. Her texts never leave the phone."
+## Live "show me" steps
 
-### 0:25 Step 2: a scam call rings as "Possible scam" (20 s)
-1. **iPhone A: open Check With Us so it is on screen.**
-2. **Google Voice: call iPhone A.**
-3. **Show the incoming call screen:** "Possible scam".
-4. **Answer, then go straight back to Check With Us and keep it in the foreground.** The bank alert for "call starts while already inside a bank" only fires while the app is open. The scammer stays on the line from here on.
+Use these when a judge asks to see something during the talk or the questions. Each takes 10 to 20 s. Pick the one that matches the judge's sponsor.
 
-"Rosa answers anyway. Scammers are persuasive. So we protect the money, not just the phone."
+| Judge asks | Do this | Sponsor |
+| --- | --- | --- |
+| "Show me a hold" | iPhone A: Pay a bill, Gift card store, 200, Yes, pay. iPhone B: Approvals shows the amount, payee and reasons. Tap Deny. iPhone A changes to "Stopped". | Auth0, Easy On The Eyes |
+| "Show me the approval" | iPhone A: Pay a bill, Neighborhood Pharmacy, 350, Yes, pay. It holds (over the $300 limit). iPhone B: Approve, Face ID. iPhone A shows "Paid". | Auth0 |
+| "Show me Nessie" | Freeze on iPhone B (one Nessie transfer to the vault). Or press Enter on `npm run demo:atm` (a real sandbox withdrawal). | Nessie |
+| "Show me the allowance" | iPhone B: Allowances shows "Utilities, up to $400, until Nov 30". iPhone A: Pay a bill, City Power & Light, 350, Yes, pay. It shows "Paid", with no hold and no push. Revoke the allowance and pay again: now it holds. | Auth0, Nessie |
+| "Show me the agent" | MacBook: press Enter on `npm run agent:bills -- --within 14`. It prints "Signed in as the bill-pay agent (scope: pay:bills)". Reload the dashboard: "Paid by the bill agent under your Utilities allowance". | Auth0 |
+| "Show me Tiger Data" | MacBook: the dashboard speed card, then the README "Tiger Data performance" table. | Tiger Data |
+| "Show me the bank alert" | During a call, with Check With Us open on iPhone A: iPhone B, Alerts, pull down. "At a bank (SwampHacks Demo Bank branch) while on a phone call." | Nessie |
+| "Show me the model" | MacBook: the README "Model evaluation" table. | AI/ML |
+| "Show me the design" | iPhone A at the largest text size. Then the gallery and [design-principles.md](design-principles.md). | Easy On The Eyes |
 
-### 0:45 Step 3: a gift card during the call pauses (35 s)
-1. **iPhone A: tap "Pay a bill", then "Gift card store". Enter 200. Tap "Next", then "Yes, pay".**
-2. iPhone A shows "Paused, waiting for family" and "Your money is safe. Your family will call you."
-3. **iPhone B: open Approvals.** The held payment shows the amount, the payee and the reasons, including "Gift card purchase", "Someone they have not paid before" and "Paid while on a phone call". Point at the short note.
-
-"Fixed code rules held this, not an AI. The AI can add a reason; it can never remove one. The note was written on Rosa's phone by Apple's on-device model, from facts our code picked."
-
-4. **iPhone B: tap Deny.**
-5. **Show iPhone A.** The screen and the lock-screen card change to "Stopped. Your family said no." Nothing reached the bank.
-
-"Deny is one tap. Approve asks for Face ID first, and our server only accepts an approver's signed Auth0 token."
-
-### 1:20 Step 4: she is at a bank during the call (20 s)
-1. **iPhone B: open Alerts.** Pull down to refresh. The alert names the bank, for example "At a bank (SwampHacks Demo Bank branch) while on a phone call."
-
-"The scammer sends her to the bank. Her phone watches the nearest bank and ATM locations from Capital One's Nessie. Nessie's banks are all near Washington, DC, so our server adds a demo bank at this table. Only the bank's name is sent, never her location."
-
-2. **Hang up the Google Voice call.**
-
-### 1:40 Step 5: ATM cash, then a gift card (20 s)
-1. **MacBook: press Enter on `npm run demo:atm`.** It prints "ATM cash $200 at ...".
-
-"Rosa takes $200 cash at an ATM. That is a real Nessie withdrawal."
-
-2. **iPhone A: Pay a bill, Gift card store, 200, Yes, pay.**
-3. **iPhone B: Approvals.** New reason: "Cash at an ATM, then a gift card. Scammers often ask for this."
-
-"Each step looks normal alone. Together they are the classic scam script. Tiger Data finds the pair with a time-window query on her spending."
-
-4. **iPhone B: tap Deny.**
-
-### 2:00 Step 6: an allowance pays a routine bill (15 s)
-1. **iPhone B: Allowances tab.** Show "Utilities, up to $400, until Nov 30" (granted by `demo:reset`).
-2. **iPhone A: Pay a bill, City Power & Light, 350, Yes, pay.** It shows "Paid". No hold, no push to the family.
-
-"$350 is over her $300 limit, but the family said yes in advance for utilities up to $400. It never lifts a gift card, a new payee, a call or a scam flag."
-
-### 2:15 Step 7: Freeze (15 s)
-1. **iPhone B: Money tab. Tap "Freeze money now", then "Freeze".** It shows "Frozen. Money is in the safe account."
-
-"One tap moves her whole spending balance to a vault account with a Nessie transfer. It runs exactly once, even if you tap twice. Every new payment now waits for the family."
-
-### 2:30 Close: the numbers (15 s)
-1. **MacBook: show the README tables.**
-
-"On a million rows in Tiger Data, continuous aggregates make 3 years of weekly totals for 200 families 13.8 times faster, and compression makes the data 3.2 times smaller. Our 1 MB on-device model catches 96.0% of real scam texts with 2.4% false holds. checkwith.us."
-
-### If there is time, or a judge asks
-Unfreeze first if step 7 ran, and make sure no call is active (a call adds a hold an allowance never lifts).
-- **Approve with Face ID:** iPhone A: Pay a bill, Neighborhood Pharmacy (a known payee), 350, Yes, pay. It holds because $350 is over the $300 limit (it may also show "Much more than they usually spend on this"). iPhone B: Approve, Face ID. iPhone A shows "Paid".
-- **Bill-pay agent (needs #46):** MacBook: press Enter on `npm run agent:bills -- --within 14`. It prints "Signed in as the bill-pay agent (scope: pay:bills)", then "Paid under the family's allowance: Sunshine Water Co. $350.00". Reload the dashboard: "Paid by the bill agent under your Utilities allowance". Say: "The agent has its own Auth0 identity with one scope. It can only ask; the same rules decide. $350 is over the $300 limit, so it paid only because of the family's $400 allowance."
-- **Allowance off:** iPhone B: Allowances, Revoke the utilities allowance. iPhone A pays City Power & Light $350 again: now it holds as "Over the limit you set".
-- **Dashboard:** MacBook: reload checkwith.us/dashboard to show the waiting payments and the spending chart.
+Unfreeze before any payment step if Freeze ran. End any call before the allowance step (a call adds a hold that an allowance never lifts).
 
 ## If X fails, say Y
 
 | If this fails | Do this | Say this |
 | --- | --- | --- |
+| The judge video does not play | Run "Show me a hold" live. | "Let me show you on the real phones." |
 | Scam text lands in the inbox | Move on. Show the model table later. | "iOS only sends unknown senders to the filter. Here are the model's scores on 884 real texts." |
-| Call shows no "Possible scam" label | Answer and continue with step 3. | "iOS reloads the call list on its own schedule. The payment rule still knows she is on a call." |
+| Call shows no "Possible scam" label | Answer and continue. | "iOS reloads the call list on its own schedule. The payment rule still knows she is on a call." |
 | Payment does not reach the server | Check `https://www.checkwith.us/api/health`. Switch to the hotspot. | "No connection means nothing is paid. The app fails closed." |
 | Family app does not show the hold | Pull down to refresh (it polls every 10 seconds). Or reload the dashboard on the MacBook. | "The family can also act from the web dashboard." |
 | Face ID fails | Use the passcode. | "The phone's passcode is the fallback, like any banking app." |
 | No on-device note | Continue. | "When Apple Intelligence is off, the family sees the plain facts instead." |
 | Bank alert does not arrive | Bring Check With Us to the foreground on iPhone A. Debug build: tap "Make this spot a test bank", or turn on "Pretend I'm on a call". Then refresh Alerts. | "Nessie's banks are in DC, so we add a demo bank here. The geofence fires when she is inside one during a call." |
-| `npm run demo:atm` fails | Skip to step 6. | "The rule is a two-hour window query on the Tiger Data hypertable: ATM cash, then a gift card." |
-| Freeze fails | Show the error, then move to the close. | "Freeze is one Nessie transfer, recorded exactly once, so a retry never moves money twice." |
-| Step 3 already shows the ATM reason | Continue. | "We ran this demo earlier, so her ATM cash from then still counts." |
+| `npm run demo:atm` fails | Skip it. | "The rule is a two-hour window query on the Tiger Data hypertable: ATM cash, then a gift card." |
+| Freeze fails | Show the error, then move on. | "Freeze is one Nessie transfer, recorded exactly once, so a retry never moves money twice." |
+| A gift card already shows the ATM reason | Continue. | "We ran this demo earlier, so her ATM cash from then still counts." |
 
-## Reset between demos (2 minutes)
+## Reset between judges (2 minutes)
 
 1. End any call on iPhone A.
 2. MacBook: `npm run demo:reset -- --live`. It clears holds, unfreezes, clears ATM cash and re-grants the allowance.
 3. iPhone B: pull down to refresh. Money tab says not frozen; Allowances shows utilities up to $400.
-4. Send the next scam text from a Google Voice number that has not texted iPhone A before, or accept that step 1 may show it in Spam already.
+4. Put the judge video back at 0:00.
+5. For a live scam text, use a Google Voice number that has not texted iPhone A before. Otherwise it may already be in Spam.
 
 ## Dashboard-only backup footage
 
-[38-second synthetic UI clip](gallery/dashboard-backup.webm) and [captions](gallery/dashboard-backup.srt). This records the local dashboard fixture, not a live payment or Guardian push. It can cover the dashboard portion if devices are unavailable; use real-phone footage for the text/call and older adult flows. Re-recording instructions: [dashboard-backup.md](gallery/dashboard-backup.md).
+[38-second synthetic UI clip](gallery/dashboard-backup.webm) and [captions](gallery/dashboard-backup.srt). This records the local dashboard fixture, not a live payment or Guardian push. It can cover the dashboard if devices are unavailable; use real-phone footage for the text, call and older adult shots. Re-recording instructions: [dashboard-backup.md](gallery/dashboard-backup.md).
