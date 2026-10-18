@@ -118,6 +118,13 @@ enum FamilyAPI {
         _ = try await send("DELETE", "family/circles/\(circle)/allowances/\(id)", token: token, as: R.self)
     }
 
+    /// A one-time code (10 minutes) that pairs the older adult's phone, as XXXX-XXXX. The server keeps only its hash.
+    struct PairingCode: Decodable, Equatable { let code: String; let expiresAt: String }
+
+    static func pairingCode(_ circle: String, _ token: String) async throws -> PairingCode {
+        try await send("POST", "family/circles/\(circle)/pairing-code", [String: Int](), token: token, as: PairingCode.self)
+    }
+
     /// Revokes the older adult's device token. Returns how many phones were unpaired.
     static func unpair(_ circle: String, _ token: String) async throws -> Int {
         struct R: Decodable { let unpaired: Int }

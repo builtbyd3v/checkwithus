@@ -16,6 +16,8 @@ import SwiftUI
     var error: String?
     /// A calm one-line answer, such as "Freeze is not available yet".
     var notice: String?
+    /// The last pairing code made on this phone, shown until it is used or a new one replaces it.
+    var pairingCode: FamilyAPI.PairingCode?
     var tab = Tab.holds
     var holdsPath: [String] = []
     var addingAllowance = false
@@ -170,6 +172,20 @@ import SwiftUI
             }
             // Only once the server agreed, so the list never shows a revoke that did not happen.
             self.allowances.removeAll { $0.id == allowance.id }
+        }
+    }
+
+    /// A new one-time code for the older adult's phone: after an unpair, or for a new phone.
+    func createPairingCode() async {
+        await run {
+            #if DEBUG
+            if self.mock {
+                self.pairingCode = .init(code: "K7QM-4R2X", expiresAt: ISO8601DateFormatter().string(from: .now.addingTimeInterval(600)))
+                return
+            }
+            #endif
+            guard let id = self.circle?.circleId else { return }
+            self.pairingCode = try await self.authed { try await FamilyAPI.pairingCode(id, $0) }
         }
     }
 
