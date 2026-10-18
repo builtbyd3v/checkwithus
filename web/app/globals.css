@@ -1,21 +1,66 @@
 @import "tailwindcss";
 
+/* Brand tokens. Same values as ios/CheckWithUs/Shared/AppTheme.swift (light, then dark).
+   Purple is the family and every main action; yellow is the older adult, a fill only, never text. */
 :root {
-  --background: #f7f5f0;
-  --foreground: #1c2926;
+  --background: #fdfcfa;
+  --foreground: #1b1420;
+  --brand-surface: #f1edf4;
+  --brand-card: #ffffff;
+  --brand-muted: #5a5062;
+  --brand-action: #a62fea;
+  --brand-link: #8e1fd0;
+  --brand-safe: #1e8e3e;
+  --brand-safe-field: #e4f3e8;
+  --brand-pause: #8a4b00;
+  --brand-pause-field: #fdedd6;
+  --brand-stop: #b3261e;
+  --brand-stop-field: #fce6e3;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #100c13;
+    --foreground: #f7f3f9;
+    --brand-surface: #211b26;
+    --brand-card: #241e29;
+    --brand-muted: #bdb3c4;
+    --brand-action: #a62fea;
+    --brand-link: #d3a2ff;
+    --brand-safe: #4cc46e;
+    --brand-safe-field: #10261a;
+    --brand-pause: #ffc27a;
+    --brand-pause-field: #2c1c08;
+    --brand-stop: #ff9c93;
+    --brand-stop-field: #33130f;
+  }
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --color-surface: var(--brand-surface);
+  --color-card: var(--brand-card);
+  --color-muted: var(--brand-muted);
+  --color-action: var(--brand-action);
+  --color-link: var(--brand-link);
+  --color-safe: var(--brand-safe);
+  --color-safe-field: var(--brand-safe-field);
+  --color-pause: var(--brand-pause);
+  --color-pause-field: var(--brand-pause-field);
+  --color-stop: var(--brand-stop);
+  --color-stop-field: var(--brand-stop-field);
+  --color-sun: #fbc02d;
+  --color-on-sun: #1b1420;
+  --font-sans: var(--font-figtree);
+  --font-heading: var(--font-gabarito);
   --font-mono: var(--font-geist-mono);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-figtree), system-ui, -apple-system, sans-serif;
 }
 
 /* Landing page tokens (app/page.tsx). Three stones palette, sage accent. */
