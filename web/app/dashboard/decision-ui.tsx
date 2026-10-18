@@ -45,12 +45,13 @@ export function DecisionForm({ paymentId, canApproveHere, decideAction, expiresA
   return <form action={decide} className="mt-4 @md:mt-6">
     <input type="hidden" name="paymentId" value={paymentId} />
     <div className="grid grid-cols-[repeat(auto-fit,minmax(min(8rem,100%),1fr))] gap-2.5 sm:flex sm:flex-wrap sm:gap-3">
-      {canApproveHere && <button name="decision" value="approve" disabled={pending || deadlinePassed}
-        className={`${base} bg-action text-white hover:bg-action-hover sm:min-w-40`}>
-        <svg viewBox="0 0 20 20" aria-hidden="true" className="size-4.5"><path d="M4.5 10.5l3.5 3.5 7.5-8" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>Approve</button>}
+      {/* Deny first, as on iOS and the landing. */}
       <button name="decision" value="deny" disabled={pending || deadlinePassed}
         className={`${base} bg-[#b42318] text-white hover:bg-[#9a1d14] sm:min-w-40 dark:bg-[#c9302a] dark:hover:bg-[#b02822]`}>
         <svg viewBox="0 0 20 20" aria-hidden="true" className="size-4.5"><circle cx="10" cy="10" r="6.6" fill="none" stroke="currentColor" strokeWidth="2" /><path d="M5.4 14.6l9.2-9.2" stroke="currentColor" strokeWidth="2" /></svg>{pending ? 'Sending…' : 'Deny'}</button>
+      {canApproveHere && <button name="decision" value="approve" disabled={pending || deadlinePassed}
+        className={`${base} bg-action text-white hover:bg-action-hover sm:min-w-40`}>
+        <svg viewBox="0 0 20 20" aria-hidden="true" className="size-4.5"><path d="M4.5 10.5l3.5 3.5 7.5-8" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>Approve</button>}
     </div>
     {!canApproveHere && <p className="mt-3">To approve, use the Guardian notification on your phone.</p>}
     {deadlinePassed && <p role="status" className="mt-3 font-semibold">Time is up. Refresh to see the latest payment status.</p>}

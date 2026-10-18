@@ -395,6 +395,7 @@ describe('strict input', () => {
   });
 
   it('rejects an unknown field instead of ignoring it', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- dropped on purpose
     const { amountCents: _omit, ...rest } = scamBody;
     const response = await read(
       await routes.payments.POST(req('/payments', { device: deviceToken, body: { ...rest, idempotencyKey: 'api-test-unknown-1', amount: 500 } }), noParams),

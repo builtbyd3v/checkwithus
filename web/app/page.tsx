@@ -11,11 +11,12 @@ import { card, display, h3, navLink, nudge, pill, primary, split, sunButton, tex
 export const metadata: Metadata = {
   title: 'checkwith.us | Scam protection the family runs',
   description: 'An iPhone app for older adults. It hides scam texts, labels scam calls and pauses risky payments until someone in the family says yes.',
+  alternates: { canonical: '/' },
 };
 
 // Auth0 redirects need a full page load, so these are plain <a> tags, not next/link.
 const DASHBOARD = '/dashboard';
-const GITHUB = 'https://github.com/builtbyd3v/checkwith.us';
+const GITHUB = 'https://github.com/builtbyd3v/checkwithus';
 
 // What the real rules give a $500 gift card at a new store, paid during a call, in the order the family sees them.
 const REASONS: HoldReason[] = ['gift_card', 'new_payee', 'over_limit', 'during_call'];

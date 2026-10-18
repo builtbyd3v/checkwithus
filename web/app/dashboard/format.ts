@@ -65,3 +65,9 @@ export function usualWeekCents(weeks: number[]): number {
   const finished = weeks.slice(0, -1);
   return finished.length ? Math.round(finished.reduce((sum, cents) => sum + cents, 0) / finished.length) : 0;
 }
+
+/** The speed card's headline. Under 1.5x the gap is noise on one family's data, so it says so instead of claiming a speedup. */
+export function speedHeadline({ aggregateMs, rawMs }: { aggregateMs: number; rawMs: number }): string {
+  const ratio = rawMs / aggregateMs;
+  return ratio >= 1.5 ? `${ratio.toFixed(1)}x faster.` : `Both under ${Math.floor(Math.max(rawMs, aggregateMs)) + 1} ms at this size.`;
+}
