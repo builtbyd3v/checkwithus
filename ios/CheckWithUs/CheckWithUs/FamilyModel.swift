@@ -295,13 +295,13 @@ import SwiftUI
     private func loadMock(_ preview: String) {
         mock = true
         tokens = .init(access: "preview", refresh: nil)
-        circles = [.init(circleId: "c1", protectedName: "Rosa", yourName: "Maria")]
+        circles = [.init(circleId: "c1", protectedName: "Sam", yourName: "Maria")]
         let now = Date()
         let iso = { (minutes: Double) in ISO8601DateFormatter().string(from: now.addingTimeInterval(minutes * 60)) }
         let payment = { (id: String, status: String, cents: Int, payee: String, kind: String, known: Bool, category: (String, String),
                          onCall: Bool, reasons: [(String, String)], note: String?, ago: Double, by: String?) in
             FamilyAPI.Payment(
-                id: id, circleId: "c1", protectedName: "Rosa", status: status, amountCents: cents,
+                id: id, circleId: "c1", protectedName: "Sam", status: status, amountCents: cents,
                 payee: .init(name: payee, kind: kind, known: known), category: .init(code: category.0, label: category.1),
                 onCall: onCall, holdReasons: reasons.map { .init(code: $0.0, label: $0.1) }, explanation: note,
                 createdAt: iso(-ago), expiresAt: iso(5 - ago), decidedByName: by, approvalsRequired: 1)
@@ -309,7 +309,7 @@ import SwiftUI
         payments = [
             payment("p1", "held", 50000, "Gift card store", "merchant", false, ("gift_cards", "Gift cards"), true,
                     [("gift_card", "Gift card purchase"), ("new_payee", "Someone they have not paid before"), ("during_call", "Paid while on a phone call")],
-                    "Rosa is paying $500 to Gift card store while on a phone call. Scammers often ask to be paid with gift cards, because the money is hard to trace or get back.", 1, nil),
+                    "Sam is paying $500 to Gift card store while on a phone call. Scammers often ask to be paid with gift cards, because the money is hard to trace or get back.", 1, nil),
             payment("p2", "held", 32000, "City Power & Light", "biller", true, ("utilities", "Utilities"), false,
                     [("over_limit", "Over the limit you set")], nil, 2, nil),
             payment("p3", "paid", 8412, "Sunrise Grocery", "merchant", true, ("groceries", "Groceries"), false, [], nil, 90, nil),
@@ -319,9 +319,9 @@ import SwiftUI
                     [("new_payee", "Someone they have not paid before")], nil, 1500, nil),
         ]
         alerts = [
-            .init(id: "a1", protectedName: "Rosa", kind: "bank_during_call", detail: "Near Chase on University Ave", createdAt: iso(-3)),
-            .init(id: "a2", protectedName: "Rosa", kind: "ask_family", detail: nil, createdAt: iso(-45)),
-            .init(id: "a3", protectedName: "Rosa", kind: "some_future_kind", detail: nil, createdAt: iso(-50)),
+            .init(id: "a1", protectedName: "Sam", kind: "bank_during_call", detail: "Near Chase on University Ave", createdAt: iso(-3)),
+            .init(id: "a2", protectedName: "Sam", kind: "ask_family", detail: nil, createdAt: iso(-45)),
+            .init(id: "a3", protectedName: "Sam", kind: "some_future_kind", detail: nil, createdAt: iso(-50)),
         ]
         balance = .init(availableCents: 241_288, ledgerBalanceCents: 273_288, reservedCents: 32000, checkedAt: iso(-1), frozen: false)
         allowances = [
