@@ -2,7 +2,7 @@
 
 Use [devpost.md](devpost.md) for the submission fields, [dev-post.md](dev-post.md)
 for the DEV article, [video-script.md](video-script.md) for the two-minute video,
-and [demo.md](demo.md) for the separate three-minute expo demo. The PR description
+and [pitch.md](pitch.md) and [demo.md](demo.md) for the separate expo demo (30 s judge video + 2:00 live talk). The PR description
 is the current work-status record; this page explains how to publish the assets.
 
 ## Select the demonstrated build

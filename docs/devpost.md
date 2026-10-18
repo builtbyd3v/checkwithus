@@ -138,7 +138,7 @@ Nessie is the bank in every step. Each endpoint has a job:
 - Gallery upload candidates: actual app captures `03-older-adult-home-safe`, `05-family-approvals`, `06-family-why-we-paused`, plus `dashboard-sequence-390`. New design boards `design-sketch`, `design-wireframe`, `design-final` are explicitly post-implementation explorations, not earlier process evidence. See `docs/design/handoff.md` and `docs/gallery/dashboard-review.md`. Upload selected assets with a sentence on the design choice.
 
 ### MLH: Best Domain Name from GoDaddy Registry
-checkwith.us is the product name, the brand and the live site. The name is the promise: before money moves, it checks with us, the family. TODO(Dev): confirm the MLH GoDaddy Registry code was used (whois shows registrar Porkbun; .us is run by GoDaddy Registry), then write one sentence on how it was registered.
+checkwith.us is the product name, the brand and the live site. The name is the promise: before money moves, it checks with us, the family. We registered it with the MLH GoDaddy Registry code. MLH codes are redeemed through Porkbun, and the .us registry is GoDaddy Registry.
 
 ### MLH: DEV Writing Challenge
 TODO(Dev): add the DEV post link (draft in `docs/dev-post.md`).
