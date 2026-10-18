@@ -986,6 +986,33 @@ struct FamilySettingsView: View {
                     }
                     .listRowBackground(Color.surface)
                 }
+                if model.circle != nil {
+                    Section {
+                        Button("Pair \(model.protectedName)'s phone") { Task { await model.createPairingCode() } }
+                            .accessibilityInputLabels(["Pair \(model.protectedName)'s phone", "Pair", "Pairing code"])
+                        if let pairing = model.pairingCode {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(pairing.code)
+                                    .font(.display(.largeTitle))
+                                    .textSelection(.enabled)
+                                    // Read one character at a time, so VoiceOver does not say it as a word.
+                                    .accessibilityLabel("Pairing code \(pairing.code.filter { $0 != "-" }.map(String.init).joined(separator: " "))")
+                                Text("On \(model.protectedName)'s phone, tap I have a code from my family and type this code.\(isoDate(pairing.expiresAt).map { " It works until \($0.formatted(date: .omitted, time: .shortened))." } ?? "")")
+                                    .font(.brand(.footnote))
+                                    .foregroundStyle(Color.secondaryText)
+                            }
+                            .padding(.vertical, 4)
+                        }
+                        Button("Unpair \(model.protectedName)'s phone", role: .destructive) { confirmUnpair = true }
+                            .accessibilityInputLabels(["Unpair \(model.protectedName)'s phone", "Unpair"])
+                        if let notice = model.notice { Text(notice).foregroundStyle(Color.secondaryText) }
+                        if let error = model.error { Text(error).foregroundStyle(Color.errorText) }
+                    } footer: {
+                        Foot("Only family can do this. \(model.protectedName)'s phone goes back to its first screen until you pair it again with a new code.")
+                    }
+                    .listRowBackground(Color.surface)
+                    .disabled(model.busy)
+                }
                 Section {
                     TextSizeChoices()
                 } header: {
@@ -1000,18 +1027,6 @@ struct FamilySettingsView: View {
                     Foot("Use this if \(model.protectedName) will use this phone.")
                 }
                 .listRowBackground(Color.surface)
-                if model.circle != nil {
-                    Section {
-                        Button("Unpair \(model.protectedName)'s phone", role: .destructive) { confirmUnpair = true }
-                            .accessibilityInputLabels(["Unpair \(model.protectedName)'s phone", "Unpair"])
-                        if let notice = model.notice { Text(notice).foregroundStyle(Color.secondaryText) }
-                        if let error = model.error { Text(error).foregroundStyle(Color.errorText) }
-                    } footer: {
-                        Foot("Only family can do this. \(model.protectedName)'s phone goes back to its first screen until you pair it again with a new code.")
-                    }
-                    .listRowBackground(Color.surface)
-                    .disabled(model.busy)
-                }
                 Section {
                     Button("Sign out", role: .destructive) { model.signOut() }
                 }
