@@ -29,7 +29,7 @@ const SLOTS: { id: SponsorId; name: string; verb: string; lit: number[] }[] = [
   { id: "tiger", name: "Tiger Data", verb: "spots the pattern", lit: [PAUSED, J45.groA.from + GROCERY.pause] },
   { id: "auth0", name: "Auth0", verb: "who can say yes", lit: [DENIED, APPROVED] },
   { id: "eyes", name: "Easy On The Eyes", verb: "nothing to learn", lit: [J45.gap2.from] },
-  { id: "godaddy", name: "GoDaddy Registry", verb: "the name", lit: [J45.end.from] },
+  { id: "godaddy", name: "GoDaddy Registry", verb: "the name is the product", lit: [J45.end.from] },
 ];
 
 const Slot = ({ slot }: { slot: (typeof SLOTS)[number] }) => {

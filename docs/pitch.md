@@ -40,7 +40,7 @@ When a judge asks "show me", use the matching live step in [demo.md](demo.md).
 | 0:08–0:16 | She pays $200 at a gift card store. Her screen: "Paused, waiting for family". Family phone shows the reasons. Tap Deny. Her lock screen: "Stopped". | "Her family decides, not the scammer." | Auth0, Easy On The Eyes |
 | 0:16–0:22 | ATM cash $200, then a gift card. The hold reads "Cash at an ATM, then a gift card". | "Normal alone. A scam together." | Nessie, Tiger Data |
 | 0:22–0:27 | Family taps Freeze. "Money is in the safe account." | "One tap. Her balance goes to a vault." | Nessie |
-| 0:27–0:30 | checkwith.us logo | "She does nothing. Her family does the work." | GoDaddy |
+| 0:27–0:30 | checkwith.us logo | "Before money moves, check with us." | GoDaddy |
 
 Shoot it on the real phones with the pinned `main` build. How to film each shot: [demo.md](demo.md).
 
@@ -116,8 +116,18 @@ Each sponsor block has a **20 s** version for the default order and a **60 s** v
 **Proof:** the README "Model evaluation" table.
 **If asked:** the 96.0% and 2.4% are slightly optimistic. We picked the 97% validation recall target after seeing one test result (README, DECISIONS 26). Say this before a judge finds it.
 
-### GoDaddy + close (10 s)
-> "The name is the promise: before money moves, check with us. checkwith.us."
+### GoDaddy Registry + close
+
+The domain is the product. "check with us" is the instruction the app enforces, and the URL is that instruction with one dot added. Every scam script says "don't tell your family". Our name says the opposite.
+
+**10 s (close, default order)**
+> "Our domain is the product. checkwith.us is the instruction itself: check with us. Every scammer says 'don't tell your family.' Our name says the opposite. Before money moves, check with us."
+
+**30 s (when the GoDaddy judge is at the table)**
+> "Our domain is the whole product in one line. Read it out loud: check with us. That's exactly what the app makes happen: before a risky payment moves, it checks with the family. The video ends on the tagline collapsing into the URL, because they're the same words. And it's the direct answer to the scam: every scam script says 'don't tell your family.' Our name tells them the opposite, and it's easy to say to a parent: 'just check with us.' A .us name from GoDaddy Registry, where 'us' is the family."
+
+**Proof:** the end of the judge video (the tagline collapses into checkwith.us), and the tagline on every screen of the pitch.
+**If asked:** Why .us? "Us" is the family, so the domain reads as a sentence and needs no logo to explain it. No hyphens and no invented spelling, so a parent can type it after hearing it once.
 
 ## Unverified: cut or verify before the expo
 

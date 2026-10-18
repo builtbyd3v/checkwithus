@@ -30,7 +30,7 @@ const SponsorMark = ({ id, w, h }: { id: SponsorId; w: number; h: number }) => {
   return (
     <div style={{ width: w, height: h, display: "flex", alignItems: "center", justifyContent: "center" }}>
       {src ? (
-        <Img src={staticFile(src)} style={{ maxWidth: w, maxHeight: h, objectFit: "contain" }} />
+        <Img src={staticFile(src)} style={{ width: w, height: h, objectFit: "contain" }} />
       ) : (
         <div style={{
           background: C.nightPanel, border: `3px solid ${C.purple}`, borderRadius: 999, padding: "12px 24px",
@@ -142,37 +142,60 @@ export const TableCard = () => {
   );
 };
 
-// 4. End: brand, the promise, and the logo wall with one word each.
+// 4. End: the tagline collapses into the domain ("check with us." -> checkwith.us), because the name IS
+// the product (GoDaddy Registry), then the logo wall with one phrase per sponsor.
 const WALL: { id: SponsorId; word: string }[] = [
   { id: "nessie", word: "moves the money" },
   { id: "auth0", word: "who can say yes" },
   { id: "tiger", word: "spots the unusual" },
   { id: "eyes", word: "nothing to learn" },
-  { id: "godaddy", word: "the name" },
+  { id: "godaddy", word: "the name is the product" },
 ];
 
 const WallItem = ({ id, word, delay }: { id: SponsorId; word: string; delay: number }) => {
   const p = usePop(delay, 13);
   return (
-    <div style={{ width: 320, display: "flex", flexDirection: "column", alignItems: "center", gap: 18, opacity: p, transform: `translateY(${(1 - p) * 30}px)` }}>
-      <SponsorMark id={id} w={300} h={76} />
-      <div style={{ color: "#D9C9EC", fontSize: 32, fontWeight: 700 }}>{word}</div>
+    <div style={{ width: 330, display: "flex", flexDirection: "column", alignItems: "center", gap: 16, opacity: p, transform: `translateY(${(1 - p) * 30}px)` }}>
+      <SponsorMark id={id} w={280} h={64} />
+      <div style={{ color: "#D9C9EC", fontSize: 28, fontWeight: 700, textAlign: "center" }}>{word}</div>
     </div>
   );
 };
 
+// "Before money moves," fades out first, then "check with us." collapses into "checkwith.us", then the icon slides in.
+const FADE = [36, 48] as const;
+const MORPH = [46, 70] as const;
+const ICON_IN = [68, 82] as const;
+
 export const EndCard = () => {
-  const head = usePop(0, 14);
-  const line = usePop(10, 16);
+  const frame = useCurrentFrame();
+  const m = interpolate(frame, MORPH, [0, 1], { ...clamp, easing: Easing.inOut(Easing.cubic) });
+  const enter = usePop(0, 14);
+  const size = 84 + m * 66;
+  const gap = (1 - m) * 0.28; // word spaces, in em
+  const fade = interpolate(frame, FADE, [1, 0], clamp);
+  const icon = interpolate(frame, ICON_IN, [0, 1], { ...clamp, easing: Easing.out(Easing.cubic) });
+  const name = usePop(ICON_IN[1] + 2, 14);
+  const wall = ICON_IN[1] + 26;
   return (
     <AbsoluteFill style={{ background: C.night, fontFamily: FONT, alignItems: "center", justifyContent: "center" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 40, opacity: head, transform: `scale(${0.9 + head * 0.1})` }}>
-        <Icon size={150} />
-        <div style={{ color: C.white, fontWeight: 800, fontSize: 140, letterSpacing: -3 }}>checkwith.us</div>
+      <div style={{ display: "flex", alignItems: "center", fontWeight: 800, fontSize: size, letterSpacing: -1, whiteSpace: "nowrap", opacity: enter, marginTop: -120 }}>
+        <span style={{ display: "inline-block", overflow: "hidden", maxWidth: fade * 1100, opacity: fade, color: C.white }}>Before money moves,&nbsp;</span>
+        <span style={{ display: "inline-block", width: icon * 170, overflow: "hidden", opacity: icon }}><Icon size={140} /></span>
+        <span style={{ color: m < 1 ? C.yellow : C.white }}>check</span>
+        <span style={{ display: "inline-block", width: `${gap}em` }} />
+        <span style={{ color: m < 1 ? C.yellow : C.white }}>with</span>
+        <span style={{ display: "inline-block", width: `${gap}em` }} />
+        <span style={{ display: "inline-block", overflow: "hidden", maxWidth: `${m * 0.4}em`, color: C.yellow }}>.</span>
+        <span style={{ color: m < 1 ? C.yellow : C.white }}>us</span>
+        <span style={{ display: "inline-block", overflow: "hidden", maxWidth: `${(1 - m) * 0.4}em`, color: C.yellow }}>.</span>
       </div>
-      <div style={{ color: C.yellow, fontWeight: 800, fontSize: 64, marginTop: 36, opacity: line }}>{TAGLINE}</div>
-      <div style={{ display: "flex", gap: 24, marginTop: 110 }}>
-        {WALL.map((w, i) => <WallItem key={w.id} {...w} delay={24 + i * 6} />)}
+      <div style={{ display: "flex", alignItems: "center", gap: 24, marginTop: 34, opacity: name, transform: `translateY(${(1 - name) * 20}px)` }}>
+        <SponsorMark id="godaddy" w={460} h={76} />
+        <div style={{ color: C.yellow, fontWeight: 800, fontSize: 56 }}>The name is the product.</div>
+      </div>
+      <div style={{ position: "absolute", bottom: 90, display: "flex", gap: 20 }}>
+        {WALL.map((w, i) => <WallItem key={w.id} {...w} delay={wall + i * 6} />)}
       </div>
     </AbsoluteFill>
   );

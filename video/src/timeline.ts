@@ -63,9 +63,9 @@ export const J45 = {
   groA: { from: 825, dur: 105 }, // GroceryScene 0-90 (+ hold): $420 groceries paused
   gap2: { from: 930, dur: 120 }, // CLIP J2 (4 s): family taps Approve. Easy On The Eyes callout
   groB: { from: 1050, dur: 90 }, // GroceryScene 90-180: approved, paid
-  end: { from: 1140, dur: 150 }, // logo + tagline + logo wall
+  end: { from: 1140, dur: 180 }, // tagline collapses into checkwith.us + GoDaddy line + logo wall
 };
-export const J45_DUR = 1290;
+export const J45_DUR = 1320;
 // Where the filmed clips sit in the left half (video pixels): under the sponsor bar, above the captions.
 export const CAM = { x: 0, y: 100, w: 960, h: 800 };
 export const SPLIT_FROM = J45.atm.from;
