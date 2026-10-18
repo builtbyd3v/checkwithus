@@ -320,7 +320,7 @@ export function DashboardView(data: DashboardData) {
         </section>
         <section aria-labelledby="rules-title" className={panel}>
           <h3 id="rules-title" className={`${panelTitle} mb-4`}>Rules</h3>
-          <HoldLimitForm circleId={data.activeCircleId} holdDollars={data.holdDollars}
+          <HoldLimitForm key={data.activeCircleId} circleId={data.activeCircleId} holdDollars={data.holdDollars}
             twoApprovalsDollars={data.twoApprovalsDollars} approverCount={data.approverCount} />
           <div className="mt-6"><PayeeForm circleId={data.activeCircleId} /></div>
         </section>

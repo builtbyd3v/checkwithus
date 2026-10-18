@@ -120,12 +120,8 @@ token. Circle access is checked server-side.
 Fresh login means a verified Auth0 `auth_time` no older than five minutes, not token
 issuance time. Request reauthentication with `max_age=0`; for the dashboard use
 `/auth/login?max_age=0&returnTo=/dashboard`. Bearer clients must arrange for Auth0 to
-include `auth_time` in the signed API token; its absence fails closed. Dashboard
-server actions `grantAllowanceAction` and `revokeAllowanceAction` are available for
-rgons's UI and use the authenticated session. The grant action accepts integer
-`maxAmountCents`, not a dollar float. The UI should show a sign-in-again action when
-step-up is required. Dashboard allowance display/forms are still to be wired by
-the UI owner.
+include `auth_time` in the signed API token; its absence fails closed. Allowances are granted and revoked through the family API (the family iPhone app); the
+dashboard has no allowance form.
 
 Amounts strictly above the circle's threshold (default $1,000) always hold and
 require two distinct current approvers; one denial blocks. Families can change the
