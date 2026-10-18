@@ -16,17 +16,21 @@ const shell = [
 const navLink = 'inline-flex min-h-11 items-center rounded-full px-3.5 font-medium text-muted hover:bg-card hover:text-foreground';
 
 /** The signed-in family member, from the Auth0 session. Nothing in the local preview, which has no session. */
-async function Approver() {
+async function signedInName(): Promise<string | undefined> {
   try {
     const { auth0 } = await import('@/lib/auth0/web');
     const user = (await auth0.getSession())?.user;
-    const name = user?.name ?? user?.nickname ?? user?.email;
-    if (!name) return null;
-    return <span title={`Signed in as ${name}`} className="inline-grid size-10 shrink-0 place-items-center rounded-full bg-action font-bold text-white">
-      <span aria-hidden="true">{name.trim().charAt(0).toUpperCase()}</span><span className="sr-only">Signed in as {name}</span></span>;
+    return user?.name ?? user?.nickname ?? user?.email;
   } catch {
-    return null;
+    return undefined;
   }
+}
+
+async function Approver() {
+  const name = await signedInName();
+  if (!name) return null;
+  return <span title={`Signed in as ${name}`} className="inline-grid size-10 shrink-0 place-items-center rounded-full bg-action font-bold text-white">
+    <span aria-hidden="true">{name.trim().charAt(0).toUpperCase()}</span><span className="sr-only">Signed in as {name}</span></span>;
 }
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
