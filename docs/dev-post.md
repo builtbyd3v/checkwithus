@@ -107,7 +107,7 @@ We measured 1,000,000 synthetic rows (200 circles, 3 years) on Tiger Cloud. The 
 
 ## Hackathon Experience
 
-We went to SwampHacks XII (Oct 16 to 18, 2026) as a team of four, and entered the Best First Timers track. Two of us, Hitesh and Rishon, were at our first hackathon. Hitesh wrote the pitch script and planned the demo video. Rishon (rgons15) did the design research that Dev turned into the app and dashboard design.
+We went to SwampHacks XII (Oct 16 to 18, 2026) as a team of four, and entered the Best First Timers track. Two of us, Hitesh and Rishon, were at our first hackathon. Hitesh wrote the pitch script and planned the demo video. Rishon did the design research that Dev turned into the app and dashboard design.
 
 We built with Claude Code and OpenAI Codex CLI. Claude Code wrote most of the code. Codex continued parts of the web backend and reviewed changes read-only. It found the data leak above and real payment bugs, like a retry that sent a new request instead of the same one. We checked every finding before a fix.
 
