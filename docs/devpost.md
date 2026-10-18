@@ -75,7 +75,7 @@ checkwith.us is one iPhone app with two roles, plus a web dashboard.
 - Data hygiene matters. With a validation set that was 91% generated text, the tuned threshold gave 88.9% test recall. After we made validation real text only (and fixed the leaks), Guard v1 reached 98.4%.
 - Give the language model facts to rewrite, not a job to decide.
 - An independent read-only reviewer catches bugs the authoring agent misses.
-- Our two first-timers shipped real product code. Hitesh built investment-scam detection (3 new rules and a probe by scam stage), the blind test set with `ml/guard_check.py`, and the Message Filter fallback that runs the rules if the model fails to load. Rishon (rgons15) built the family web dashboard: decision cards that lock at the deadline, an accessible spending chart, and a local preview with synthetic data. Rishon also made the iPhone app icon and the video script.
+- Our two first-timers: Hitesh wrote the pitch script and planned the demo video. Rishon (rgons15) did the design research that Dev turned into the app and dashboard design.
 
 ## What's next for checkwith.us
 
@@ -145,7 +145,7 @@ checkwith.us is the product name, the brand and the live site. Read the address 
 TODO(Dev): add the DEV post link (draft in `docs/dev-post.md`).
 
 ### Best First Timers (our specialized track)
-Two of the four of us, Hitesh and Rishon, are at our first hackathon. Hitesh built investment-scam detection (3 new rules and a probe by scam stage), the blind test set with `ml/guard_check.py`, and the Message Filter fallback that runs the rules if the model fails to load. Rishon (rgons15) built the family web dashboard: decision cards that lock at the deadline, an accessible spending chart, and a local preview with synthetic data. Rishon also made the iPhone app icon and the video script.
+Two of the four of us, Hitesh and Rishon, are at our first hackathon. Hitesh wrote the pitch script and planned the demo video. Rishon (rgons15) did the design research that Dev turned into the app and dashboard design.
 
 ### Our scam models (shown for judges, not an entry)
 Two models we trained, with honest scores on 884 real test texts (README "Model evaluation"):
