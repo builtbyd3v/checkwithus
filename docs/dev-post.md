@@ -107,7 +107,7 @@ We measured 1,000,000 synthetic rows (200 circles, 3 years) on Tiger Cloud. The 
 
 ## Hackathon Experience
 
-We went to SwampHacks XII (Oct 16 to 18, 2026) as a team of four, and entered the Best First Timers track. TODO(Dev): name the first-timers and add one true sentence on what each built or learned.
+We went to SwampHacks XII (Oct 16 to 18, 2026) as a team of four, and entered the Best First Timers track. Two of us, Hitesh and Rishon, were at our first hackathon. Hitesh built investment-scam detection (3 new rules and a probe by scam stage), the blind test set with `ml/guard_check.py`, and the Message Filter fallback that runs the rules if the model fails to load. Rishon (rgons15) built the family web dashboard: decision cards that lock at the deadline, an accessible spending chart, and a local preview with synthetic data. Rishon also made the iPhone app icon and the video script.
 
 We built with Claude Code and OpenAI Codex CLI. Claude Code wrote most of the code. Codex continued parts of the web backend and reviewed changes read-only. It found the data leak above and real payment bugs, like a retry that sent a new request instead of the same one. We checked every finding before a fix.
 

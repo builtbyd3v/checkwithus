@@ -108,7 +108,7 @@ Each sponsor block has a **20 s** version for the default order and a **60 s** v
 ### Best First Timers (10 s, our specialized track)
 
 **10 s** (a first-timer says it)
-> "Two of us are at our first hackathon. TODO(Dev): first-timer names and what each built. Ask them how it works."
+> "Hitesh and Rishon are at their first hackathon. Hitesh built the investment-scam rules and our blind test. Rishon built the family dashboard. Ask them how it works."
 
 **Proof:** each first-timer shows and explains their own piece.
 
