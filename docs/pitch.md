@@ -114,6 +114,7 @@ Each sponsor block has a **20 s** version for the default order and a **60 s** v
 > "We trained two models. A DistilBERT model scored well, but it's 67 MB, and iOS kills the Message Filter above about 25 to 30 MB. So we shipped Guard tiny: character and word n-grams with logistic regression, 1 MB of weights, 0.14 milliseconds a text in Swift, together with fixed rules. On 884 real texts it catches 96.0% of scams with 2.4% false holds. The hard part was honest data. We found near-duplicate scam campaigns leaking between train and test, so we cluster similar texts and keep each cluster in one split. Then the rule that matters: the model can only add a hold reason, never remove one, so a fooled model makes us more careful, never less. And when a payment is held, Apple's on-device model writes a short note for the family, from facts our code picked."
 
 **Proof:** the README "Model evaluation" table.
+**If asked:** the 96.0% and 2.4% are slightly optimistic. We picked the 97% validation recall target after seeing one test result (README, DECISIONS 26). Say this before a judge finds it.
 
 ### GoDaddy + close (10 s)
 > "The name is the promise: before money moves, check with us. checkwith.us."
@@ -123,7 +124,7 @@ Each sponsor block has a **20 s** version for the default order and a **60 s** v
 1. **Bill-pay agent:** the code is on main (PR #46 itself was closed unmerged), but the real Auth0 Machine-to-Machine grant is not tested on the live tenant. Ask Dev for one live `npm run agent:bills` run. If it does not run, say "tested against a fake Auth0".
 2. **CIBA Guardian push:** built and tested against a fake Auth0 (`web/test/fake-auth0.ts`), not verified live. Do not say "live". Mention it only if a judge asks.
 3. **`approve:payments`:** the server checks this Auth0 permission only when the token carries a `permissions` claim or `AUTH0_RBAC=true`. Otherwise the circle's approver role alone decides. Before saying "Auth0 RBAC", confirm RBAC is on for the live Auth0 API.
-5. **Freeze on stage:** Freeze needs an Auth0 sign-in from the last 5 minutes. If iPhone B signed in earlier, tapping Freeze opens the Auth0 login sheet first. Sign in again on iPhone B just before a judge arrives.
+4. **Freeze on stage:** Freeze needs an Auth0 sign-in from the last 5 minutes. If iPhone B signed in earlier, tapping Freeze opens the Auth0 login sheet first. Sign in again on iPhone B just before a judge arrives.
 
 Checked against `main` on Oct 17 (Hitesh, with Claude Code): the 10 Nessie resource types, Freeze exactly once, `demo:atm`, PKCE, token checks, roles, the 2-approver rule, the agent's scope and machine-token rejection, the hypertable, compression, the three continuous aggregates, the 2-hour window, the [perf.md](perf.md) numbers, the speed card, the screen wording, the accessibility list and the model numbers in the README.
 
