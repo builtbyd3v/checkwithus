@@ -1,36 +1,55 @@
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { Suspense, type ReactNode } from 'react';
+import { Logo } from './logo';
 
 const shell = [
-  'min-h-screen bg-family-canvas text-family-ink min-[1100px]:flex',
-  '[&_h1]:tracking-[-.035em] [&_h2]:tracking-[-.035em] [&_h3]:tracking-[-.035em]',
-  '[&_:focus-visible]:outline-3 [&_:focus-visible]:outline-family-blue [&_:focus-visible]:outline-offset-4',
-  '[&_button]:rounded-[10px] [&_input]:rounded-[10px] [&_select]:rounded-[10px] [&_input]:accent-family-blue',
-  '[&_button]:transition-colors [&_a]:transition-colors [&_button]:duration-150 [&_a]:duration-150 motion-reduce:[&_button]:transition-none motion-reduce:[&_a]:transition-none',
-  '[&_main]:px-[clamp(16px,3vw,32px)] [&_main>section]:min-w-0 [&_article]:p-[clamp(16px,2vw,28px)]',
+  'min-h-screen bg-surface font-sans text-foreground selection:bg-action/25 dark:bg-background',
+  '[&_h1]:font-heading [&_h2]:font-heading [&_h3]:font-heading [&_h4]:font-heading [&_h1]:tracking-[-.025em] [&_h2]:tracking-[-.02em] [&_h3]:tracking-[-.02em] [&_h4]:tracking-[-.02em]',
+  '[&_:focus-visible]:outline-3 [&_:focus-visible]:outline-action [&_:focus-visible]:outline-offset-3',
+  '[&_input]:accent-action',
+  '[&_button]:transition-[color,background-color,scale] [&_a]:transition-colors [&_button]:duration-150 [&_a]:duration-150 [&_button]:ease-out-soft motion-reduce:[&_button]:transition-none motion-reduce:[&_a]:transition-none',
+  '[&_button:active:not(:disabled)]:scale-[.98] motion-reduce:[&_button:active:not(:disabled)]:scale-100',
   '[&_h1]:[overflow-wrap:anywhere] [&_h2]:[overflow-wrap:anywhere] [&_h3]:[overflow-wrap:anywhere] [&_dd]:[overflow-wrap:anywhere]',
   '[&_article_strong]:max-w-full [&_article_strong]:[overflow-wrap:anywhere]',
   '[&_form_button]:min-w-[min(7rem,100%)] [&_form_button]:max-w-full',
-  'max-sm:[&_main>section]:px-4 max-sm:[&_dl>div]:min-w-0 max-sm:[&_dl>div]:p-5',
 ].join(' ');
-const navLink = 'flex min-h-12 items-center gap-3 rounded-[10px] px-4 text-[15px] font-semibold text-family-body hover:bg-family-blue-soft hover:text-family-blue-deep';
+const navLink = 'inline-flex min-h-11 items-center rounded-full px-3.5 font-medium text-muted hover:bg-card hover:text-foreground';
+
+/** The signed-in family member, from the Auth0 session. Nothing in the local preview, which has no session. */
+async function signedInName(): Promise<string | undefined> {
+  try {
+    const { auth0 } = await import('@/lib/auth0/web');
+    const user = (await auth0.getSession())?.user;
+    return user?.name ?? user?.nickname ?? user?.email;
+  } catch {
+    return undefined;
+  }
+}
+
+async function Approver() {
+  const name = await signedInName();
+  if (!name) return null;
+  return <span title={`Signed in as ${name}`} className="inline-grid size-10 shrink-0 place-items-center rounded-full bg-action font-bold text-white">
+    <span aria-hidden="true">{name.trim().charAt(0).toUpperCase()}</span><span className="sr-only">Signed in as {name}</span></span>;
+}
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return <div className={shell}>
-    <a className="absolute left-2 top-2 z-50 -translate-y-[180%] bg-white p-3 focus:translate-y-0" href="#family-content">Skip to dashboard</a>
-    <aside className="sticky top-0 hidden h-screen w-[216px] shrink-0 flex-col border-r border-family-line bg-white px-4 py-8 min-[1100px]:flex" aria-label="Family workspace">
-      <Link href="/" className="px-4 text-2xl font-bold tracking-[-.06em]">checkwith<span className="text-family-blue">.us</span></Link>
-      <p className="mb-4 mt-12 px-4 text-xs font-semibold uppercase tracking-[.16em] text-family-muted">Your family</p>
-      <nav aria-label="Family workspace navigation" className="space-y-2">
-        <Link aria-current="page" className={`${navLink} bg-family-blue-soft`} href="/dashboard"><span aria-hidden="true">◈</span> Overview</Link>
-        <Link className={navLink} href="/dashboard#activity"><span aria-hidden="true">▤</span> Activity</Link>
-        <Link className={navLink} href="/dashboard#setup"><span aria-hidden="true">◎</span> Family circle</Link>
+    <a className="absolute left-2 top-2 z-50 -translate-y-[180%] rounded-xl bg-card p-3 focus:translate-y-0" href="#family-content">Skip to dashboard</a>
+    <header className="mx-auto flex min-h-14 max-w-[1280px] flex-wrap items-center gap-x-10 gap-y-2 px-4 py-2 sm:min-h-[76px] sm:px-10">
+      <Link href="/dashboard" className="flex min-h-11 items-center gap-2.5 font-heading text-lg font-extrabold tracking-[-.02em] sm:text-xl">
+        <Logo className="size-[26px] sm:size-[30px]" />checkwith.us</Link>
+      <nav aria-label="Dashboard" className="hidden gap-1 md:flex">
+        <Link className={`${navLink} bg-card font-semibold text-foreground`} aria-current="page" href="/dashboard">Overview</Link>
+        <Link className={navLink} href="/dashboard#activity">Activity</Link>
+        <Link className={navLink} href="/dashboard#payees">Payees</Link>
+        <Link className={navLink} href="/dashboard#setup">Family</Link>
       </nav>
-      <div className="mt-auto rounded-2xl bg-family-canvas p-4">
-        <p className="text-sm font-semibold">A little peace of mind.</p>
-        <p className="mt-2 text-sm leading-6 text-family-muted">Clear reasons. Family decisions. One payment at a time.</p>
+      <div className="ml-auto flex items-center gap-2">
+        <a href="/auth/logout" className={navLink}>Sign out</a>
+        <Suspense fallback={null}><Approver /></Suspense>
       </div>
-    </aside>
-    <div id="family-content" tabIndex={-1} className="min-w-0 flex-1">{children}</div>
+    </header>
+    <div id="family-content" tabIndex={-1} className="min-w-0">{children}</div>
   </div>;
 }

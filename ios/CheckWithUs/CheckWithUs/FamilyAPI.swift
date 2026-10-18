@@ -118,6 +118,12 @@ enum FamilyAPI {
         _ = try await send("DELETE", "family/circles/\(circle)/allowances/\(id)", token: token, as: R.self)
     }
 
+    /// Revokes the older adult's device token. Returns how many phones were unpaired.
+    static func unpair(_ circle: String, _ token: String) async throws -> Int {
+        struct R: Decodable { let unpaired: Int }
+        return try await send("POST", "family/circles/\(circle)/unpair", [String: Int](), token: token, as: R.self).unpaired
+    }
+
     private struct ErrorBody: Decodable { let error: String?; let message: String? }
 
     private static func send<R: Decodable>(_ method: String, _ path: String, _ body: (some Encodable)? = String?.none,
@@ -125,6 +131,8 @@ enum FamilyAPI {
         var request = URLRequest(url: API.base.appending(path: path), timeoutInterval: 15)
         request.httpMethod = method
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        // For step-up routes (unfreeze, unpair, allowances): the server reads the sign-in time from it.
+        if let id = FamilyAuth.load()?.id { request.setValue(id, forHTTPHeaderField: "X-Id-Token") }
         if let body {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = try JSONEncoder().encode(body)

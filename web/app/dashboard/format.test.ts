@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { usualLabel } from '@/lib/usual';
-import { alertHeadline, timeAgo } from './format';
+import { alertHeadline, dayHeading, moneyProtected, timeAgo, timeOfDay, usualWeekCents } from './format';
 
 it('words each alert kind and skips unknown ones', () => {
   expect(alertHeadline({ kind: 'bank_during_call', detail: 'At a bank (Seven Corners 1 ATM) while on a phone call.' }, 'Rosa'))
@@ -26,4 +26,30 @@ it('prefers the payee history, falls back to daily spending, hides small or miss
   expect(usualLabel({ payee_times: null, daily_times: 1 }, 'Target', 'Rosa')).toBeNull();
   expect(usualLabel({ payee_times: null, daily_times: null }, 'Target', 'Rosa')).toBeNull();
   expect(usualLabel(undefined, 'Target', 'Rosa')).toBeNull();
+});
+
+it('groups by the family day and words the heading', () => {
+  const now = new Date('2026-10-17T19:00:00Z');
+  expect(dayHeading(new Date('2026-10-17T13:00:00Z'), now)).toBe('Today');
+  // 1 AM UTC on the 17th is still the 16th in New York.
+  expect(dayHeading(new Date('2026-10-17T01:00:00Z'), now)).toBe('Yesterday');
+  expect(dayHeading(new Date('2026-10-09T20:00:00Z'), now)).toBe('Friday, Oct 9');
+  expect(timeOfDay(new Date('2026-10-17T19:02:00Z'))).toBe('3:02 PM');
+});
+
+it('counts denials this month plus everything held, in cents', () => {
+  const now = new Date('2026-10-17T19:00:00Z');
+  const payments = [
+    { status: 'denied', amountCents: 74000, createdAt: '2026-10-09T20:00:00Z' },
+    { status: 'denied', amountCents: 9900, createdAt: '2026-09-30T12:00:00Z' },
+    { status: 'paid', amountCents: 4618, createdAt: '2026-10-17T15:00:00Z' },
+  ];
+  expect(moneyProtected(payments, [{ status: 'held', amountCents: 50000, createdAt: '2026-10-17T19:02:00Z' }], now))
+    .toEqual({ deniedCents: 74000, heldCents: 50000 });
+});
+
+it('takes the usual week from finished weeks only', () => {
+  expect(usualWeekCents([100, 200, 300, 9999])).toBe(200);
+  expect(usualWeekCents([0, 0, 1])).toBe(0);
+  expect(usualWeekCents([])).toBe(0);
 });

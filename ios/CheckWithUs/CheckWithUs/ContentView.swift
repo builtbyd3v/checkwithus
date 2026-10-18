@@ -1,3 +1,4 @@
+import GuardKit
 import SwiftUI
 
 /// One screen at a time, one main action per screen. Text uses Dynamic Type styles so it grows with the
@@ -39,17 +40,12 @@ struct PairView: View {
 
     var body: some View {
         Page {
+            AppIconTile(size: 64)
             Text("Connect to your family")
-                .font(.largeTitle.bold())
+                .font(.display(.largeTitle))
             Text("Ask your family for the code on their screen. Type it here.")
-                .font(.title2)
-            TextField("Code", text: $code, prompt: Text("Code").foregroundStyle(Color.secondaryText))
-                .font(.largeTitle.monospaced())
-                .textInputAutocapitalization(.characters)
-                .autocorrectionDisabled()
-                .padding()
-                .background(.quaternary, in: .rect(cornerRadius: 16))
-                .accessibilityLabel("Family code")
+                .font(.brand(.title2))
+            CodeEntryField(label: "Family code", code: $code) { Task { await pair() } }
             ErrorText()
             // Very large text: Connect scrolls with the page, so the code box is fully in view at first.
             if typeSize.isAccessibilitySize { connect }
@@ -59,8 +55,12 @@ struct PairView: View {
     }
 
     private var connect: some View {
-        BigButton("Connect", symbol: "link") { await model.pair(code: code.trimmingCharacters(in: .whitespaces)) }
-            .disabled(code.trimmingCharacters(in: .whitespaces).count < 8)
+        BigButton("Connect", symbol: "link") { await pair() }
+            .disabled(ShortCode.canonical(code) == nil)
+    }
+
+    private func pair() async {
+        if let canonical = ShortCode.canonical(code) { await model.pair(code: canonical) }
     }
 }
 
@@ -73,23 +73,26 @@ struct HomeView: View {
         let paused = outcome == "waiting" || outcome == "sending"
         Page {
             if let name = model.config?.protectedName {
-                Text("Hi \(name)").font(.title)
+                Text("Hi \(name)").font(.brand(.title))
             }
             VStack(spacing: 16) {
                 Image(systemName: paused ? "pause.circle.fill" : "checkmark.shield.fill")
                     .font(.system(size: 120))
-                    .foregroundStyle(paused ? .orange : .green)
+                    .foregroundStyle(paused ? Color.pause : Color.safe)
                     .accessibilityHidden(true)
                 Text(paused ? OutcomeText.headline("waiting") : "You're safe")
-                    .font(.largeTitle.bold())
+                    .font(.hero)
                 Text(paused ? OutcomeText.detail("waiting") : "Your family is looking out for you.")
-                    .font(.title2)
+                    .font(.brand(.title2))
             }
+            .padding(28)
             .frame(maxWidth: .infinity)
+            .background(paused ? Color.pauseField : Color.safeField, in: .rect(cornerRadius: 32))
             .multilineTextAlignment(.center)
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(paused ? .isButton : [])
             .accessibilityHint(paused ? "Shows the paused payment." : "")
+            .accessibilityInputLabels(paused ? ["Show payment", "Payment"] : [])
             .onTapGesture { if paused { model.go(.status) } }
             // Read the change aloud when a payment pauses or settles while Home is open.
             // The real outcome, so "Stopped" or "It did not go through" is heard too.
@@ -108,6 +111,10 @@ struct HomeView: View {
             // The other buttons scroll at this size; this says so and takes you there.
             if typeSize.isAccessibilitySize { MoreBelowButton() } else { more }
         }
+        // Text size sits top right, as a settings button, so it never competes with the main action.
+        .safeAreaInset(edge: .top, spacing: 0) {
+            HStack { Spacer(); TextSizeButton() }.background(Color.bg)
+        }
     }
 
     @ViewBuilder private var more: some View {
@@ -120,7 +127,9 @@ struct HomeView: View {
                     .frame(maxWidth: .infinity, minHeight: 56)
                     .contentShape(.rect)
             }
-            .font(.title3.weight(.semibold))
+            .modifier(ShapeWhenAsked())
+            .accessibilityInputLabels(["Scam call warnings", "Turn on scam call warnings"])
+            .font(.brand(.title3, weight: .semibold))
             .multilineTextAlignment(.center)
         }
     }
@@ -129,11 +138,13 @@ struct HomeView: View {
 struct ChoosePayeeView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dynamicTypeSize) private var typeSize
+    /// One icon column, so every name starts at the same place.
+    @ScaledMetric(relativeTo: .title2) private var iconWidth = 32
 
     var body: some View {
         Page(back: .home) {
             Text("Who do you want to pay?")
-                .font(.largeTitle.bold())
+                .font(.display(.largeTitle))
             ForEach(Payee.all) { payee in
                 Button { model.go(.amount(payee)) } label: {
                     // Very large text: icon above the name, so the name gets the full width.
@@ -144,16 +155,26 @@ struct ChoosePayeeView: View {
                                 Text(payee.name)
                             }
                         } else {
-                            Label(payee.name, systemImage: payee.symbol)
+                            // A trailing chevron, so each row reads as tappable.
+                            HStack(spacing: 16) {
+                                Image(systemName: payee.symbol).frame(width: iconWidth).accessibilityHidden(true)
+                                Text(payee.name).frame(maxWidth: .infinity, alignment: .leading)
+                                Image(systemName: "chevron.right")
+                                    .font(.brand(.body, weight: .semibold))
+                                    .foregroundStyle(Color.secondaryText)
+                                    .accessibilityHidden(true)
+                            }
                         }
                     }
-                    .font(.title2.weight(.semibold))
+                    .font(.brand(.title2, weight: .semibold))
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
-                    .padding(.horizontal)
+                    .padding(.leading, 8)
                 }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.roundedRectangle(radius: 16))
+                .buttonStyle(.borderedProminent)
+                .tint(Color.surface)
+                .foregroundStyle(Color.ink)
+                .buttonBorderShape(.roundedRectangle(radius: 20))
             }
         }
     }
@@ -174,20 +195,21 @@ struct AmountView: View {
     var body: some View {
         Page(back: .choosePayee) {
             Text("How much to \(payee.name)?")
-                .font(.largeTitle.bold())
+                .font(.display(.largeTitle))
             HStack {
-                Text("$").font(.largeTitle.bold()).accessibilityHidden(true)
+                Text("$").font(.brand(.largeTitle, weight: .bold)).accessibilityHidden(true)
                 TextField("0", text: $text)
-                    .font(.largeTitle.bold())
+                    .font(.brand(.largeTitle, weight: .bold))
+                    .tint(Color.action)
                     .keyboardType(payee.kind == "biller" ? .decimalPad : .numberPad)
                     .focused($focused)
                     .accessibilityLabel("Amount in dollars")
             }
-            .padding()
-            .background(.quaternary, in: .rect(cornerRadius: 16))
+            .padding(20)
+            .background(Color.surface, in: .rect(cornerRadius: 20))
             if !text.isEmpty && amount == nil {
                 Text(payee.kind == "biller" ? "Type an amount like 84.12" : "Use whole dollars, like 50")
-                    .font(.title3)
+                    .font(.brand(.title3))
                     .foregroundStyle(Color.errorText)
             }
         } action: {
@@ -206,16 +228,21 @@ struct ConfirmView: View {
     var body: some View {
         Page(back: .amount(payee)) {
             Text("Pay \(dollars(cents)) to \(payee.name)?")
-                .font(.largeTitle.bold())
+                .font(.display(.largeTitle))
             if model.isOnCall {
-                Text("You are on a phone call. We will ask your family first.")
-                    .font(.title2)
+                // Icon and words, so the call state never depends on color.
+                Label("You are on a phone call. We will ask your family first.", systemImage: "phone.fill")
+                    .font(.brand(.title2))
                     .foregroundStyle(Color.warningText)
+                    .padding(20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.pauseField, in: .rect(cornerRadius: 20))
             }
             ErrorText()
         } action: {
             BigButton("Yes, pay", symbol: "checkmark") { await model.pay(payee, cents: cents) }
             BigButton("No, go back", symbol: "xmark", prominent: false) { model.go(.home) }
+                .accessibilityInputLabels(["No, go back", "Go back", "No"])
         }
     }
 }
@@ -226,7 +253,8 @@ struct StatusView: View {
 
     var body: some View {
         let outcome = model.payment?.outcome ?? "failed"
-        Page {
+        // The whole page takes the status color, with the icon and words on top.
+        Page(field: OutcomeText.field(outcome), centered: true) {
             VStack(spacing: 16) {
                 Image(systemName: OutcomeText.symbol(outcome))
                     .font(.system(size: 120))
@@ -234,12 +262,15 @@ struct StatusView: View {
                     .symbolEffect(.pulse, isActive: outcome == "waiting" && !reduceMotion)
                     .accessibilityHidden(true)
                 Text(OutcomeText.headline(outcome))
-                    .font(.largeTitle.bold())
+                    .font(.hero)
                 Text(OutcomeText.detail(outcome))
-                    .font(.title2)
+                    .font(.brand(.title2))
                 if let payment = model.payment {
                     Text("\(dollars(payment.amountCents)) to \(payment.payee.name)")
-                        .font(.title2.weight(.semibold))
+                        .font(.brand(.title2, weight: .semibold))
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 14)
+                        .background(Color.bg, in: .rect(cornerRadius: 20))
                 }
             }
             .frame(maxWidth: .infinity)
@@ -259,16 +290,16 @@ struct AskedView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        Page {
+        Page(centered: true) {
             VStack(spacing: 16) {
                 Image(systemName: "phone.arrow.down.left.fill")
                     .font(.system(size: 100))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Color.safe)
                     .accessibilityHidden(true)
                 Text("We told your family")
-                    .font(.largeTitle.bold())
+                    .font(.display(.largeTitle))
                 Text("They will call you soon. Do not send money to anyone until you talk to them.")
-                    .font(.title2)
+                    .font(.brand(.title2))
             }
             .frame(maxWidth: .infinity)
             .multilineTextAlignment(.center)
@@ -287,11 +318,17 @@ struct Page<Content: View, Actions: View>: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var position = ScrollPosition()
     var back: Screen?
+    /// Page color: the plain ground, or a status color on Paused, Stopped and Paid.
+    var field = Color.bg
+    /// Centered while it fits (status screens); it still scrolls at very large text.
+    var centered = false
     @ViewBuilder var content: Content
     @ViewBuilder var action: Actions
 
-    init(back: Screen? = nil, @ViewBuilder content: () -> Content, @ViewBuilder action: () -> Actions = { EmptyView() }) {
+    init(back: Screen? = nil, field: Color = .bg, centered: Bool = false, @ViewBuilder content: () -> Content, @ViewBuilder action: () -> Actions = { EmptyView() }) {
         self.back = back
+        self.field = field
+        self.centered = centered
         self.content = content()
         self.action = action()
     }
@@ -302,16 +339,19 @@ struct Page<Content: View, Actions: View>: View {
                 if let back {
                     Button { model.go(back) } label: {
                         Label("Back", systemImage: "chevron.left")
-                            .font(.title2.weight(.semibold))
+                            .font(.brand(.title2, weight: .semibold))
                             .frame(minHeight: 56)
                     }
+                    .modifier(ShapeWhenAsked())
                 }
                 content
             }
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .defaultScrollAnchor(centered ? .center : .top, for: .alignment)
         .scrollPosition($position)
+        .background(field.ignoresSafeArea())
         // Shows the scroll bar briefly, a hint that very large text continues below.
         .scrollIndicatorsFlash(onAppear: true)
         .safeAreaInset(edge: .bottom) {
@@ -325,7 +365,7 @@ struct Page<Content: View, Actions: View>: View {
                     .padding(.top, 12)
                     .padding(.bottom, 8)
                     // Opaque, so text scrolling under the buttons never shows through them.
-                    .background(.background)
+                    .background(field)
                     .environment(\.scrollToBottom) {
                         withAnimation(reduceMotion ? nil : .default) { position.scrollTo(edge: .bottom) }
                     }
@@ -344,10 +384,21 @@ struct MoreBelowButton: View {
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .contentShape(.rect)
         }
-        .font(.title3.weight(.semibold))
+        .modifier(ShapeWhenAsked())
+        .font(.brand(.title3, weight: .semibold))
         // ponytail: capped so the hint stays one line and leaves room for the page; VoiceOver users get the hint.
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         .accessibilityHint("Shows Pay a bill and more.")
+    }
+}
+
+/// Text-only buttons get a visible shape when Button Shapes is on (Settings > Accessibility > Display & Text Size).
+/// The big buttons are bordered already.
+struct ShapeWhenAsked: ViewModifier {
+    @Environment(\.accessibilityShowButtonShapes) private var showShapes
+
+    func body(content: Content) -> some View {
+        if showShapes { content.buttonStyle(.bordered) } else { content }
     }
 }
 
@@ -359,15 +410,20 @@ extension EnvironmentValues {
 struct BigButton: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.isEnabled) private var isEnabled
     let title: String
-    let symbol: String
+    /// No symbol: words only (the Welcome screen).
+    let symbol: String?
     var prominent = true
+    /// Yellow fill: the older adult's own choice on the role picker, as in the logo.
+    var sun = false
     let action: () async -> Void
 
-    init(_ title: String, symbol: String, prominent: Bool = true, action: @escaping () async -> Void) {
+    init(_ title: String, symbol: String? = nil, prominent: Bool = true, sun: Bool = false, action: @escaping () async -> Void) {
         self.title = title
         self.symbol = symbol
         self.prominent = prominent
+        self.sun = sun
         self.action = action
     }
 
@@ -375,17 +431,62 @@ struct BigButton: View {
         let button = Button { Task { await action() } } label: {
             Group {
                 // Very large text: the words get the full width instead of wrapping beside the icon.
-                if typeSize.isAccessibilitySize { Text(title) } else { Label(title, systemImage: symbol) }
+                if let symbol, !typeSize.isAccessibilitySize { Label(title, systemImage: symbol) } else { Text(title) }
             }
-            .font(.title.bold())
+            .font(.brand(.title, weight: .bold))
             .frame(maxWidth: .infinity, minHeight: 80)
         }
-        Group {
-            if prominent { button.buttonStyle(.borderedProminent) } else { button.buttonStyle(.bordered) }
-        }
-        .buttonBorderShape(.roundedRectangle(radius: 20))
-        .disabled(model.busy)
+        // Filled, no outlines: purple with white text, yellow or the surface tone with ink text.
+        let fill = sun ? Color.sun : prominent ? Color.action : Color.surface
+        let text = sun ? Color.onSun : prominent ? Color.white : Color.ink
+        button
+            .buttonStyle(.borderedProminent)
+            .tint(fill)
+            // Disabled keeps the system's dimmed look.
+            .foregroundStyle(isEnabled && !model.busy ? text : Color.secondaryText)
+            .buttonBorderShape(.roundedRectangle(radius: 24))
+            .disabled(model.busy)
     }
+}
+
+/// The app icon as a rounded tile (22.5% corners, as on the Home Screen), with a hairline so it holds its edge on bg.
+struct AppIconTile: View {
+    let size: CGFloat
+
+    var body: some View {
+        Image("AppIconTile")
+            .resizable()
+            .frame(width: size, height: size)
+            .clipShape(.rect(cornerRadius: size * 0.225))
+            .overlay { RoundedRectangle(cornerRadius: size * 0.225).strokeBorder(Color.ink.opacity(0.1)) }
+            .accessibilityHidden(true)
+    }
+}
+
+/// Top right on Pair and Home: the older adult's only setting. Nothing in it leads to the family side.
+struct TextSizeButton: View {
+    @State private var choosing = false
+
+    var body: some View {
+        Button { choosing = true } label: {
+            Image(systemName: "textformat.size")
+                .font(.brand(.title2, weight: .semibold))
+                .foregroundStyle(Color.secondaryText)
+                .frame(minWidth: 56, minHeight: 56)
+                .contentShape(.rect)
+        }
+        .modifier(ShapeWhenAsked())
+        .padding(.trailing, 8)
+        .accessibilityLabel("Text size")
+        .accessibilityInputLabels(["Text size", "Text", "Settings"])
+        .sheet(isPresented: $choosing) { TextSizeSheet() }
+    }
+}
+
+extension Font {
+    /// The 40 pt status headline (Home, Status), Gabarito, scaling with Dynamic Type from the large title.
+    /// ponytail: names the font here; move into AppTheme as a Font.display size if the lead wants one place.
+    static let hero = Font.custom("Gabarito-ExtraBold", size: 40, relativeTo: .largeTitle)
 }
 
 /// The last error, in the server's plain words.
@@ -395,19 +496,10 @@ struct ErrorText: View {
     var body: some View {
         if let error = model.error {
             Text(error)
-                .font(.title3)
+                .font(.brand(.title3))
                 .foregroundStyle(Color.errorText)
         }
     }
-}
-
-extension Color {
-    /// Text colors with at least 4.5:1 contrast on the light background. System orange, red and gray text fall short.
-    static let warningText = Color(UIColor { $0.userInterfaceStyle == .dark ? .systemOrange : UIColor(red: 0.64, green: 0.28, blue: 0, alpha: 1) })
-    static let secondaryText = Color(UIColor { $0.userInterfaceStyle == .dark ? .secondaryLabel : UIColor(white: 0.36, alpha: 1) })
-    static let errorText = Color(UIColor { $0.userInterfaceStyle == .dark ? .systemRed : UIColor(red: 0.77, green: 0.12, blue: 0.12, alpha: 1) })
-    /// Button tint: white on it is 6.4:1 in light mode (system blue is 3.5:1). Dark mode keeps system blue.
-    static let action = Color(UIColor { $0.userInterfaceStyle == .dark ? .systemBlue : UIColor(red: 0, green: 0.34, blue: 0.8, alpha: 1) })
 }
 
 #Preview {

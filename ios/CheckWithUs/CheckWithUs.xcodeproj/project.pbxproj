@@ -516,10 +516,11 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Check With Us";
+				INFOPLIST_KEY_CFBundleDisplayName = "Check With Us$(DISPLAY_SUFFIX)";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "If someone keeps you on the phone and sends you to the bank, we tell your family. We only tell your family the bank's name, never your exact location.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "If someone keeps you on the phone and sends you to the bank, we tell your family. We only tell your family the bank's name, never your exact location.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
+				INFOPLIST_FILE = "CheckWithUs-Info.plist";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Face ID confirms it is you before you approve a payment.";
 				CODE_SIGN_ENTITLEMENTS = CheckWithUs.entitlements;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -535,8 +536,9 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.devgiribharatgirigoswami.CheckWithUs;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.devgiribharatgirigoswami.CheckWithUs$(BUNDLE_SUFFIX)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) COPY$(BUNDLE_SUFFIX:identifier)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -561,10 +563,11 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Check With Us";
+				INFOPLIST_KEY_CFBundleDisplayName = "Check With Us$(DISPLAY_SUFFIX)";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "If someone keeps you on the phone and sends you to the bank, we tell your family. We only tell your family the bank's name, never your exact location.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "If someone keeps you on the phone and sends you to the bank, we tell your family. We only tell your family the bank's name, never your exact location.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
+				INFOPLIST_FILE = "CheckWithUs-Info.plist";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Face ID confirms it is you before you approve a payment.";
 				CODE_SIGN_ENTITLEMENTS = CheckWithUs.entitlements;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -580,8 +583,9 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.devgiribharatgirigoswami.CheckWithUs;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.devgiribharatgirigoswami.CheckWithUs$(BUNDLE_SUFFIX)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) COPY$(BUNDLE_SUFFIX:identifier)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -611,7 +615,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.devgiribharatgirigoswami.CheckWithUs.MessageFilter;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.devgiribharatgirigoswami.CheckWithUs$(BUNDLE_SUFFIX).MessageFilter";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -641,7 +645,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.devgiribharatgirigoswami.CheckWithUs.MessageFilter;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.devgiribharatgirigoswami.CheckWithUs$(BUNDLE_SUFFIX).MessageFilter";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -672,7 +676,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.devgiribharatgirigoswami.CheckWithUs.SafeCard;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.devgiribharatgirigoswami.CheckWithUs$(BUNDLE_SUFFIX).SafeCard";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -702,7 +706,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.devgiribharatgirigoswami.CheckWithUs.SafeCard;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.devgiribharatgirigoswami.CheckWithUs$(BUNDLE_SUFFIX).SafeCard";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -734,7 +738,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.devgiribharatgirigoswami.CheckWithUs.CallDirectory;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.devgiribharatgirigoswami.CheckWithUs$(BUNDLE_SUFFIX).CallDirectory";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -765,7 +769,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.devgiribharatgirigoswami.CheckWithUs.CallDirectory;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.devgiribharatgirigoswami.CheckWithUs$(BUNDLE_SUFFIX).CallDirectory";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;

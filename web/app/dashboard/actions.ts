@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { auth0 } from '@/lib/auth0/web';
 import { CATEGORIES, PAYEE_KINDS } from '@/lib/categories';
 import { db } from '@/lib/db';
-import { createPairingCode, joinCircle, rotateInviteCode } from '@/lib/family';
+import { createPairingCode, joinCircle, rotateInviteCode, unpairDevices } from '@/lib/family';
 import { formatCents, parseDollars } from '@/lib/money';
 import { normalizeName } from '@/lib/names';
 import { requirePermission } from '@/lib/permissions';
@@ -95,6 +95,18 @@ export async function pairingAction(_state: FormState, form: FormData): Promise<
   try {
     const pairing = await createPairingCode(db(), sub, circleId.data);
     return { message: 'Enter this code on the older adult’s phone.', ...pairing };
+  } catch (error) { return fail(error); }
+}
+
+/** Releases the older adult's phone. Same rules as the family app's unpair route. */
+export async function unpairAction(_state: FormState, form: FormData): Promise<FormState> {
+  const circleId = z.uuid().safeParse(value(form, 'circleId'));
+  if (!circleId.success) return { message: 'Circle not found.' };
+  const session = await auth0.getSession();
+  if (!session?.user.sub) redirect('/auth/login?returnTo=/dashboard');
+  try {
+    const { unpaired } = await unpairDevices(db(), session.user.sub, session.user.auth_time, circleId.data);
+    return { message: unpaired ? 'Their phone is unpaired. It goes back to the first screen.' : 'No phone was paired.' };
   } catch (error) { return fail(error); }
 }
 

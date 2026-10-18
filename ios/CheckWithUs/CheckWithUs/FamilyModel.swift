@@ -173,6 +173,18 @@ import SwiftUI
         }
     }
 
+    /// Revokes the older adult's phone on the server. Needs a fresh sign-in; `authed` runs it when the server asks.
+    func unpair() async {
+        await run {
+            #if DEBUG
+            if self.mock { self.notice = "\(self.protectedName)'s phone is unpaired."; return }
+            #endif
+            guard let id = self.circle?.circleId else { return }
+            let count = try await self.authed { try await FamilyAPI.unpair(id, $0) }
+            self.notice = count > 0 ? "\(self.protectedName)'s phone is unpaired." : "No phone was paired."
+        }
+    }
+
     // MARK: - Plumbing
 
     /// Calls the API with the access token. A step-up answer opens Auth0 for a fresh sign-in and retries once,

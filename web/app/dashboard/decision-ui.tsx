@@ -25,7 +25,7 @@ export function DecisionStatus() {
   useEffect(() => {
     if (notice) result.current?.focus();
   }, [notice]);
-  return <p ref={result} id="decision-status" role="status" tabIndex={-1} className={notice ? 'mt-4 rounded-lg bg-white px-4 py-3 font-semibold text-family-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-family-blue' : 'sr-only'}>{notice?.message}</p>;
+  return <p ref={result} id="decision-status" role="status" tabIndex={-1} className={notice ? 'mb-4 rounded-2xl bg-card px-5 py-4 font-semibold' : 'sr-only'}>{notice?.message}</p>;
 }
 
 /** Approve or deny one held payment. Under CIBA, approving happens in the Guardian push only. */
@@ -41,17 +41,19 @@ export function DecisionForm({ paymentId, canApproveHere, decideAction, expiresA
     if (result.decided) window.dispatchEvent(new CustomEvent(DECIDED_EVENT, { detail: result.message }));
     return result;
   }, initial);
-  const base = 'inline-flex min-h-12 min-w-28 items-center justify-center rounded-lg px-5 text-base font-semibold focus-visible:outline-3 focus-visible:outline-offset-2 disabled:opacity-60';
-  return <form action={decide} className="mt-5 border-t border-family-line pt-4">
+  const base = 'inline-flex min-h-14 items-center justify-center gap-2 rounded-full px-[26px] text-base font-semibold disabled:opacity-60 sm:min-h-13';
+  return <form action={decide} className="mt-4 @md:mt-6">
     <input type="hidden" name="paymentId" value={paymentId} />
-    <div className="flex flex-wrap gap-3">
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(8rem,100%),1fr))] gap-2.5 sm:flex sm:flex-wrap sm:gap-3">
       {canApproveHere && <button name="decision" value="approve" disabled={pending || deadlinePassed}
-        className={`${base} bg-family-blue text-white hover:bg-family-blue-deep focus-visible:outline-family-blue`}>Approve</button>}
+        className={`${base} bg-action text-white hover:bg-action-hover sm:min-w-40`}>
+        <svg viewBox="0 0 20 20" aria-hidden="true" className="size-4.5"><path d="M4.5 10.5l3.5 3.5 7.5-8" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>Approve</button>}
       <button name="decision" value="deny" disabled={pending || deadlinePassed}
-        className={`${base} border border-rose-200 bg-white text-rose-900 hover:bg-rose-50 focus-visible:outline-rose-800`}>{pending ? 'Sending…' : 'Deny'}</button>
+        className={`${base} bg-[#b42318] text-white hover:bg-[#9a1d14] sm:min-w-40 dark:bg-[#c9302a] dark:hover:bg-[#b02822]`}>
+        <svg viewBox="0 0 20 20" aria-hidden="true" className="size-4.5"><circle cx="10" cy="10" r="6.6" fill="none" stroke="currentColor" strokeWidth="2" /><path d="M5.4 14.6l9.2-9.2" stroke="currentColor" strokeWidth="2" /></svg>{pending ? 'Sending…' : 'Deny'}</button>
     </div>
-    {!canApproveHere && <p className="mt-2 text-sm text-family-body">To approve, use the Guardian notification on your phone.</p>}
-    {deadlinePassed && <p role="status" className="mt-3 text-sm font-semibold text-family-body">Time is up. Refresh to see the latest payment status.</p>}
-    {!state.decided && <p role="status" className="mt-3 text-sm text-family-ink">{state.message}</p>}
+    {!canApproveHere && <p className="mt-3">To approve, use the Guardian notification on your phone.</p>}
+    {deadlinePassed && <p role="status" className="mt-3 font-semibold">Time is up. Refresh to see the latest payment status.</p>}
+    {!state.decided && <p role="status" className="mt-3">{state.message}</p>}
   </form>;
 }

@@ -18,8 +18,14 @@ struct API {
         static let offline = Failure(message: "We could not reach your family. Check the internet and try again.")
     }
 
+    /// The family unpaired this phone: the server revoked its token (401). The token is already deleted.
+    struct Unpaired: Error, LocalizedError {
+        var errorDescription: String? { "This phone is not connected to your family anymore." }
+    }
+
     struct Pairing: Decodable { let deviceToken: String }
     struct ServerError: Decodable { let message: String }
+    private struct ServerCode: Decodable { let error: String }
 
     struct Config: Decodable {
         struct Member: Decodable { let displayName: String }
@@ -107,6 +113,14 @@ struct API {
         }
         guard let (data, response) = try? await URLSession.shared.data(for: request),
               let status = (response as? HTTPURLResponse)?.statusCode else { throw Failure.offline }
+        // Every call with a token is a device route, so our own 401 means the family revoked it. Deleted here so the
+        // bank watcher and Siri stop using it too; AppModel.forget() then shows the first screen. Only our JSON
+        // counts: a 401 from a proxy or captive portal must not unlock the phone.
+        if status == 401, token != nil,
+           (try? JSONDecoder().decode(ServerCode.self, from: data))?.error == "unauthorized" {
+            TokenStore.delete(service: "us.checkwith.device")
+            throw Unpaired()
+        }
         guard (200..<300).contains(status) else {
             let message = (try? JSONDecoder().decode(ServerError.self, from: data))?.message
             throw Failure(message: message ?? "Something went wrong. Please try again.")
@@ -131,7 +145,9 @@ func cents(fromDollars text: String) -> Int? {
 
 /// "$84.12", or "$500" for whole dollars.
 func dollars(_ cents: Int) -> String {
-    cents % 100 == 0 ? "$\(cents / 100)" : String(format: "$%d.%02d", cents / 100, cents % 100)
+    // US dollars, so a US thousands separator whatever the phone's region: $2,412.88.
+    let whole = (cents / 100).formatted(.number.locale(Locale(identifier: "en_US")))
+    return cents % 100 == 0 ? "$\(whole)" : "$\(whole)." + String(format: "%02d", cents % 100)
 }
 
 /// The device token is a credential, so it lives in the Keychain, not UserDefaults. The family app keeps its

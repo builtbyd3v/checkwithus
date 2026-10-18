@@ -1,42 +1,39 @@
 import SwiftUI
 
-/// Who uses this phone: "protected" (the older adult) or "family". Chosen once, changed in Settings.
+/// Who uses this phone: "protected" (the older adult) or "family". A paired phone is the older adult's, whatever
+/// the role says, so a scammer cannot talk her into the family side. Only the family can release it (unpair).
 struct RootView: View {
     @Environment(AppModel.self) private var model
     @AppStorage("role") private var role = ""
-    @State private var settings = false
 
     var body: some View {
-        switch role {
-        case "family":
-            FamilyRootView()
-        case "protected":
+        if model.token != nil || role == "protected" {
             ContentView()
-                // A bar above the page, not an overlay, so very large text never runs under the gear.
+                // Figtree for any text without its own font. Screens set Font.brand / Font.display themselves.
+                .font(.brand(.body))
+                // A bar above the page, not an overlay, so very large text never runs under it.
                 .safeAreaInset(edge: .top, spacing: 0) {
-                    // Only on the home and connect screens, so it never sits on top of a payment
-                    // or the bank permission step (#25).
-                    if model.token == nil || (model.screen == .home && !BankWatcher.shared.needsPermission) {
+                    // Before pairing only: back to the first screen. Once paired there is no way out on this phone.
+                    if model.token == nil {
                         HStack {
-                            Spacer()
-                            Button { settings = true } label: {
-                                Image(systemName: "gearshape.fill").font(.title2).frame(width: 56, height: 56)
+                            Button { role = "" } label: {
+                                Label("Back", systemImage: "chevron.left")
+                                    .font(.brand(.title2, weight: .semibold))
+                                    .frame(minHeight: 56)
                             }
-                            .tint(.secondary)
-                            .accessibilityLabel("Settings")
-                            .padding(.trailing, 8)
+                            .modifier(ShapeWhenAsked())
+                            .padding(.leading, 24)
+                            Spacer()
+                            TextSizeButton()
                         }
-                        .background(.background)
+                        .background(Color.bg)
                     }
                 }
-                .sheet(isPresented: $settings) { ProtectedSettingsView() }
-                #if DEBUG
-                .onAppear { if UserDefaults.standard.string(forKey: "preview") == "settings" { settings = true } }
-                #endif
-        default:
+        } else if role == "family" {
+            FamilyRootView()
+        } else {
             RolePickerView()
-                // A phone that was paired before the picker existed belongs to the older adult.
-                .onAppear { if UserDefaults.standard.object(forKey: "role") == nil, model.token != nil { role = "protected" } }
+                .font(.brand(.body))
         }
     }
 }
@@ -45,41 +42,31 @@ struct RolePickerView: View {
     @AppStorage("role") private var role = ""
 
     var body: some View {
-        Page {
-            Text("Who uses this phone?")
-                .font(.largeTitle.bold())
-            Text("You can change this later in Settings.")
-                .font(.title2)
+        // The same first screen for both roles: centered while it fits, it still scrolls at very large text.
+        Page(centered: true) {
+            VStack(spacing: 0) {
+                AppIconTile(size: 120)
+                Text("Welcome to Check With Us")
+                    .font(.display(.largeTitle))
+                    .padding(.top, 32)
+                Text("Did your family give you a code? Tap the top button.")
+                    .font(.brand(.title2))
+                    .frame(maxWidth: 320)
+                    .padding(.top, 14)
+            }
+            .frame(maxWidth: .infinity)
+            .multilineTextAlignment(.center)
         } action: {
             // Any role choice starts the family side signed out (see FamilyAuth.forget).
-            BigButton("I'm the one being protected", symbol: "checkmark.shield.fill") { FamilyAuth.forget(); role = "protected" }
-            BigButton("I'm family", symbol: "person.2.fill", prominent: false) { FamilyAuth.forget(); role = "family" }
+            BigButton("I have a code from my family", sun: true) { FamilyAuth.forget(); role = "protected" }
+                .accessibilityInputLabels(["I have a code", "Code", "I have a code from my family"])
+            BigButton("I'm family: Sign in") { FamilyAuth.forget(); role = "family" }
+                .accessibilityInputLabels(["Sign in", "I'm family", "Family"])
         }
     }
 }
 
-/// Settings for the older adult: big text, one choice.
-struct ProtectedSettingsView: View {
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    SwitchRoleButton()
-                        .font(.title3)
-                        .frame(minHeight: 56)
-                } footer: {
-                    // Primary color: the gray footer text is under 4.5:1 on the grouped background.
-                    Text("Only do this if a family member will use this phone.").font(.body).foregroundStyle(Color.primary)
-                }
-            }
-            .navigationTitle("Settings")
-            .toolbar { Button("Done") { dismiss() }.font(.title3.weight(.semibold)) }
-        }
-    }
-}
-
+/// Family side only: a paired phone never shows the family side (see RootView).
 struct SwitchRoleButton: View {
     @AppStorage("role") private var role = ""
 

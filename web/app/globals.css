@@ -1,64 +1,111 @@
 @import "tailwindcss";
 
+/* Brand tokens. Same values as ios/CheckWithUs/Shared/AppTheme.swift (light, then dark).
+   Purple is the family and every main action; yellow is the older adult, a fill only, never text. */
 :root {
-  --background: #f7f5f0;
-  --foreground: #1c2926;
+  --background: #fdfcfa;
+  --foreground: #1b1420;
+  --brand-surface: #f1edf4;
+  --brand-card: #ffffff;
+  --brand-muted: #5a5062;
+  --brand-action: #a62fea;
+  --brand-link: #8e1fd0;
+  --brand-safe: #1e8e3e;
+  --brand-safe-field: #e4f3e8;
+  --brand-pause: #8a4b00;
+  --brand-pause-field: #fdedd6;
+  --brand-stop: #b3261e;
+  --brand-stop-field: #fce6e3;
+  /* Landing page (app/page.tsx): two lanes, yellow for the older adult, lilac for the family. */
+  --brand-lane-them: #fff4d1;
+  --brand-lane-family: #f4e8fc;
+  --lp-bg: #ffffff;
+  --lp-ink: #1c1426;
+  --lp-soft: #5b5068;
+  --lp-line: rgb(28 20 38 / 0.13);
+  --lp-link: #7a1bb3;
+  --lp-card: #ffffff;
+  --lp-screen: #ffffff;
+  --lp-cta: #1c1426;
+  --lp-ok: #1a6e3d;
+  --lp-ok-field: #ddf3e5;
+  /* The paused row of the timeline: the lanes, lifted towards the page colour. */
+  --lp-key-them: color-mix(in srgb, var(--brand-lane-them) 60%, var(--lp-bg));
+  --lp-key-family: color-mix(in srgb, var(--brand-lane-family) 60%, var(--lp-bg));
+  /* Landing elevation for a hovered control. */
+  --lp-shadow-lift: 0 1px 2px rgb(40 16 64 / 0.08), 0 10px 22px -10px rgb(122 27 179 / 0.5);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #100c13;
+    --foreground: #f7f3f9;
+    --brand-surface: #211b26;
+    --brand-card: #241e29;
+    --brand-muted: #bdb3c4;
+    --brand-action: #a62fea;
+    --brand-link: #d3a2ff;
+    --brand-safe: #4cc46e;
+    --brand-safe-field: #10261a;
+    --brand-pause: #ffc27a;
+    --brand-pause-field: #2c1c08;
+    --brand-stop: #ff9c93;
+    --brand-stop-field: #33130f;
+    --brand-lane-them: #201a0b;
+    --brand-lane-family: #1d1230;
+    --lp-bg: #110c18;
+    --lp-ink: #f3eef8;
+    --lp-soft: #baafc7;
+    --lp-line: rgb(243 238 248 / 0.14);
+    --lp-link: #d19bf8;
+    --lp-card: #1a1424;
+    --lp-screen: #0b090f;
+    --lp-cta: #2a1745;
+    --lp-ok: #6fd49b;
+    --lp-ok-field: #12301f;
+    --lp-shadow-lift: 0 1px 2px rgb(0 0 0 / 0.4), 0 10px 24px -10px rgb(166 47 234 / 0.55);
+  }
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --color-surface: var(--brand-surface);
+  --color-card: var(--brand-card);
+  --color-muted: var(--brand-muted);
+  --color-action: var(--brand-action);
+  --color-link: var(--brand-link);
+  --color-safe: var(--brand-safe);
+  --color-safe-field: var(--brand-safe-field);
+  --color-pause: var(--brand-pause);
+  --color-pause-field: var(--brand-pause-field);
+  --color-stop: var(--brand-stop);
+  --color-stop-field: var(--brand-stop-field);
+  --color-sun: #fbc02d;
+  --color-on-sun: #1b1420;
+  --color-lane-them: var(--brand-lane-them);
+  --color-lane-family: var(--brand-lane-family);
+  --color-action-hover: #8f1fd6;
+  --color-lp-bg: var(--lp-bg);
+  --color-lp-ink: var(--lp-ink);
+  --color-lp-soft: var(--lp-soft);
+  --color-lp-line: var(--lp-line);
+  --color-lp-link: var(--lp-link);
+  --color-lp-card: var(--lp-card);
+  --color-lp-screen: var(--lp-screen);
+  --color-lp-cta: var(--lp-cta);
+  --color-lp-ok: var(--lp-ok);
+  --color-lp-ok-field: var(--lp-ok-field);
+  --shadow-lift: var(--lp-shadow-lift);
+  --font-sans: var(--font-figtree);
+  --font-heading: var(--font-gabarito);
   --font-mono: var(--font-geist-mono);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
-}
-
-/* Landing page tokens (app/page.tsx). Three stones palette, sage accent. */
-@theme {
-  --color-paper: #eeecea;
-  --color-panel: #e4e1dd;
-  --color-field: #cdc3b6;
-  --color-ink: #2e2d2c;
-  --color-soft: #5e5a56;
-  --color-sage: #56654e;
-  --color-sage-deep: #45523f;
-  --color-screen: #fbfaf8;
-  --color-decline: #c4352b;
-  --color-answer: #3a7d44;
-}
-
-@theme inline {
-  --font-display: var(--font-newsreader);
-}
-
-@keyframes rise {
-  from { opacity: 0; transform: translateY(24px); }
-  to { opacity: 1; transform: none; }
-}
-
-/* Entrance tied to scroll. Browsers without view timelines, and reduced motion, show content as is. */
-@utility rise {
-  @media (prefers-reduced-motion: no-preference) {
-    @supports (animation-timeline: view()) {
-      animation: rise linear both;
-      animation-timeline: view();
-      animation-range: entry 0% entry 70%;
-    }
-  }
-}
-@utility rise-late {
-  @media (prefers-reduced-motion: no-preference) {
-    @supports (animation-timeline: view()) {
-      animation: rise linear both;
-      animation-timeline: view();
-      animation-range: entry 15% entry 90%;
-    }
-  }
+  font-family: var(--font-figtree), system-ui, -apple-system, sans-serif;
 }
 
 /* Family workspace tokens from the supplied DESIGN.md. */
@@ -72,4 +119,32 @@ body {
   --color-family-blue: #2468c9;
   --color-family-blue-deep: #1c519d;
   --color-family-blue-soft: #e9f2ff;
+}
+
+/* Landing page system: one ease, the hero entrance and the scroll reveal. */
+@theme {
+  --ease-out-soft: cubic-bezier(0.23, 1, 0.32, 1);
+  --animate-rise: lp-rise 800ms cubic-bezier(0.22, 1, 0.36, 1) both;
+
+  @keyframes lp-rise {
+    from { opacity: 0; translate: 0 24px; }
+  }
+}
+
+/* One focus ring for every control on the landing page: brand purple, offset from the edge. */
+.lp :focus-visible {
+  outline: 3px solid var(--brand-action);
+  outline-offset: 3px;
+}
+
+/* Scroll reveal. Reveal.tsx marks only what starts below the fold as pending, so the page is
+   complete without script and nothing in the first screen blinks. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-reveal] {
+    transition: opacity 700ms var(--ease-out-soft), translate 900ms var(--ease-out-soft);
+  }
+  [data-reveal="pending"] {
+    opacity: 0;
+    translate: 0 28px;
+  }
 }

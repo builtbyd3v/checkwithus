@@ -62,6 +62,30 @@ export function isMachineToken(payload: JWTPayload): boolean {
   return payload.gty === 'client-credentials' || (payload.sub?.endsWith('@clients') ?? false);
 }
 
+/** The Auth0 Native app the family iPhone signs in with (public, also in ios/.../FamilyAuth.swift). */
+const IOS_CLIENT_ID = 'GTknuXEohQaPK6TzgzEdJoWozbxgQUDh';
+
+/**
+ * Auth0 access tokens carry no auth_time, so the iPhone app also sends its ID token in `X-Id-Token`.
+ * Its auth_time counts only when Auth0 signed it for our iPhone app and the same person. Anything
+ * else is ignored rather than rejected: the person then gets the normal "sign in again" step-up.
+ */
+async function idTokenAuthTime(request: Request, sub: string): Promise<number | undefined> {
+  const idToken = request.headers.get('x-id-token');
+  if (!idToken) return undefined;
+  try {
+    const { payload } = await jwtVerify(idToken, keys(), {
+      issuer: `https://${auth0Env().AUTH0_DOMAIN}/`,
+      audience: IOS_CLIENT_ID,
+      algorithms: ['RS256'],
+      subject: sub,
+    });
+    return typeof payload.auth_time === 'number' ? payload.auth_time : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** The signed-in family member, or AuthError (401). */
 export async function requireFamilyUser(request: Request): Promise<FamilyUser> {
   const payload = await verifyApiToken(bearerToken(request));
@@ -73,10 +97,11 @@ export async function requireFamilyUser(request: Request): Promise<FamilyUser> {
   if (!payload.sub) throw new AuthError('Token has no subject');
   const name = typeof payload.name === 'string' ? payload.name : null;
   const { permissions } = payload;
+  const authTime = typeof payload.auth_time === 'number' ? payload.auth_time : await idTokenAuthTime(request, payload.sub);
   return {
     sub: payload.sub,
     name,
-    ...(typeof payload.auth_time === 'number' ? { authTime: payload.auth_time } : {}),
+    ...(authTime !== undefined ? { authTime } : {}),
     // A malformed claim must not read as "no claim": it yields no permissions.
     ...(permissions !== undefined
       ? { permissions: Array.isArray(permissions) ? permissions.filter((p): p is string => typeof p === 'string') : [] }

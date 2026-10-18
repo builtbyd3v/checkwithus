@@ -54,12 +54,12 @@ enum Screen: Equatable {
     var isOnCall: Bool { calls.calls.contains { !$0.hasEnded } }
 
     #if DEBUG
-    /// Screenshots without a server: launch with `-preview home|payees|confirm|waiting|denied|asked|settings`.
+    /// Screenshots without a server: launch with `-preview home|payees|confirm|waiting|denied|asked`.
     init() {
         let payee = Payee.all[3]
         let held = { (outcome: String) in API.Payment(id: "preview", outcome: outcome, amountCents: 50000, payee: .init(name: payee.name), decidedByName: nil) }
         switch UserDefaults.standard.string(forKey: "preview") {
-        case "home", "settings": token = "preview"; config = .init(protectedName: "Rosa", family: [])
+        case "home": token = "preview"; config = .init(protectedName: "Rosa", family: [])
         case "asked": token = "preview"; screen = .asked
         case "payees": token = "preview"; screen = .choosePayee
         case "confirm": token = "preview"; screen = .confirm(payee, cents: 50000)
@@ -86,6 +86,25 @@ enum Screen: Equatable {
             self.token = token
             await self.loadConfig()
         }
+    }
+
+    /// The family unpaired this phone (a 401 from a device route): forget the token and any held payment, and
+    /// go back to the first screen. Only the family can do this; the older adult has no way out on the phone.
+    func forget() {
+        #if DEBUG
+        // -preview screenshots use a fake token the server answers with 401.
+        if UserDefaults.standard.string(forKey: "preview") != nil { return }
+        #endif
+        TokenStore.delete(service: "us.checkwith.device")
+        token = nil
+        config = nil
+        payment = nil
+        attempt = nil
+        screen = .home
+        UserDefaults.standard.removeObject(forKey: Self.watchedKey)
+        UserDefaults.standard.set("", forKey: "role")
+        activity = nil
+        Task { for old in Activity<PaymentActivity>.activities { await old.end(nil, dismissalPolicy: .immediate) } }
     }
 
     /// The Call Directory extension is off until someone turns it on in Settings.
@@ -115,7 +134,7 @@ enum Screen: Equatable {
 
     func loadConfig() async {
         guard let token else { return }
-        if let latest = try? await API.config(token: token) { config = latest }
+        do { config = try await API.config(token: token) } catch is API.Unpaired { forget() } catch {}
     }
 
     func askFamily() async {
@@ -162,8 +181,9 @@ enum Screen: Equatable {
 
     /// After a restart: reload the held payment and its lock-screen card, then keep polling.
     func resume() async {
-        guard payment == nil, let token, let id = UserDefaults.standard.string(forKey: Self.watchedKey),
-              let latest = try? await API.payment(id: id, token: token) else { return }
+        guard payment == nil, let token, let id = UserDefaults.standard.string(forKey: Self.watchedKey) else { return }
+        let latest: API.Payment
+        do { latest = try await API.payment(id: id, token: token) } catch { if error is API.Unpaired { forget() }; return }
         payment = latest
         activity = Activity<PaymentActivity>.activities.first
         await updateActivity(latest)
@@ -187,6 +207,8 @@ enum Screen: Equatable {
                 payment = latest
                 await updateActivity(latest)
                 if latest.isSettled { UserDefaults.standard.removeObject(forKey: Self.watchedKey) }
+            } catch is API.Unpaired {
+                forget()
             } catch {
                 delay = min(delay * 2, 30)
             }
@@ -227,7 +249,7 @@ enum Screen: Equatable {
     private func run(_ work: @escaping () async throws -> Void) async {
         busy = true
         error = nil
-        do { try await work() } catch { self.error = error.localizedDescription }
+        do { try await work() } catch is API.Unpaired { forget() } catch { self.error = error.localizedDescription }
         busy = false
     }
 }

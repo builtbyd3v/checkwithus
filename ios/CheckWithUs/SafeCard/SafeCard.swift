@@ -19,12 +19,14 @@ struct SafeCard: Widget {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(OutcomeText.headline(outcome)).font(.title3.bold())
                     Text("\(context.attributes.amount) to \(context.attributes.payee)").font(.body)
-                    Text(OutcomeText.detail(outcome)).font(.callout).foregroundStyle(.secondary)
+                    Text(OutcomeText.detail(outcome)).font(.callout).foregroundStyle(Color.secondaryText)
                 }
                 Spacer(minLength: 0)
             }
             .padding()
             .accessibilityElement(children: .combine)
+            .activityBackgroundTint(Color.card)
+            .activitySystemActionForegroundColor(Color.ink)
         } dynamicIsland: { context in
             let outcome = context.state.outcome
             return DynamicIsland {

@@ -225,13 +225,13 @@ struct BankPermissionView: View {
                 .frame(maxWidth: .infinity)
                 .accessibilityHidden(true)
             Text("Bank safety")
-                .font(.largeTitle.bold())
+                .font(.display(.largeTitle))
             Text("If someone keeps you on the phone and sends you to the bank, we tell your family.")
-                .font(.title2)
+                .font(.brand(.title2))
             Text("Your phone will ask to use your location. Tap Allow While Using App. Then tap Change to Always Allow.")
-                .font(.title3)
+                .font(.brand(.title3))
             Text("We only tell your family the bank's name, never your exact location.")
-                .font(.title3)
+                .font(.brand(.title3))
         } action: {
             BigButton("Turn on", symbol: "location.fill") { BankWatcher.shared.requestPermission() }
             BigButton("Not now", symbol: "xmark", prominent: false) { BankWatcher.shared.skipped = true }
@@ -245,14 +245,15 @@ struct BankAlwaysNote: View {
         if BankWatcher.shared.status == .authorizedWhenInUse {
             VStack(spacing: 4) {
                 Text("Bank alerts only work if location is set to Always.")
-                    .font(.title3)
+                    .font(.brand(.title3))
                     .multilineTextAlignment(.center)
                 Button {
                     if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
                 } label: {
                     Text("Open Settings").frame(maxWidth: .infinity, minHeight: 56).contentShape(.rect)
                 }
-                .font(.title3.weight(.semibold))
+                .modifier(ShapeWhenAsked())
+                .font(.brand(.title3, weight: .semibold))
             }
         }
     }
@@ -268,7 +269,7 @@ struct BankDebugPanel: View {
             Button("Make this spot a test bank") { watcher.markTestBank() }
             Text("Watching \(watcher.watching) banks").foregroundStyle(.secondary)
         }
-        .font(.footnote)
+        .font(.brand(.footnote))
     }
 }
 #endif

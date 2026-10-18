@@ -27,6 +27,7 @@ All paths below are relative to the base URL.
 | `GET /family/me` | Family | Circles the signed-in member belongs to |
 | `POST /family/join` | Family | Join with `{inviteCode, displayName}` |
 | `POST /family/circles/:id/pairing-code` | Family | Generate a one-time device pairing code |
+| `POST /family/circles/:id/unpair` | Family (approver, fresh login) | `{}` -> `{unpaired: n}`: revokes the older adult's device token; her app hears 401 and returns to its first screen |
 | `GET /family/alerts` | Family | Recent alerts from the member's circles |
 | `GET /family/payments` | Family | Latest 50 payments across the member's circles |
 | `GET /family/payments?status=held` | Family | Pending payments, independently of recent completed payments |
@@ -148,7 +149,7 @@ one. Fixed rules decide, and Auth0 decides who may override them.
 | A payment inside an allowance (known payee, matching payee or category, at or under the cap, before expiry, granted by a current approver, no scam reason, under the two-approval threshold) | Nobody: it pays at once | The payment stores `allowanceId` |
 | Any held payment (new payee, gift card, crypto, wire, during a call, Guard flag, over the hold limit, unusual spending, ATM cash then gift card, frozen) | One approver | CIBA push to every approver's Auth0 Guardian (`APPROVAL_MODE=ciba`), or the family app (`app` mode) |
 | A held payment over the two-approval threshold (default $1,000) | Two distinct approvers; one Deny stops it | Same channels; one tally across them |
-| Grant an allowance, change the threshold or roles, unfreeze | One approver with a fresh login (`auth_time` within 5 minutes) | `max_age=0` sign-in |
+| Grant an allowance, change the threshold or roles, unfreeze, unpair her phone | One approver with a fresh login (`auth_time` within 5 minutes) | `max_age=0` sign-in |
 | Deny, freeze, revoke an allowance | One approver, no fresh login | These only stop money |
 
 Approver means the circle role in our database. Approving also needs Auth0's
