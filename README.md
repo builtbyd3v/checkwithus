@@ -23,6 +23,7 @@ family dashboard.
 - **Payments.** The app has one big "Pay a bill" flow. Every payment goes to our server, which runs fixed code rules. A risky payment pauses, and the phone says the family will call. A lock-screen Live Activity shows the state; it updates while the app polls the server (in the foreground, or for a short time in the background), not by push.
 - **Help.** One big "Ask my family" button sends an alert to the family.
 - **Bank while on a call.** The phone watches the nearest bank and ATM locations from Nessie, plus any demo locations the server adds (`DEMO_BANK_LOCATIONS`). If the phone is inside one during a phone call, the family gets an alert with the bank's name, never the phone's location. Scammers often keep a victim on the line and send them to the bank.
+- **Settings.** A gear in the corner opens text size, light or dark, and the list of family members. Signing out is not on this phone: the family unpairs it from their app.
 - **Accessibility.** Tested at the largest accessibility text size: pinned buttons on an opaque bar, no mid-word breaks, VoiceOver announces the real outcome, darker colors for contrast, 56 pt tap targets, and Reduce Motion stops the waiting pulse.
 
 **The family does the work.**
@@ -31,7 +32,7 @@ family dashboard.
 - **Freeze.** One tap moves the whole spending balance to a vault account with one Nessie transfer, exactly once. New payments hold while frozen. Freeze needs no fresh sign-in, because it only protects money. Unfreeze needs one.
 - **Top up.** An approver adds money from their own Nessie account with one transfer ($1 to $10,000, whole dollars, fresh login, not while frozen). The API is built; the iPhone app has no top-up screen yet.
 - **Allowances.** Approvers grant a scoped, expiring permission, for example "utilities up to $400 until Nov 30". Inside it, a known payee can be paid over the usual limit with no approval. It never lifts gift card, crypto, wire, new payee, phone call or scam-check holds. The allowance is stored in our database (Tiger Data), granted after a fresh Auth0 login.
-- **Alerts.** "Ask my family" and "at a bank during a call" alerts show in the family app and on the dashboard, newest first. The family app polls every 10 seconds; there are no push notifications yet.
+- **Alerts.** "Ask my family" and "at a bank during a call" alerts show in the family app and on the dashboard, newest first. The family app polls every 10 seconds. New alerts and held payments show as iOS banners, a red number on the app icon and a badge on the Alerts tab while the app is open or recently used.
 - **Explanation.** Apple's on-device model (Foundation Models) rewrites the true facts about a held payment into a short, calm note for the family. Code picks the facts; the note is dropped if it loses a risk fact.
 - **Dashboard.** Waiting payments with "About Nx their usual at this payee", a weekly spending chart, the alerts list, and a "How fast this page is" card that times the real weekly query on the aggregate and on raw rows.
 
@@ -76,7 +77,7 @@ Built and merged to `main`. Verified on the live Auth0 tenant on Oct 17: the age
 
 Design notes for the older adult screens: [`docs/design-principles.md`](docs/design-principles.md), with sources in [`docs/research.md`](docs/research.md) and screenshots in [`docs/gallery/`](docs/gallery/).
 
-Known limits: no push notifications (alerts and the lock-screen card update by polling). The allowance lives in our database, not in Auth0. No usability test with older adults yet.
+Known limits: no server push yet (APNs). Banners and the lock-screen card come from polling, so they arrive only while the app is open or recently used. The allowance lives in our database, not in Auth0. No usability test with older adults yet.
 
 ## Model evaluation
 
@@ -218,7 +219,7 @@ Required by SwampHacks and MLH rules, and disclosed on Devpost. Each PR also nam
 
 | Tool | Used for |
 | --- | --- |
-| Claude Code (Opus 5, Opus 5.5) | Most code in `web/`, `ios/` and `ml/`: backend, Nessie and Auth0 integration, Tiger Data schema and benchmark, family-circle logic, dataset pipeline, training and eval scripts, Core ML export, GuardKit, iPhone app and extensions, landing page, and these docs. Haiku subagents searched for datasets. Licenses listed in [`ml/data/SOURCES.md`](ml/data/SOURCES.md). |
+| Claude Code (Opus 5, Opus 5.5, with Sonnet 5.5 and Haiku 5.5 subagents) | Most code in `web/`, `ios/` and `ml/`: backend, Nessie and Auth0 integration, Tiger Data schema and benchmark, family-circle logic, dataset pipeline, training and eval scripts, Core ML export, GuardKit, iPhone app and extensions, landing page, and these docs. Haiku subagents searched for datasets. Licenses listed in [`ml/data/SOURCES.md`](ml/data/SOURCES.md). |
 | OpenAI Codex CLI | Continued the `web/` backend: approval and reconciliation fixes, the synthetic demo seed, and the family dashboard. |
 | OpenAI Codex CLI (read-only review) | Second-opinion review of changed files through a `Stop` hook, and review panels on the `ml/` dataset and the iPhone app. It found near-duplicate data leaks, label conflicts and several race conditions, which were then fixed. It reviews; a human and the authoring agent decide. |
 | Apple Foundation Models (inside the product) | Runs on the phone and rewrites true facts into a short note for the family. It never decides anything. |
@@ -228,6 +229,10 @@ Required by SwampHacks and MLH rules, and disclosed on Devpost. Each PR also nam
 
 All code in this repository was written during the event window. The scam models
 are trained by us; the project is not a reskin of an existing AI tool.
+
+## License
+
+Our code is under the [MIT License](LICENSE). Fonts keep their own license ([`LICENSES/OFL-1.1.txt`](LICENSES/OFL-1.1.txt)), and datasets and models keep theirs (see Credits and [`ml/data/SOURCES.md`](ml/data/SOURCES.md)).
 
 ## Credits
 

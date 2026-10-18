@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { formatCents, toCents } from '@/lib/money';
+import { formatCents, parseDollars, toCents } from '@/lib/money';
+import { POLICY_OFF_CENTS } from '@/lib/rules';
 import type { SequenceEvidence } from '@/lib/scam-sequence';
 import type { Speed } from '@/lib/speed';
 import type { familyPaymentView } from '@/lib/views';
@@ -320,9 +321,13 @@ export function DashboardView(data: DashboardData) {
         </section>
         <section aria-labelledby="rules-title" className={panel}>
           <h3 id="rules-title" className={`${panelTitle} mb-4`}>Rules</h3>
-          <HoldLimitForm key={data.activeCircleId} circleId={data.activeCircleId} holdDollars={data.holdDollars}
-            twoApprovalsDollars={data.twoApprovalsDollars} approverCount={data.approverCount} />
-          <div className="mt-6"><PayeeForm circleId={data.activeCircleId} /></div>
+          {role === 'approver'
+            ? <>
+              <HoldLimitForm key={data.activeCircleId} circleId={data.activeCircleId} holdDollars={data.holdDollars}
+                twoApprovalsDollars={data.twoApprovalsDollars} approverCount={data.approverCount} />
+              <div className="mt-6"><PayeeForm circleId={data.activeCircleId} /></div>
+            </>
+            : <RulesSummary holdDollars={data.holdDollars} twoApprovalsDollars={data.twoApprovalsDollars} />}
         </section>
         <section aria-labelledby="people-title" className={panel}>
           <h3 id="people-title" className={`${panelTitle} mb-4`}>People</h3>
@@ -342,4 +347,19 @@ export function DashboardView(data: DashboardData) {
     </section>
     <footer className="mt-8 text-sm text-muted">Scam checks run on {firstName}’s iPhone. Their texts never leave it. Family decisions move money through fixed rules.</footer>
   </main>;
+}
+
+/** Viewers cannot change rules, so they read them instead of seeing a form the server refuses. */
+function RulesSummary({ holdDollars, twoApprovalsDollars }: { holdDollars: string; twoApprovalsDollars: string }) {
+  const describe = (dollars: string) => {
+    const cents = parseDollars(dollars);
+    return cents >= POLICY_OFF_CENTS ? null : formatCents(cents);
+  };
+  const hold = describe(holdDollars);
+  const two = describe(twoApprovalsDollars);
+  return <div className="grid gap-2">
+    <p>{hold ? `Payments over ${hold} wait for the family.` : 'Big payments do not wait for the family. Scam checks still apply.'}</p>
+    <p>{two ? `Over ${two}, two approvers must say yes.` : 'One approver can decide any payment.'}</p>
+    <p className="text-sm text-muted">An approver in your family can change these rules.</p>
+  </div>;
 }

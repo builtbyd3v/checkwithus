@@ -161,7 +161,7 @@ describe('rules settings', () => {
     signedIn(now() - 600);
     await expect(save(fields)).resolves.toEqual({
       message: 'To loosen a rule, sign in again. Then save within 5 minutes.',
-      signInUrl: '/auth/login?returnTo=/dashboard&max_age=0',
+      signInUrl: `/auth/login?returnTo=${encodeURIComponent(`/dashboard?circle=${circleId}`)}&max_age=0`,
     });
     expect(updates()).toHaveLength(0);
   });
