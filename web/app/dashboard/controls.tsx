@@ -8,7 +8,7 @@ import { CodeInput } from './code-input';
 import { DecisionForm } from './decision-ui';
 
 const initial: FormState = { message: '' };
-const inputClass = 'h-13 w-full rounded-[14px] border-2 border-[#e4e0eb] bg-card px-4 text-lg font-semibold text-foreground outline-none hover:border-rule focus:border-action focus:ring-3 focus:ring-action/25 dark:border-[#302a39]';
+const inputClass = 'h-13 w-full rounded-[14px] border-2 border-[#e4e0eb] bg-card px-4 text-lg font-semibold text-foreground outline-none hover:border-action/40 focus:border-action focus:ring-3 focus:ring-action/25 dark:border-[#302a39]';
 const labelClass = 'mb-2 block font-semibold';
 const buttonClass = 'inline-flex min-h-13 items-center justify-center rounded-full bg-action px-[22px] font-semibold text-white hover:bg-action-hover disabled:opacity-60';
 const quietButton = 'inline-flex min-h-13 items-center justify-center gap-2 rounded-full bg-surface px-6 font-semibold text-foreground hover:bg-action/10 disabled:opacity-60 dark:bg-white/[.06] dark:hover:bg-action/20';
