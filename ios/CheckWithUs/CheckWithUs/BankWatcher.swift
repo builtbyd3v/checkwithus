@@ -252,6 +252,7 @@ struct BankAlwaysNote: View {
                 } label: {
                     Text("Open Settings").frame(maxWidth: .infinity, minHeight: 56).contentShape(.rect)
                 }
+                .modifier(ShapeWhenAsked())
                 .font(.title3.weight(.semibold))
             }
         }

@@ -90,6 +90,7 @@ struct HomeView: View {
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(paused ? .isButton : [])
             .accessibilityHint(paused ? "Shows the paused payment." : "")
+            .accessibilityInputLabels(paused ? ["Show payment", "Payment"] : [])
             .onTapGesture { if paused { model.go(.status) } }
             // Read the change aloud when a payment pauses or settles while Home is open.
             // The real outcome, so "Stopped" or "It did not go through" is heard too.
@@ -120,6 +121,8 @@ struct HomeView: View {
                     .frame(maxWidth: .infinity, minHeight: 56)
                     .contentShape(.rect)
             }
+            .modifier(ShapeWhenAsked())
+            .accessibilityInputLabels(["Scam call warnings", "Turn on scam call warnings"])
             .font(.title3.weight(.semibold))
             .multilineTextAlignment(.center)
         }
@@ -216,6 +219,7 @@ struct ConfirmView: View {
         } action: {
             BigButton("Yes, pay", symbol: "checkmark") { await model.pay(payee, cents: cents) }
             BigButton("No, go back", symbol: "xmark", prominent: false) { model.go(.home) }
+                .accessibilityInputLabels(["No, go back", "Go back", "No"])
         }
     }
 }
@@ -305,6 +309,7 @@ struct Page<Content: View, Actions: View>: View {
                             .font(.title2.weight(.semibold))
                             .frame(minHeight: 56)
                     }
+                    .modifier(ShapeWhenAsked())
                 }
                 content
             }
@@ -344,10 +349,21 @@ struct MoreBelowButton: View {
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .contentShape(.rect)
         }
+        .modifier(ShapeWhenAsked())
         .font(.title3.weight(.semibold))
         // ponytail: capped so the hint stays one line and leaves room for the page; VoiceOver users get the hint.
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         .accessibilityHint("Shows Pay a bill and more.")
+    }
+}
+
+/// Text-only buttons get a visible shape when Button Shapes is on (Settings > Accessibility > Display & Text Size).
+/// The big buttons are bordered already.
+struct ShapeWhenAsked: ViewModifier {
+    @Environment(\.accessibilityShowButtonShapes) private var showShapes
+
+    func body(content: Content) -> some View {
+        if showShapes { content.buttonStyle(.bordered) } else { content }
     }
 }
 
@@ -403,11 +419,17 @@ struct ErrorText: View {
 
 extension Color {
     /// Text colors with at least 4.5:1 contrast on the light background. System orange, red and gray text fall short.
-    static let warningText = Color(UIColor { $0.userInterfaceStyle == .dark ? .systemOrange : UIColor(red: 0.64, green: 0.28, blue: 0, alpha: 1) })
-    static let secondaryText = Color(UIColor { $0.userInterfaceStyle == .dark ? .secondaryLabel : UIColor(white: 0.36, alpha: 1) })
-    static let errorText = Color(UIColor { $0.userInterfaceStyle == .dark ? .systemRed : UIColor(red: 0.77, green: 0.12, blue: 0.12, alpha: 1) })
+    /// With Increase Contrast on, the light colors get darker (7:1); the dark-mode system colors adapt on their own.
+    static let warningText = Color(UIColor { $0.userInterfaceStyle == .dark ? .systemOrange : UIColor(red: $0.high ? 0.5 : 0.64, green: $0.high ? 0.2 : 0.28, blue: 0, alpha: 1) })
+    static let secondaryText = Color(UIColor { $0.userInterfaceStyle == .dark ? .secondaryLabel : UIColor(white: $0.high ? 0.25 : 0.36, alpha: 1) })
+    static let errorText = Color(UIColor { $0.userInterfaceStyle == .dark ? .systemRed : UIColor(red: $0.high ? 0.6 : 0.77, green: $0.high ? 0.05 : 0.12, blue: $0.high ? 0.05 : 0.12, alpha: 1) })
     /// Button tint: white on it is 6.4:1 in light mode (system blue is 3.5:1). Dark mode keeps system blue.
-    static let action = Color(UIColor { $0.userInterfaceStyle == .dark ? .systemBlue : UIColor(red: 0, green: 0.34, blue: 0.8, alpha: 1) })
+    static let action = Color(UIColor { $0.userInterfaceStyle == .dark ? .systemBlue : UIColor(red: 0, green: $0.high ? 0.26 : 0.34, blue: $0.high ? 0.64 : 0.8, alpha: 1) })
+}
+
+private extension UITraitCollection {
+    /// Increase Contrast (Settings > Accessibility > Display & Text Size).
+    var high: Bool { accessibilityContrast == .high }
 }
 
 #Preview {

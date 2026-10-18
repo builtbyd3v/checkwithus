@@ -118,6 +118,12 @@ enum FamilyAPI {
         _ = try await send("DELETE", "family/circles/\(circle)/allowances/\(id)", token: token, as: R.self)
     }
 
+    /// Revokes the older adult's device token. Returns how many phones were unpaired.
+    static func unpair(_ circle: String, _ token: String) async throws -> Int {
+        struct R: Decodable { let unpaired: Int }
+        return try await send("POST", "family/circles/\(circle)/unpair", [String: Int](), token: token, as: R.self).unpaired
+    }
+
     private struct ErrorBody: Decodable { let error: String?; let message: String? }
 
     private static func send<R: Decodable>(_ method: String, _ path: String, _ body: (some Encodable)? = String?.none,

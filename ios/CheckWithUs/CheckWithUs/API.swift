@@ -18,6 +18,11 @@ struct API {
         static let offline = Failure(message: "We could not reach your family. Check the internet and try again.")
     }
 
+    /// The family unpaired this phone: the server revoked its token (401). The token is already deleted.
+    struct Unpaired: Error, LocalizedError {
+        var errorDescription: String? { "This phone is not connected to your family anymore." }
+    }
+
     struct Pairing: Decodable { let deviceToken: String }
     struct ServerError: Decodable { let message: String }
 
@@ -107,6 +112,12 @@ struct API {
         }
         guard let (data, response) = try? await URLSession.shared.data(for: request),
               let status = (response as? HTTPURLResponse)?.statusCode else { throw Failure.offline }
+        // Every call with a token is a device route, so 401 means the family revoked it. Deleted here so the
+        // bank watcher and Siri stop using it too; AppModel.forget() then shows the first screen.
+        if status == 401, token != nil {
+            TokenStore.delete(service: "us.checkwith.device")
+            throw Unpaired()
+        }
         guard (200..<300).contains(status) else {
             let message = (try? JSONDecoder().decode(ServerError.self, from: data))?.message
             throw Failure(message: message ?? "Something went wrong. Please try again.")

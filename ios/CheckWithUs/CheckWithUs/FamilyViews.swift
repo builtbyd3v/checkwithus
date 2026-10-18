@@ -394,6 +394,7 @@ struct MoneyView: View {
                             Label("Freeze money now", systemImage: "snowflake")
                                 .foregroundStyle(Color.errorText)
                         }
+                        .accessibilityInputLabels(["Freeze money now", "Freeze"])
                     }
                     if let notice = model.notice { Text(notice).foregroundStyle(.secondary) }
                     if let error = model.error { Text(error).foregroundStyle(.red) }
@@ -525,6 +526,7 @@ enum AllowanceWords {
 
 struct FamilySettingsView: View {
     @Environment(FamilyModel.self) private var model
+    @State private var confirmUnpair = false
 
     var body: some View {
         NavigationStack {
@@ -540,11 +542,27 @@ struct FamilySettingsView: View {
                 } footer: {
                     Text("Use this if \(model.protectedName) will use this phone.")
                 }
+                if model.circle != nil {
+                    Section {
+                        Button("Unpair \(model.protectedName)'s phone", role: .destructive) { confirmUnpair = true }
+                            .accessibilityInputLabels(["Unpair \(model.protectedName)'s phone", "Unpair"])
+                        if let notice = model.notice { Text(notice).foregroundStyle(.secondary) }
+                        if let error = model.error { Text(error).foregroundStyle(.red) }
+                    } footer: {
+                        Text("Only family can do this. \(model.protectedName)'s phone goes back to its first screen until you pair it again with a new code.")
+                    }
+                    .disabled(model.busy)
+                }
                 Section {
                     Button("Sign out", role: .destructive) { model.signOut() }
                 }
             }
             .navigationTitle("Settings")
+            .confirmationDialog("Unpair \(model.protectedName)'s phone?", isPresented: $confirmUnpair, titleVisibility: .visible) {
+                Button("Unpair", role: .destructive) { Task { await model.unpair() } }
+            } message: {
+                Text("Check With Us stops checking payments on that phone.")
+            }
         }
     }
 }
