@@ -50,7 +50,7 @@ export const HookCard = () => {
   const frame = useCurrentFrame();
   const v = interpolate(frame, [4, 40], [0, 7.7], { ...clamp, easing: Easing.out(Easing.cubic) });
   const sub = usePop(18, 16);
-  const line = usePop(50, 11);
+  const line = usePop(70, 11); // the number gets 2 s alone before the second line
   return (
     <AbsoluteFill style={{ background: C.night, fontFamily: FONT, alignItems: "center", justifyContent: "center", textAlign: "center" }}>
       <div style={{ color: C.yellow, fontWeight: 800, fontSize: 240, lineHeight: 1, letterSpacing: -4, fontVariantNumeric: "tabular-nums" }}>
@@ -70,9 +70,7 @@ export const HookCard = () => {
   );
 };
 
-// 2. Promise: what checkwith.us does, in three short chips.
-const CHIPS = ["Routine bills pay.", "Unusual waits for family.", "Scams stop."];
-
+// 2. Promise: the logo and the tagline, nothing else.
 export const PromiseCard = () => {
   const head = usePop(0, 14);
   const line = usePop(8, 14);
@@ -85,21 +83,7 @@ export const PromiseCard = () => {
       <div style={{ color: C.ink, fontWeight: 700, fontSize: 76, marginTop: 44, opacity: line, transform: `translateY(${(1 - line) * 20}px)` }}>
         {TAGLINE}
       </div>
-      <div style={{ display: "flex", gap: 28, marginTop: 80 }}>
-        {CHIPS.map((t, i) => <PromiseChip key={t} text={t} delay={24 + i * 12} strong={i === CHIPS.length - 1} />)}
-      </div>
     </AbsoluteFill>
-  );
-};
-
-const PromiseChip = ({ text, delay, strong }: { text: string; delay: number; strong: boolean }) => {
-  const p = usePop(delay, 10);
-  return (
-    <div style={{
-      background: strong ? C.purple : C.white, color: strong ? C.white : C.purpleInk, border: `4px solid ${C.purple}`,
-      borderRadius: 999, padding: "16px 36px", fontWeight: 800, fontSize: 48, whiteSpace: "nowrap",
-      opacity: Math.min(1, p * 2), transform: `scale(${p})`, boxShadow: "0 8px 0 rgba(42,18,64,0.12)",
-    }}>{text}</div>
   );
 };
 

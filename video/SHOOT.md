@@ -1,12 +1,11 @@
-# Judge video (53.2 s): 3 clips to film
+# Judge video (43 s): 2 clips to film
 
-The left half stays black except for three gaps. Film these clips, drop them in `video/public/clips/`, and I splice them in.
+The left half stays black except for two gaps. Film these clips, drop them in `video/public/clips/`, and I splice them in.
 
 | Clip | Length | Starts at | What happens (over the shoulder, on the family phone) |
 | --- | --- | --- | --- |
-| J1.mov | 4 s | 14.5 s | Phone buzzes: the $420 groceries hold. Read it, Face ID, tap **Approve**. |
-| J2.mov | 4 s | 28.7 s | Phone buzzes: the $200 gift card hold. Read it, tap **Deny**. |
-| J3.mov | 3 s | 35.2 s | Tap **Freeze**. |
+| J1.mov | 4 s | 19.5 s | Phone buzzes: the $200 gift card hold. Read it, tap **Deny**. |
+| J2.mov | 4 s | 31.0 s | Phone buzzes: the $420 groceries hold. Read it, Face ID, tap **Approve**. |
 
 - Film landscape, 1080p or 4K, 30 fps. Keep the phone screen in the center. The clip fills a 960 x 800 box, so the outer edges get cropped.
 - Record 2 extra seconds before and after each action. I trim each clip to its gap.

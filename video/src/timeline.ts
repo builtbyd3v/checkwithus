@@ -51,31 +51,25 @@ export const LOGO_DEVPOST = 150;
 export const JUDGE_DUR = STORY_DUR + LOGO_JUDGE;
 export const DEVPOST_DUR = STORY_DUR + PIPE_DUR + LOGO_DEVPOST;
 
-// Judge cut (~53 s). Absolute frames. GAP segments are where the team's filmed family clips go (left half),
-// while the right half keeps the older adult waiting. Pattern: routine pays, unusual waits, scam stops.
+// Judge cut (~43 s). Two stories: a scam gets stopped, a legit payment still goes through.
+// Rule: one new thing at a time, 3 s+ on screen after it lands. GAP segments hold the team's filmed clips.
 export const J45 = {
-  hook: { from: 0, dur: 135 }, // $7.7B lost, scammers talk past warnings
-  promise: { from: 135, dur: 105 }, // tagline + the 3-part pattern
-  bill: { from: 240, dur: 105 }, // BillScene: $350 water bill pays inside the allowance
-  groA: { from: 345, dur: 90 }, // GroceryScene 0-90: $420 groceries paused
-  gap1: { from: 435, dur: 120 }, // CLIP J1 (4 s): family reviews, Face ID, Approve
-  groB: { from: 555, dur: 50 }, // GroceryScene 90-140: approved, paid
-  call: { from: 605, dur: 75 }, // CallScene 0-75: "Possible scam", answered
-  atm: { from: 680, dur: 75 }, // AtmScene 0-75: $200 cash
-  giftA: { from: 755, dur: 105 }, // HoldScene 0-105: gift card paused, frustrated
-  gap2: { from: 860, dur: 120 }, // CLIP J2 (4 s): family Deny
-  giftB: { from: 980, dur: 50 }, // HoldScene 150-200: "Stopped"
-  frzA: { from: 1030, dur: 25 }, // FreezeScene 0-25
-  gap3: { from: 1055, dur: 90 }, // CLIP J3 (3 s): family taps Freeze
-  frzB: { from: 1145, dur: 75 }, // FreezeScene 25-100: coins to the vault
-  table: { from: 1220, dur: 270 }, // "Not just ___" sponsor table
-  end: { from: 1490, dur: 105 }, // tagline + pattern + logo wall
+  hook: { from: 0, dur: 150 }, // $7.7B lost, then why warnings fail
+  promise: { from: 150, dur: 120 }, // logo + tagline only
+  atm: { from: 270, dur: 165 }, // AtmScene: cash on a scam call. Nessie callout
+  giftA: { from: 435, dur: 150 }, // HoldScene 0-150: gift card paused. Tiger Data callout
+  gap1: { from: 585, dur: 120 }, // CLIP J1 (4 s): family taps Deny
+  giftB: { from: 705, dur: 120 }, // HoldScene 150-270: "Stopped". Auth0 callout
+  groA: { from: 825, dur: 105 }, // GroceryScene 0-90 (+ hold): $420 groceries paused
+  gap2: { from: 930, dur: 120 }, // CLIP J2 (4 s): family taps Approve. Easy On The Eyes callout
+  groB: { from: 1050, dur: 90 }, // GroceryScene 90-180: approved, paid
+  end: { from: 1140, dur: 150 }, // logo + tagline + logo wall
 };
-export const J45_DUR = 1595;
+export const J45_DUR = 1290;
 // Where the filmed clips sit in the left half (video pixels): under the sponsor bar, above the captions.
 export const CAM = { x: 0, y: 100, w: 960, h: 800 };
-export const SPLIT_FROM = J45.bill.from;
-export const SPLIT_TO = J45.frzB.from + J45.frzB.dur;
+export const SPLIT_FROM = J45.atm.from;
+export const SPLIT_TO = J45.groB.from + J45.groB.dur;
 
 // Local beats inside the two new scenes (frames from each scene's own start).
 export const BILL = { tap: 25, paid: 50, dur: 105 };
