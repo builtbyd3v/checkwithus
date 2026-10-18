@@ -19,7 +19,7 @@ const fixture: ReviewPayment = {
   holdReasons: [{ code: 'gift_card', label: 'Gift card purchase' }, { code: 'during_call', label: 'Paid while on a phone call' }],
   approvalsRequired: 1,
 };
-const option = 'inline-flex min-h-11 items-center gap-2 rounded-full bg-background px-4 font-semibold';
+const option = 'inline-flex min-h-11 items-center gap-2 rounded-full bg-surface px-4 font-semibold hover:bg-action/10 dark:bg-white/[.06]';
 const states = ['held', 'approved', 'denied', 'expired'] as const;
 
 export function DashboardPreview() {
@@ -37,9 +37,9 @@ export function DashboardPreview() {
     return { message: denied ? 'Denied. The payment will not go through.' : 'Approved. The payment is on its way.', decided: true };
   }
   return <main className="mx-auto w-full max-w-5xl px-4 pb-16 sm:px-10">
-    <header><h1 className="text-4xl font-semibold sm:text-5xl">Looking out for {firstName}</h1>
-      <p className="mt-2 text-muted">Local gallery preview. Synthetic family; decisions here never send money. <Link href="/dashboard/preview/full" className="font-semibold text-link underline underline-offset-4">See the whole dashboard</Link></p></header>
-    <section aria-label="Preview controls" className="my-6 flex flex-wrap gap-2 rounded-3xl bg-surface p-4">
+    <header><h1 className="text-4xl font-extrabold sm:text-5xl">Looking out for {firstName}</h1>
+      <p className="mt-2 text-muted">Local gallery preview. Synthetic family; decisions here never send money. <Link href="/dashboard/preview/full" className="font-semibold text-link hover:text-action">See the whole dashboard</Link></p></header>
+    <section aria-label="Preview controls" className="my-6 flex flex-wrap gap-2 rounded-3xl bg-card p-4">
       {states.map((state) => <button key={state} onClick={() => setStatus(state)} className={option}>Show {state}</button>)}
       <label className={option}><input type="checkbox" checked={guardian} onChange={(event) => setGuardian(event.target.checked)} />Guardian required</label>
       <label className={option}><input type="checkbox" checked={viewer} onChange={(event) => setViewer(event.target.checked)} />Viewer</label>
@@ -48,8 +48,8 @@ export function DashboardPreview() {
       <label className={option}><input type="checkbox" checked={sequence} onChange={(event) => setSequence(event.target.checked)} />ATM sequence</label>
       <button onClick={() => setExpiresAt(new Date(Date.now() + 2000).toISOString())} className={option}>Expire in two seconds</button>
     </section>
-    <section aria-labelledby="preview-title" className="rounded-[28px] bg-action/10 p-4 sm:p-7">
-      <h2 id="preview-title" className="text-2xl font-semibold">{status === 'held' ? '1 payment waiting' : 'All clear right now'}</h2>
+    <section aria-labelledby="preview-title" className="rounded-[28px] bg-[#f1e4fc] p-4 sm:p-7 dark:bg-[#221632]">
+      <h2 id="preview-title" className="text-2xl font-extrabold">{status === 'held' ? '1 payment waiting' : 'All clear right now'}</h2>
       <DecisionStatus />
       {status !== 'held' && <h3 id="decided-title" tabIndex={-1} className="mt-5 font-semibold">Recently decided</h3>}
       <div className="mt-5 max-w-2xl"><PaymentCard payment={{ ...fixture, status, approvalsRequired: twoApprovers ? 2 : 1,
@@ -63,7 +63,7 @@ export function DashboardPreview() {
       </PaymentCard></div>
     </section>
     <section aria-labelledby="join-preview-title" className="mt-10 max-w-xl">
-      <h2 id="join-preview-title" className="text-2xl font-semibold">Join form</h2>
+      <h2 id="join-preview-title" className="text-2xl font-extrabold">Join form</h2>
       <p className="mt-1 text-muted">What a signed-in member with no circle sees. Joining here needs a real sign-in.</p>
       <JoinForm />
     </section>

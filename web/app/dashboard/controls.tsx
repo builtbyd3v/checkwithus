@@ -8,10 +8,10 @@ import { CodeInput } from './code-input';
 import { DecisionForm } from './decision-ui';
 
 const initial: FormState = { message: '' };
-const inputClass = 'h-13 w-full rounded-xl border border-muted bg-background px-4 text-lg text-foreground outline-none focus:border-action focus:ring-3 focus:ring-action/25';
-const labelClass = 'mb-1.5 block font-semibold';
-const buttonClass = 'inline-flex min-h-13 items-center justify-center rounded-full bg-action px-6 font-semibold text-white hover:bg-action/90 disabled:opacity-60';
-const quietButton = 'inline-flex min-h-13 items-center justify-center rounded-full bg-background px-6 font-semibold text-foreground hover:bg-action/10 disabled:opacity-60';
+const inputClass = 'h-13 w-full rounded-[14px] border-2 border-[#e4e0eb] bg-card px-4 text-lg font-semibold text-foreground outline-none hover:border-rule focus:border-action focus:ring-3 focus:ring-action/25 dark:border-[#302a39]';
+const labelClass = 'mb-2 block font-semibold';
+const buttonClass = 'inline-flex min-h-13 items-center justify-center rounded-full bg-action px-[22px] font-semibold text-white hover:bg-action-hover disabled:opacity-60';
+const quietButton = 'inline-flex min-h-13 items-center justify-center gap-2 rounded-full bg-surface px-6 font-semibold text-foreground hover:bg-action/10 disabled:opacity-60 dark:bg-white/[.06] dark:hover:bg-action/20';
 
 export { Countdown } from './deadline';
 
@@ -47,13 +47,15 @@ export function FreezeControl({ circleId, frozen, firstName, vaultLabel, vaultDo
   const [frozeState, freezeNow, freezing] = useActionState(freezeAction, initial);
   const [unfrozeState, unfreezeNow, unfreezing] = useActionState(unfreezeAction, initial);
   if (!frozen) return <div>
-    <p>During a scam, move {firstName}’s spending money to the vault. Every payment waits for the family until you unfreeze.</p>
-    <form action={freezeNow} className="mt-4"><input type="hidden" name="circleId" value={circleId} />
-      <button disabled={freezing} className={`${quietButton} w-full`}>{freezing ? 'Freezing…' : 'Freeze money now'}</button></form>
+    <p className="mb-4">During a scam, move {firstName}’s spending money to the vault. Every payment waits for the family until you unfreeze.</p>
+    <form action={freezeNow}><input type="hidden" name="circleId" value={circleId} />
+      <button disabled={freezing} className={`${quietButton} w-full`}>
+        <svg viewBox="0 0 20 20" aria-hidden="true" className="size-4.5"><rect x="4" y="9" width="12" height="8.5" rx="2" fill="currentColor" /><path d="M6.8 9V6.6a3.2 3.2 0 016.4 0V9" fill="none" stroke="currentColor" strokeWidth="2" /></svg>
+        {freezing ? 'Freezing…' : 'Freeze money now'}</button></form>
     <Feedback state={frozeState} />
   </div>;
   return <div className="rounded-2xl bg-pause-field px-5 py-4">
-    <p className="font-heading text-lg font-semibold text-pause">Spending is frozen</p>
+    <p className="font-heading text-lg font-extrabold tracking-[-.02em] text-pause">Spending is frozen</p>
     <p className="mt-1">{vaultLabel} is safe in the vault. Every payment waits for the family.</p>
     <Feedback state={frozeState} />
     <form action={unfreezeNow} className="mt-4 flex flex-wrap items-end gap-3">
@@ -68,10 +70,11 @@ export function FreezeControl({ circleId, frozen, firstName, vaultLabel, vaultDo
 export function HoldLimitForm({ circleId, holdDollars }: { circleId: string; holdDollars: string }) {
   const [settings, saveSettings, settingsPending] = useActionState(saveSettingsAction, initial);
   return <div>
-    <form action={saveSettings} className="flex flex-wrap items-end gap-3">
+    <form action={saveSettings} className="flex flex-wrap items-end gap-2.5">
       <input type="hidden" name="circleId" value={circleId} />
       <div className="min-w-[min(10rem,100%)] flex-1"><label htmlFor="holdDollars" className={labelClass}>Hold payments over, in dollars</label>
-        <input id="holdDollars" name="holdDollars" inputMode="decimal" defaultValue={holdDollars} required className={inputClass} /></div>
+        <div className="relative"><span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-lg text-muted">$</span>
+          <input id="holdDollars" name="holdDollars" inputMode="decimal" defaultValue={holdDollars} required className={`${inputClass} pl-9`} /></div></div>
       <button disabled={settingsPending} className={buttonClass}>Save</button>
     </form><Feedback state={settings} />
   </div>;
@@ -80,8 +83,8 @@ export function HoldLimitForm({ circleId, holdDollars }: { circleId: string; hol
 export function PayeeForm({ circleId }: { circleId: string }) {
   const [payee, addPayee, payeePending] = useActionState(addPayeeAction, initial);
   return <div>
-    <h4 className="font-heading text-lg font-semibold">Add a known payee</h4>
-    <p className="mt-1 text-muted">New payees are held until your family knows them.</p>
+    <h4 className="font-extrabold">Add a known payee</h4>
+    <p className="mt-1 text-sm text-muted">New payees are held until your family knows them.</p>
     <form action={addPayee} className="mt-4 grid gap-3 sm:grid-cols-2">
       <input type="hidden" name="circleId" value={circleId} />
       <div className="sm:col-span-2"><label htmlFor="payeeName" className={labelClass}>Payee name</label>
@@ -95,19 +98,21 @@ export function PayeeForm({ circleId }: { circleId: string }) {
   </div>;
 }
 
-function Code({ label, code }: { label: string; code?: string }) {
+function Code({ label, code, expiresAt }: { label: string; code?: string; expiresAt?: string }) {
   if (!code) return null;
-  return <p className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-background px-4 py-3">
-    <span className="text-muted">{label}</span><span className="font-mono text-xl font-semibold tracking-wider">{code}</span></p>;
+  const until = expiresAt && new Date(expiresAt);
+  return <p className="mt-3 flex min-h-14 flex-wrap items-center gap-x-3 gap-y-1 rounded-[14px] bg-surface py-2.5 pl-4 pr-4 dark:bg-white/[.06]">
+    <span className="flex-1 text-sm text-muted">{label}</span><span className="text-xl font-semibold tracking-[.06em] tabular-nums">{canonicalCode(code) ?? code}</span>
+    {until && !Number.isNaN(until.getTime()) && <span className="text-sm text-muted">Until {until.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>}</p>;
 }
 
 export function InviteForm({ circleId }: { circleId: string }) {
   const [invite, makeInvite, invitePending] = useActionState(inviteAction, initial);
   return <div>
-    <p className="text-muted">Up to three family members can join this circle.</p>
+    <p className="text-sm text-muted">Up to three family members can join this circle.</p>
     <form action={makeInvite} className="mt-3"><input type="hidden" name="circleId" value={circleId} />
       <button disabled={invitePending} className={`${quietButton} w-full`}>Create invite code</button></form>
-    <Feedback state={invite} /><Code label="Invite code" code={invite.code} />
+    <Feedback state={invite} /><Code label="Invite code" code={invite.code} expiresAt={invite.expiresAt} />
   </div>;
 }
 
@@ -115,7 +120,7 @@ export function PairingForm({ circleId, firstName }: { circleId: string; firstNa
   const [pairing, makePairing, pairingPending] = useActionState(pairingAction, initial);
   const [unpair, unpairNow, unpairPending] = useActionState(unpairAction, initial);
   return <div>
-    <p className="text-muted">A one-time code connects {firstName}’s iPhone to the family circle.</p>
+    <p className="text-sm text-muted">A one-time code connects {firstName}’s iPhone to the family circle.</p>
     <div className="mt-3 grid gap-3 sm:grid-cols-2">
       <form action={makePairing}><input type="hidden" name="circleId" value={circleId} />
         <button disabled={pairingPending} className={`${quietButton} w-full`}>Create pairing code</button></form>
@@ -123,7 +128,7 @@ export function PairingForm({ circleId, firstName }: { circleId: string; firstNa
         <input type="hidden" name="circleId" value={circleId} />
         <button disabled={unpairPending} className={`${quietButton} w-full`}>Unpair their phone</button></form>
     </div>
-    <Feedback state={pairing} /><Code label="Pairing code" code={pairing.code} />
+    <Feedback state={pairing} /><Code label="Pairing code" code={pairing.code} expiresAt={pairing.expiresAt} />
     <Feedback state={unpair} />
   </div>;
 }

@@ -5,7 +5,7 @@ import { familyPaymentView } from '@/lib/views';
 import type { DashboardData } from '../view';
 
 /** Synthetic family for the local preview only. Nothing here reaches a database or a bank. */
-export const PROTECTED_NAME = 'Rosa Alvarez';
+export const PROTECTED_NAME = 'Sam Alvarez';
 const circleId = '00000000-0000-4000-8000-000000000001';
 const minutes = (now: Date, count: number) => new Date(now.getTime() - count * 60_000);
 
@@ -34,7 +34,7 @@ export function dashboardFixture(nowIso: string, expiresAt: string): Omit<Dashbo
     payment(2, { payeeName: 'Sunrise Grocery', amountCents: toCents(4618), status: 'paid', createdAt: minutes(now, 220) }),
     payment(3, { payeeName: 'City Power & Light', amountCents: toCents(12840), status: 'paid', createdAt: minutes(now, 360), category: 'utilities', payeeKind: 'biller', initiatedBy: 'agent', allowanceId: 'a1' }),
     payment(4, { payeeName: 'Neighborhood Pharmacy', amountCents: toCents(2375), status: 'paid', createdAt: minutes(now, 1500), category: 'pharmacy' }),
-    payment(5, { payeeName: 'Medicare Refund Dept', amountCents: toCents(74000), status: 'denied', createdAt: minutes(now, 11600), decidedAt: minutes(now, 11590), holdReasons: ['wire_transfer', 'new_payee'], category: 'other' }, 'Maria'),
+    payment(5, { payeeName: 'Medicare Refund Dept', amountCents: toCents(74000), status: 'denied', createdAt: minutes(now, 11600), decidedAt: minutes(now, 11590), holdReasons: ['wire_transfer', 'new_payee'], category: 'other' }, 'Jordan'),
   ];
   return {
     now, firstName, circles: [{ circleId, protectedName: PROTECTED_NAME }], activeCircleId: circleId,
@@ -47,7 +47,7 @@ export function dashboardFixture(nowIso: string, expiresAt: string): Omit<Dashbo
     sequences: new Map([[held.id, { cashAt: minutes(now, 23).toISOString(), paymentAt: minutes(now, 2).toISOString(), cashCents: toCents(20000), atmName: 'Main St ATM (synthetic)' }]]),
     speed: { aggregateMs: 0.84, rawMs: 37.9, compression: { beforeBytes: 9_200_000, afterBytes: 1_000_000 }, measuredAt: minutes(now, 1) },
     benchmarkLine: 'Benchmark numbers come from the recorded report on the live dashboard.',
-    members: [{ id: 'm1', display_name: 'Maria' }, { id: 'm2', display_name: 'Leo' }],
+    members: [{ id: 'm1', display_name: 'Jordan' }, { id: 'm2', display_name: 'Lee' }],
     payees: [
       { id: 'p1', name: 'City Power & Light', categoryLabel: 'Utilities' },
       { id: 'p2', name: 'Neighborhood Pharmacy', categoryLabel: 'Pharmacy' },

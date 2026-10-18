@@ -19,7 +19,7 @@ const slots = Array.from({ length: CODE_LENGTH }, (_, i) => i);
  */
 export function CodeInput({ id, name, value, onChange }: CodeInputProps) {
   const active = Math.min(value.length, CODE_LENGTH - 1);
-  const box = (i: number) => <span key={i} className={`flex h-14 min-w-0 flex-1 items-center justify-center rounded-xl bg-surface font-mono text-2xl font-semibold text-foreground sm:h-16 sm:text-3xl ${
+  const box = (i: number) => <span key={i} className={`flex h-14 min-w-0 flex-1 items-center justify-center rounded-xl bg-card font-sans text-2xl font-semibold text-foreground sm:h-16 sm:text-3xl ${
     i === active ? 'group-focus-within:bg-card group-focus-within:ring-3 group-focus-within:ring-action' : ''}`}>{value[i] ?? ''}</span>;
   return <div className="group relative">
     <input id={id} value={value} aria-describedby={`${id}-count`}

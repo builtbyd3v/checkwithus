@@ -37,7 +37,7 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ circ
   if (!session?.user.sub) redirect('/auth/login?returnTo=/dashboard');
   const circles = await memberships(db(), session.user.sub);
   if (!circles.length) return <main className="mx-auto flex max-w-xl flex-col px-4 pb-16 pt-6 sm:px-6">
-    <h1 className="text-4xl font-semibold">Join your family circle</h1>
+    <h1 className="text-4xl font-extrabold">Join your family circle</h1>
     <p className="mt-3 text-lg text-muted">Ask a family member for the invite code. Your account will then show the payments you can help review.</p>
     <JoinForm />
   </main>;
