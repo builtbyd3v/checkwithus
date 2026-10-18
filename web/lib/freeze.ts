@@ -161,7 +161,7 @@ export function createFreezeService(deps: { pool: pg.Pool; nessie: NessieClient 
         // payments pass while the money may be in the vault. Never resent.
         // ponytail: no lookup at Nessie to settle it, so this stays frozen until someone checks the bank.
         if (last.status === 'sending') {
-          throw new HttpError(409, 'unfreeze_unconfirmed', 'The bank has not confirmed the earlier unfreeze, so spending stays frozen.');
+          throw new HttpError(409, 'unfreeze_unconfirmed', 'The bank has not confirmed the earlier unfreeze, so spending stays frozen. Tap Freeze, then Unfreeze to try again.');
         }
         // It sent but stopped before lifting the freeze: finish it, send nothing.
         await q.query('update circles set frozen = false where id = $1', [circleId]);
@@ -184,7 +184,7 @@ export function createFreezeService(deps: { pool: pg.Pool; nessie: NessieClient 
       }
       if (outcome === 'unknown') {
         // It may still be in the vault: stay frozen rather than let payments pass. Never resent.
-        throw new HttpError(502, 'unfreeze_unconfirmed', 'The bank has not confirmed the unfreeze, so spending stays frozen.');
+        throw new HttpError(502, 'unfreeze_unconfirmed', 'The bank has not confirmed the unfreeze, so spending stays frozen. Tap Freeze, then Unfreeze to try again.');
       }
     }
     let frozen = false;
