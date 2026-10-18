@@ -520,6 +520,7 @@
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "If someone keeps you on the phone and sends you to the bank, we tell your family. We only tell your family the bank's name, never your exact location.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "If someone keeps you on the phone and sends you to the bank, we tell your family. We only tell your family the bank's name, never your exact location.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
+				INFOPLIST_FILE = "CheckWithUs-Info.plist";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Face ID confirms it is you before you approve a payment.";
 				CODE_SIGN_ENTITLEMENTS = CheckWithUs.entitlements;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -565,6 +566,7 @@
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "If someone keeps you on the phone and sends you to the bank, we tell your family. We only tell your family the bank's name, never your exact location.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "If someone keeps you on the phone and sends you to the bank, we tell your family. We only tell your family the bank's name, never your exact location.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
+				INFOPLIST_FILE = "CheckWithUs-Info.plist";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Face ID confirms it is you before you approve a payment.";
 				CODE_SIGN_ENTITLEMENTS = CheckWithUs.entitlements;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
