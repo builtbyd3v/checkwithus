@@ -1,6 +1,6 @@
 # Devpost draft: checkwith.us
 
-Copy each section into the matching Devpost field. Check every `TODO(Dev):` before submitting. Due **Sun Oct 18, 7:30 AM EDT**.
+Copy each section into the matching Devpost field. Due **Sun Oct 18, 7:30 AM EDT**.
 
 Recording plan: [two-minute video script](video-script.md). Upload captions and account steps: [publishing handoff](publishing.md).
 
@@ -9,7 +9,7 @@ Everything here is on `main` and live at checkwith.us.
 - **Project name:** checkwith.us
 - **Elevator pitch (max 200 characters):** Before money moves, check with us. Scam texts filtered on the phone, scam calls labeled, risky payments paused until the family says yes.
 - **Links:** https://checkwith.us and https://github.com/builtbyd3v/checkwithus
-- **Video (max 2 minutes):** [38-second synthetic dashboard backup clip](gallery/dashboard-backup.webm), with [captions](gallery/dashboard-backup.srt). This is UI-only backup footage; upload the complete team/device demo and add its public link before submission.
+- **Video (max 2 minutes):** uploaded to the Devpost project. Backup: [38-second synthetic dashboard clip](gallery/dashboard-backup.webm), with [captions](gallery/dashboard-backup.srt).
 - **Opt in to all 7 (exact names):** Best First Timers; Capital One - The Best Use of Nessie!; MLH Prize: Best Domain Name from GoDaddy Registry; MLH Prize: Best Use of Auth0; MLH Prize: Best Use of Tiger Data; Easy On the Eyes Award - Best UI/UX Design; MLH - DEV Writing Challenge.
 - **Specialized track:** Best First Timers only (at most one is allowed). Two of our four teammates are at their first hackathon; eligibility confirmed with organizers on Oct 18.
 
@@ -146,7 +146,7 @@ Nessie is the bank in every step. Each endpoint has a job:
 checkwith.us is the product name, the brand and the live site. Read the address as a sentence: "check with .us". The name is the promise: before money moves, it checks with us, the family. We registered it with the MLH GoDaddy Registry code. MLH codes are redeemed through Porkbun, and the .us registry is GoDaddy Registry.
 
 ### MLH: DEV Writing Challenge
-TODO(Dev): add the DEV post link (draft in `docs/dev-post.md`).
+The DEV post goes live after the event. Draft: [`dev-post.md`](dev-post.md).
 
 ### Best First Timers (our specialized track)
 Two of the four of us, Hitesh and Rishon, are at our first hackathon. Hitesh wrote the pitch script and planned the demo video. Rishon did the design research that Dev turned into the app and dashboard design.

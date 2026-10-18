@@ -7,7 +7,7 @@ cover_image:
 
 _This is a submission for the [MLH x DEV Writing Challenge](https://dev.to/mlh-hackathon)_
 
-<!-- TODO(Dev): sign in to DEV with the MLH account linked to your registration. Add a cover image. Fill every TODO(Dev) below. Then set published: true. -->
+<!-- Before publishing (after the event): sign in to DEV with the MLH account linked to your registration. Add a cover image. Embed the Devpost video with `{% embed VIDEO_URL %}`. Then set published: true. -->
 
 ## What I Built
 
@@ -73,14 +73,12 @@ The model's score can add a hold reason. No branch can remove one. A broken mode
 
 A gift card alone is always held. The hold limit defaults to $300. Over $1,000 by default, two different approvers must say yes, and one no stops the payment. Both are family settings. The family can change them or turn them off on the dashboard.
 
-<!-- TODO(Dev): "turn them off" was not on main when this was written. Confirm it is deployed, or cut those words. -->
-
 A language model does one job: it explains a hold. Apple's on-device Foundation Models rewrites facts that code picked. If the note loses a fact, we send the plain facts.
 
 ## Demo
 
 - **Live:** [www.checkwith.us](https://www.checkwith.us). The "Try a payment" widget runs the same `decideHold` code in your browser. The family dashboard needs a sign-in, so use the video to see the family side.
-- **Video:** TODO(Dev): embed the demo video here with `{% embed VIDEO_URL %}`.
+- **Video:** on our Devpost project page.
 
 In the demo, Sam is a made-up older adult:
 
@@ -110,7 +108,5 @@ We measured 1,000,000 synthetic rows (200 circles, 3 years) on Tiger Cloud. The 
 We went to SwampHacks XII (Oct 16 to 18, 2026) as a team of four, and entered the Best First Timers track. Two of us, Hitesh and Rishon, were at our first hackathon. Hitesh wrote the pitch script and planned the demo video. Rishon did the design research that Dev turned into the app and dashboard design.
 
 We built with Claude Code and OpenAI Codex CLI. Claude Code wrote most of the code. Codex continued parts of the web backend and reviewed changes read-only. It found the data leak above and real payment bugs, like a retry that sent a new request instead of the same one. We checked every finding before a fix.
-
-TODO(Dev): add one true sentence on the atmosphere, or what you will remember most.
 
 Next: test the screens with older adults and their families, and add push alerts. Our scores describe our test set, not every scam.

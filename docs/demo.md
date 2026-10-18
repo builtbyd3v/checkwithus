@@ -22,7 +22,7 @@ One build for everything
 - [ ] The commit on the Vercel deployment page matches the pinned commit. (`/api/health` does not show a commit.)
 - [ ] `https://www.checkwith.us/api/health` prints `{"ok":true,"database":"reachable"}`. Use `www`: the apex redirects to `www` and drops the app's login token.
 - [ ] Migrations on the live database: `cd web && npm run db:migrate` (014 freeze, 015 ATM cash, 016 weekly and per-payee aggregates, 017 ledger credits, 020 payment initiator).
-- [ ] `DEMO_BANK_LOCATIONS` is set on Vercel to a spot at the expo table, for example `[{"name":"SwampHacks Demo Bank","lat":29.6463,"lng":-82.3478}]`. TODO(Dev): confirm the coordinates on site, redeploy after changing it, then relaunch the app on iPhone A.
+- [ ] `DEMO_BANK_LOCATIONS` is set on Vercel to a spot at the expo table, for example `[{"name":"SwampHacks Demo Bank","lat":29.6463,"lng":-82.3478}]`. Confirm the coordinates on site, redeploy after changing it, then relaunch the app on iPhone A.
 - [ ] `npm run smoke:demo` passes (a $350 City Power & Light bill pays with no push while the allowance exists, and holds when it is revoked; runs on a throwaway schema).
 - [ ] If showing the bill-pay agent: `AUTH0_AGENT_CLIENT_ID` and `AUTH0_AGENT_CLIENT_SECRET` are in the MacBook's `.env.local`, and a second terminal has `npm run agent:bills -- --within 14` typed, not run. Run it only after `demo:reset`. Verified live on Oct 17 (it paid the $350 water bill).
 - [ ] `npm run demo:reset -- --live` on the real demo circle (only there; without `--live` it refuses anything but a throwaway `wt_*` schema). It reseeds the demo circle, clears held payments, unfreezes, clears recent ATM cash, and grants the utilities allowance up to $400 until Nov 30.
@@ -51,7 +51,7 @@ MacBook
 - [ ] Terminal open in `web/` with `.env.local`. Type `npm run demo:atm` and do not press Enter yet.
 - [ ] A tab with the README "Model evaluation" and "Tiger Data performance" tables.
 - [ ] The 30 s judge video downloaded and open, ready to play full screen with sound off.
-- [ ] Google Voice signed in, with the scam text typed and ready. TODO(Dev): test the exact text on iPhone A once; use one that lands in Spam.
+- [ ] Google Voice signed in, with the scam text typed and ready. Test the exact text on iPhone A once; use one that lands in Spam.
 - [ ] Wi-Fi works on all devices. A phone hotspot is ready as backup.
 
 Suggested scam text (made up, test it first): `FL Toll Services: unpaid toll balance of $6.89. Pay today to avoid a $50 late fee: https://fl-toll-pay.example`
