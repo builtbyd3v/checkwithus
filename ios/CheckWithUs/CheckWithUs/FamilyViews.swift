@@ -114,6 +114,13 @@ struct HoldsView: View {
         let recent = model.payments.filter { $0.status != "held" }
         NavigationStack(path: $model.holdsPath) {
             List {
+                // The website shows this too: while frozen, Approve fails until someone unfreezes.
+                if model.frozen {
+                    Button { model.tab = .money } label: {
+                        Label("Money is frozen. Unfreeze it on the Money tab before you approve.", systemImage: "snowflake")
+                            .foregroundStyle(Color.errorText)
+                    }
+                }
                 Section("Waiting for you") {
                     if model.held.isEmpty {
                         // Her status card in her color: ink on yellow, 10.9:1.
@@ -214,15 +221,19 @@ struct PaymentDetailView: View {
                         LabeledContent("Blocked if no answer in") { Text(expires, style: .timer).monospacedDigit() }
                     }
                 }
-                if let error = model.error {
-                    Text(error).foregroundStyle(Color.errorText)
-                }
             }
             .navigationTitle(payment.payee.name)
             .navigationBarTitleDisplayMode(.inline)
             .safeAreaInset(edge: .bottom) {
                 if payment.status == "held" {
                     VStack(spacing: 8) {
+                        // Next to the buttons, so a failed Approve (for example while frozen) says why.
+                        if let error = model.error {
+                            Text(error).font(.callout.weight(.semibold)).foregroundStyle(Color.errorText)
+                        } else if model.frozen {
+                            Text("Money is frozen. Unfreeze it on the Money tab before you approve.")
+                                .font(.callout.weight(.semibold)).foregroundStyle(Color.errorText)
+                        }
                         if (payment.approvalsRequired ?? 1) > 1 {
                             Text("This needs \(payment.approvalsRequired ?? 2) family approvals.")
                                 .font(.footnote)
@@ -464,6 +475,8 @@ struct AllowancesView: View {
                 if let error = model.error { Text(error).foregroundStyle(Color.errorText) }
             }
             .navigationTitle("Allowances")
+            // Inline title: Add sits on the same line as "Allowances" (tester ask), not above a large title.
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 Button { model.addingAllowance = true } label: { Label("Add", systemImage: "plus") }
             }
@@ -545,6 +558,13 @@ struct FamilySettingsView: View {
                         LabeledContent("You", value: circle.yourName)
                         LabeledContent("Protecting", value: circle.protectedName)
                     }
+                }
+                Section {
+                    TextSizeChoices()
+                } header: {
+                    Text("Text size")
+                } footer: {
+                    Text("Changes only this app. \"Same as iPhone\" uses your iPhone's text size.")
                 }
                 Section {
                     SwitchRoleButton()
