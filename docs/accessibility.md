@@ -31,5 +31,5 @@ Each test takes under a minute. The paths start in Settings > Accessibility.
 ## Locked to the older adult
 
 - A paired phone always opens the older adult screens, whatever role was picked before. There is no on-device way out.
-- Only the family can release it: Settings > "Unpair her phone" in the family app, or "Unpair their phone" on the dashboard. Both need an approver and a fresh sign-in.
-- After that, her phone gets 401 on its next request. It deletes the Keychain token and goes back to the first screen.
+- Only the family can release it: Settings > "Unpair (name)'s phone" in the family app, or "Unpair their phone" on the dashboard. Both need an approver and a fresh sign-in.
+- After that, their phone gets 401 on its next request. It deletes the Keychain token and goes back to the first screen.
