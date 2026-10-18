@@ -1,6 +1,8 @@
 'use client';
 
 import { useActionState, useState } from 'react';
+import { parseDollars } from '@/lib/money';
+import { isPolicyOff } from '@/lib/rules';
 import { canonicalCode } from '@/lib/short-code';
 import { addPayeeAction, decideAction, freezeAction, inviteAction, joinAction, pairingAction, saveSettingsAction, unfreezeAction, unpairAction, type FormState } from './actions';
 
@@ -67,16 +69,67 @@ export function FreezeControl({ circleId, frozen, firstName, vaultLabel, vaultDo
   </div>;
 }
 
-export function HoldLimitForm({ circleId, holdDollars }: { circleId: string; holdDollars: string }) {
+/** A real on/off switch: a button with role="switch", named by its visible label. */
+function Switch({ id, labelId, on, onChange }: { id: string; labelId: string; on: boolean; onChange: (on: boolean) => void }) {
+  return <button id={id} type="button" role="switch" aria-checked={on} aria-labelledby={labelId} onClick={() => onChange(!on)}
+    className="group inline-flex min-h-11 shrink-0 items-center rounded-full outline-none focus-visible:ring-3 focus-visible:ring-action/25">
+    <span className={`flex h-8 w-14 items-center rounded-full p-1 transition-colors ${on ? 'bg-action' : 'bg-[#e4e0eb] dark:bg-[#302a39]'}`}>
+      <span className={`size-6 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-6' : ''}`} /></span>
+    <span className="sr-only">{on ? 'On' : 'Off'}</span>
+  </button>;
+}
+
+function AmountField({ id, name, label, defaultValue }: { id: string; name: string; label: string; defaultValue: string }) {
+  return <div className="mt-3"><label htmlFor={id} className={labelClass}>{label}</label>
+    <div className="relative"><span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-lg text-muted">$</span>
+      <input id={id} name={name} inputMode="decimal" defaultValue={defaultValue} required maxLength={20} className={`${inputClass} pl-9`} /></div></div>;
+}
+
+const isOff = (dollars: string) => { try { return isPolicyOff(parseDollars(dollars)); } catch { return false; } };
+
+/**
+ * Hold limit and two-approver rule. The two-approver part shows only when the page passes its amount;
+ * without it the form leaves that rule as it is.
+ */
+export function HoldLimitForm({ circleId, holdDollars, twoApprovalsDollars, approverCount }: {
+  circleId: string; holdDollars: string; twoApprovalsDollars?: string; approverCount?: number;
+}) {
   const [settings, saveSettings, settingsPending] = useActionState(saveSettingsAction, initial);
+  const [holdOn, setHoldOn] = useState(!isOff(holdDollars));
+  const [twoOn, setTwoOn] = useState(twoApprovalsDollars === undefined || !isOff(twoApprovalsDollars));
+  // Off is stored as a sentinel, so turning a rule back on starts from the default amount.
+  const holdStart = isOff(holdDollars) ? '300.00' : holdDollars;
+  const twoStart = twoApprovalsDollars === undefined || isOff(twoApprovalsDollars) ? '1000.00' : twoApprovalsDollars;
   return <div>
-    <form action={saveSettings} className="flex flex-wrap items-end gap-2.5">
+    <form action={saveSettings}>
       <input type="hidden" name="circleId" value={circleId} />
-      <div className="min-w-[min(10rem,100%)] flex-1"><label htmlFor="holdDollars" className={labelClass}>Hold payments over, in dollars</label>
-        <div className="relative"><span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-lg text-muted">$</span>
-          <input id="holdDollars" name="holdDollars" inputMode="decimal" defaultValue={holdDollars} required className={`${inputClass} pl-9`} /></div></div>
-      <button disabled={settingsPending} className={buttonClass}>Save</button>
-    </form><Feedback state={settings} />
+      <input type="hidden" name="holdLimit" value={holdOn ? 'on' : 'off'} />
+      <div className="flex items-center justify-between gap-4">
+        <span id="holdLimitLabel" className="font-semibold">Hold big payments</span>
+        <Switch id="holdLimitSwitch" labelId="holdLimitLabel" on={holdOn} onChange={setHoldOn} />
+      </div>
+      {holdOn
+        ? <AmountField id="holdDollars" name="holdDollars" label="Hold payments over, in dollars" defaultValue={holdStart} />
+        : <p className="mt-1 text-sm text-muted">Off. Gift cards, crypto, wires, new payees and calls still wait for you.</p>}
+
+      {twoApprovalsDollars !== undefined && <div className="mt-6">
+        <input type="hidden" name="twoApprovals" value={twoOn ? 'on' : 'off'} />
+        <div className="flex items-center justify-between gap-4">
+          <span id="twoApprovalsLabel" className="font-semibold">Two approvers for large payments</span>
+          <Switch id="twoApprovalsSwitch" labelId="twoApprovalsLabel" on={twoOn} onChange={setTwoOn} />
+        </div>
+        {twoOn
+          ? <AmountField id="twoDollars" name="twoDollars" label="Two people must say yes over, in dollars" defaultValue={twoStart} />
+          : <p className="mt-1 text-sm text-muted">Off. One approver decides every payment.</p>}
+        {twoOn && approverCount !== undefined && approverCount < 2 && <p role="note" className="mt-3 rounded-2xl bg-pause-field px-4 py-3">
+          <span className="font-semibold text-pause">You have one approver.</span> Payments over this amount cannot be approved. Add an approver or turn this off.</p>}
+      </div>}
+
+      <p className="mt-4 text-sm text-muted">Changes apply to new payments.</p>
+      <button disabled={settingsPending} className={`${buttonClass} mt-3`}>{settingsPending ? 'Saving…' : 'Save rules'}</button>
+    </form>
+    <Feedback state={settings} />
+    {settings.signInUrl && <a href={settings.signInUrl} className={`${quietButton} mt-3`}>Sign in again</a>}
   </div>;
 }
 
