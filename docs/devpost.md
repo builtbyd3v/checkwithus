@@ -80,7 +80,11 @@ checkwith.us is one iPhone app with two roles, plus a web dashboard.
 ## What's next for checkwith.us
 
 - A real scam-number feed for the Call Directory (for example FTC complaint data), instead of a demo list.
-- Push notifications for alerts (today the family app polls every 10 seconds).
+- Server push (APNs) for alerts. Today the family app shows iOS banners and an icon badge while it is open or recently used, because it polls every 10 seconds.
+- "Ask my family" places a real phone call to a family member, not only an alert.
+- Unfreeze with a one-time email code instead of a full sign-in.
+- More than one waiting payment at a time.
+- The older adult can ask to sign out, and the family approves it.
 - Use the per-payee aggregate in the hold rules too, not only on the dashboard.
 - A top-up screen in the family app.
 - Better coverage of "wrong number" investment scams (0 of 10 blind openers caught today).

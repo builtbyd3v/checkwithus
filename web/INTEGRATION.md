@@ -21,6 +21,7 @@ All paths below are relative to the base URL.
 | `GET /device/config` | Device | Family names, hold threshold, timeout, locked app groups |
 | `GET /device/bank-locations` | Device | Cached public Nessie ATM/branch directory for on-device bank-location checks |
 | `POST /device/alerts` | Device | Record `ask_family` or `bank_during_call` with optional detail |
+| `GET /device/family` | Device | Family names and roles for the paired circle: `{family: [{displayName, role}]}` |
 | `GET /device/labels?cursor=<nextCursor>` | Device | Family decisions as labels for local training; optional legacy `after` starting filter |
 | `POST /payments` | Device | Request a payment with an idempotency key |
 | `GET /payments/:id` | Device | Poll payment state; process Guardian answers and recover interrupted sends |
