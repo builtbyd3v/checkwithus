@@ -9,7 +9,7 @@ import { ApproveScreen, Icon, NothingWaitingScreen, PausedScreen, SafeScreen, ty
 import { card, display, h3, navLink, nudge, pill, primary, split, sunButton, textLink } from './_landing/ui';
 
 export const metadata: Metadata = {
-  title: 'checkwith.us | Scam protection the family runs',
+  title: 'checkwith.us | Before money moves, check with us.',
   description: 'An iPhone app for older adults. It hides scam texts, labels scam calls and pauses risky payments until someone in the family says yes.',
   alternates: { canonical: '/' },
 };
@@ -225,11 +225,11 @@ export default function Home() {
         {/* Two lanes. On a phone they stack: their lane, the icon at the seam, then the family's lane. */}
         <div className="relative grid lg:grid-cols-2 lg:pb-20">
           <h1 className="contents">
-            <span className={`order-1 bg-lane-them ${pad} pt-6 lg:order-none lg:px-[10%] lg:pt-10 motion-safe:animate-rise ${heroText}`}>Your loved one does nothing new.</span>
-            <span className={`order-5 bg-lane-family ${pad} pt-20 lg:order-none lg:px-[10%] lg:pt-10 motion-safe:animate-rise motion-safe:[animation-delay:120ms] ${heroText}`}>Their family does the work.</span>
+            <span className={`order-1 bg-lane-them ${pad} pt-6 lg:order-none lg:px-[10%] lg:pt-10 motion-safe:animate-rise ${heroText}`}>Before money moves,<span className="lg:hidden"> check with us.</span></span>
+            <span className={`order-5 bg-lane-family ${pad} pt-20 lg:order-none lg:px-[10%] lg:pt-10 motion-safe:animate-rise motion-safe:[animation-delay:120ms] max-lg:hidden ${heroText}`}>check with us.</span>
           </h1>
           <p className={`order-2 bg-lane-them lg:order-none ${who}`}><Icon name="phone" />On their iPhone</p>
-          <p className={`order-6 bg-lane-family lg:order-none ${who}`}><Icon name="shield" />On the family&rsquo;s iPhone</p>
+          <p className={`order-6 bg-lane-family max-lg:pt-16 lg:order-none ${who}`}><Icon name="shield" />On the family&rsquo;s iPhone</p>
           <div className="order-3 flex justify-center bg-lane-them pb-20 lg:order-none lg:pb-0 motion-safe:animate-rise motion-safe:[animation-delay:200ms]"><SafeScreen className={heroPhone} /></div>
           <div className="order-7 flex justify-center bg-lane-family pb-16 lg:order-none lg:pb-0 motion-safe:animate-rise motion-safe:[animation-delay:280ms]"><NothingWaitingScreen className={heroPhone} /></div>
           <div className="relative z-10 order-4 -my-12 justify-self-center lg:absolute lg:bottom-[18.5rem] lg:left-1/2 lg:my-0 lg:-translate-x-1/2 motion-safe:animate-rise motion-safe:[animation-delay:400ms]">
