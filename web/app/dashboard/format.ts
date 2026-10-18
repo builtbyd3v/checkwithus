@@ -25,3 +25,43 @@ export function timeAgo(then: Date, now: Date): string {
   if (hours > -24) return relative.format(hours, 'hour');
   return relative.format(Math.round(hours / 24), 'day');
 }
+
+// ponytail: the demo family is in Gainesville; use the circle's time_zone if families span zones.
+const zone = 'America/New_York';
+const dayKey = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' });
+const weekday = new Intl.DateTimeFormat('en-US', { timeZone: zone, weekday: 'long', month: 'short', day: 'numeric' });
+const clockTime = new Intl.DateTimeFormat('en-US', { timeZone: zone, hour: 'numeric', minute: '2-digit' });
+const monthName = new Intl.DateTimeFormat('en-US', { timeZone: zone, month: 'long' });
+
+/** "2026-10-17" in the family's time zone, for grouping by day. */
+export const localDay = (date: Date) => dayKey.format(date);
+/** "3:02 PM" in the family's time zone. */
+export const timeOfDay = (date: Date) => clockTime.format(date);
+/** "October" in the family's time zone. */
+export const monthOf = (date: Date) => monthName.format(date);
+
+/** "Today", "Yesterday" or "Friday, Oct 9". */
+export function dayHeading(date: Date, now: Date): string {
+  const day = localDay(date);
+  if (day === localDay(now)) return 'Today';
+  if (day === localDay(new Date(now.getTime() - 86_400_000))) return 'Yesterday';
+  return weekday.format(date);
+}
+
+type Money = { status: string; amountCents: number; createdAt: string | null };
+
+/** Money the family kept from moving: denials this month plus everything still waiting. Integer cents. */
+export function moneyProtected(payments: Money[], held: Money[], now: Date) {
+  const month = localDay(now).slice(0, 7);
+  const deniedCents = payments
+    .filter((payment) => payment.status === 'denied' && payment.createdAt && localDay(new Date(payment.createdAt)).startsWith(month))
+    .reduce((sum, payment) => sum + payment.amountCents, 0);
+  const heldCents = held.reduce((sum, payment) => sum + payment.amountCents, 0);
+  return { deniedCents, heldCents };
+}
+
+/** The usual week: the mean of the finished weeks (all but the last), whole cents. Zero when there is no history. */
+export function usualWeekCents(weeks: number[]): number {
+  const finished = weeks.slice(0, -1);
+  return finished.length ? Math.round(finished.reduce((sum, cents) => sum + cents, 0) / finished.length) : 0;
+}
