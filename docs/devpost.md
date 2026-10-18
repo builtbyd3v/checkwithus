@@ -100,7 +100,7 @@ Rosa's bill-pay agent has its own Auth0 identity: a Machine-to-Machine client wh
 - The same rules decide, the same path as Rosa's phone. Inside the family's expiring allowance, the bill pays with no push. Outside it, the payment is held and the family is asked once (family app, or Guardian push in CIBA mode).
 - Least privilege: it acts only where the family granted a live allowance, never pays a cycle twice, and never asks again after a no. Every family route rejects machine tokens, so it can never approve, freeze or grant itself more. Revoking the allowance stops it.
 - The dashboard labels its payments ("Paid by the bill agent under your Utilities allowance").
-- TODO(Dev): the real M2M grant is not verified on the live tenant. Verify one `npm run agent:bills` run, or say "tested against a fake Auth0".
+- Verified on the live Auth0 tenant: the agent signs in with only `pay:bills` and pays a due bill under the family allowance.
 
 ### Capital One: Best Use of Nessie
 Nessie is the bank in every step. Each endpoint has a job:
@@ -138,7 +138,7 @@ Nessie is the bank in every step. Each endpoint has a job:
 - Gallery upload candidates: actual app captures `03-older-adult-home-safe`, `05-family-approvals`, `06-family-why-we-paused`, plus `dashboard-sequence-390`. New design boards `design-sketch`, `design-wireframe`, `design-final` are explicitly post-implementation explorations, not earlier process evidence. See `docs/design/handoff.md` and `docs/gallery/dashboard-review.md`. Upload selected assets with a sentence on the design choice.
 
 ### MLH: Best Domain Name from GoDaddy Registry
-checkwith.us is the product name, the brand and the live site. The name is the promise: before money moves, it checks with us, the family. TODO(Dev): confirm the MLH GoDaddy Registry code was used (whois shows registrar Porkbun; .us is run by GoDaddy Registry), then write one sentence on how it was registered.
+checkwith.us is the product name, the brand and the live site. The name is the promise: before money moves, it checks with us, the family. We registered it with the MLH GoDaddy Registry code. MLH codes are redeemed through Porkbun, and the .us registry is GoDaddy Registry.
 
 ### MLH: DEV Writing Challenge
 TODO(Dev): add the DEV post link (draft in `docs/dev-post.md`).

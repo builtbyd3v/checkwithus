@@ -427,3 +427,29 @@ describe('errors carry a code', () => {
     expect(error).toBeInstanceOf(PaymentError);
   });
 });
+
+describe('the ledger balance', () => {
+  it('refuses a payment bigger than the money available, and sends nothing', async () => {
+    const fresh = await pool.query<{ id: string }>(
+      `insert into circles (protected_name, nessie_customer_id, nessie_account_id, opening_balance_cents)
+       values ('Empty Test (synthetic)', 'test', $1, 0) returning id`,
+      ['test-account-' + crypto.randomUUID()],
+    );
+    const id = fresh.rows[0]!.id;
+    // A known biller, so the bill would pay straight away and only the balance can stop it.
+    await pool.query(
+      `insert into payees (circle_id, name, normalized_name, kind, category)
+       values ($1, 'City Power & Light', $2, 'biller', 'utilities')`,
+      [id, normalizeName('City Power & Light')],
+    );
+    const writesBefore = fake.paymentWrites().length;
+    try {
+      await expect(service.createPayment(id, { ...electricBill, idempotencyKey: key() })).rejects.toMatchObject({ code: 'insufficient_funds' });
+      const saved = await pool.query('select 1 from payments where circle_id = $1', [id]);
+      expect(saved.rowCount).toBe(0);
+      expect(fake.paymentWrites()).toHaveLength(writesBefore);
+    } finally {
+      await pool.query('delete from circles where id = $1', [id]);
+    }
+  });
+});

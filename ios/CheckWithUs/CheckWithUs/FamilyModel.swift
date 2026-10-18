@@ -187,9 +187,19 @@ import SwiftUI
 
     // MARK: - Plumbing
 
-    /// Calls the API with the access token. A 401 refreshes the token once (shared by every caller), then signs
-    /// out (the sign-in screen shows). A step-up answer opens Auth0 for a fresh sign-in and retries once.
+    /// Calls the API with the access token. A step-up answer opens Auth0 for a fresh sign-in and retries once,
+    /// including when it only appears after the token was refreshed (a 401 first, then a 403 step-up).
     private func authed<T>(_ call: (String) async throws -> T) async throws -> T {
+        do {
+            return try await refreshing401(call)
+        } catch let failure as FamilyAPI.Failure where failure.code == "step_up_required" {
+            save(try await FamilyAuth.signIn(fresh: true))
+            return try await call(tokens!.access)
+        }
+    }
+
+    /// A 401 refreshes the token once (shared by every caller), then signs out (the sign-in screen shows).
+    private func refreshing401<T>(_ call: (String) async throws -> T) async throws -> T {
         guard let current = tokens else { throw API.Failure(message: "Please sign in.") }
         do {
             let result = try await call(current.access)
@@ -202,9 +212,6 @@ import SwiftUI
                 signOut()
                 throw again
             }
-        } catch let failure as FamilyAPI.Failure where failure.code == "step_up_required" {
-            save(try await FamilyAuth.signIn(fresh: true))
-            return try await call(tokens!.access)
         }
     }
 

@@ -32,18 +32,10 @@
 | DEV Writing | A post about how we built it | #7 |
 | Best Use of AI/ML | Two trained models with honest scores in the README (already done) | #7 |
 
-## The 3-minute demo
-Setup: one iPhone as the older adult, one iPhone with the family app as the family (MacBook dashboard as backup), Google Voice as the scammer.
-1. A scam text never reaches the inbox.
-2. A scam call rings as "Possible scam".
-3. A gift-card payment during the call pauses; the family denies it in the family app; the phone updates.
-4. The family gets an alert: she is at a bank during the call.
-5. Cash at an ATM, then a gift card: held as a scam sequence.
-6. A $350 utility bill pays with no push, because the family allowance covers utilities up to $400.
-7. The family taps Freeze; the balance moves to the vault.
-8. Close on the Tiger Data numbers and the model scores.
-
-Full script: [demo.md](demo.md).
+## The expo demo (3 minutes max) and the Devpost video
+- **At the table (2:30):** a 30 s judge video with the wow moments, then a 2:00 live talk with one block per sponsor. Script: [pitch.md](pitch.md).
+- **Devices, filming and live "show me" steps:** [demo.md](demo.md).
+- **Devpost video (1:30 to 2:00):** a separate, fuller showcase. Script: [video-script.md](video-script.md).
 
 ## Out of scope (cut on Oct 17 to focus on sponsors)
 - Qwen fine-tune ("checkwith-1") and model retraining

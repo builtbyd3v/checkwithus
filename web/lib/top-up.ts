@@ -16,6 +16,7 @@ import { HttpError } from '@/lib/http';
 import { toCents, type Cents } from '@/lib/money';
 import { NessieError, type NessieClient } from '@/lib/nessie/client';
 import { checkingAccountBody, customerBody, taggedDescription, transferBody } from '@/lib/nessie/format';
+import { createFreezeService } from '@/lib/freeze';
 import { requireFreshLogin, requirePermission } from '@/lib/permissions';
 
 export type TopUpResult = { id: string; movedCents: Cents; status: 'sending' | 'sent' };
@@ -119,6 +120,13 @@ export function createTopUpService(deps: { pool: pg.Pool; nessie: NessieClient }
     }
     // If this write fails the row stays 'sending': not counted, never resent.
     await pool.query(`update ledger_credits set status = 'sent', nessie_id = $2 where id = $1`, [credit.id, nessieId]);
+    // The lock was released before the send, so a Freeze tap may have swept the balance in between and missed
+    // this money. If spending is frozen now, sweep it into the vault too (a failure leaves it for the next tap).
+    const { rows: now } = await pool.query<{ frozen: boolean }>('select frozen from circles where id = $1', [circleId]);
+    if (now[0]?.frozen) {
+      await createFreezeService({ pool, nessie }).freeze(sub, circleId)
+        .catch((error: unknown) => console.error(`Top-up ${credit.id} could not be swept into the frozen vault: ${error instanceof Error ? error.message : String(error)}`));
+    }
     return { id: credit.id, movedCents: toCents(credit.amount_cents), status: 'sent' };
   }
 
