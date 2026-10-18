@@ -67,6 +67,7 @@ struct HomeView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dynamicTypeSize) private var typeSize
     @ScaledMetric(relativeTo: .largeTitle) private var hero = 40
+    @State private var choosingTextSize = false
 
     var body: some View {
         let outcome = model.payment?.outcome
@@ -111,6 +112,7 @@ struct HomeView: View {
             // The other buttons scroll at this size; this says so and takes you there.
             if typeSize.isAccessibilitySize { MoreBelowButton() } else { more }
         }
+        .sheet(isPresented: $choosingTextSize) { TextSizeSheet() }
     }
 
     @ViewBuilder private var more: some View {
@@ -128,6 +130,13 @@ struct HomeView: View {
             .font(.title3.weight(.semibold))
             .multilineTextAlignment(.center)
         }
+        Button { choosingTextSize = true } label: {
+            Label("Text size", systemImage: "textformat.size")
+                .frame(maxWidth: .infinity, minHeight: 56)
+                .contentShape(.rect)
+        }
+        .modifier(ShapeWhenAsked())
+        .font(.title3.weight(.semibold))
     }
 }
 

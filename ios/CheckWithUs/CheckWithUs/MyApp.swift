@@ -10,6 +10,7 @@ import SwiftUI
     var body: some Scene {
         WindowGroup {
             RootView()
+                .modifier(AppTextSizeModifier())
                 .environment(model)
                 // Purple as text everywhere; filled buttons set the brand fill themselves.
                 .tint(Color.link)
