@@ -62,7 +62,7 @@ const requestsFor = async (paymentId: string) =>
 beforeAll(async () => {
   const circle = await pool.query<{ id: string }>(
     `insert into circles (protected_name, nessie_customer_id, nessie_account_id, opening_balance_cents)
-     values ('Rosa Test (synthetic)', 'test-customer', $1, 500000) returning id`,
+     values ('Rosa Test (synthetic)', 'test-customer', $1, 50000000) returning id`,
     ['test-account-' + crypto.randomUUID()],
   );
   circleId = circle.rows[0]!.id;
